@@ -360,7 +360,7 @@ export class SistemaActor extends Actor {
   /*  4. JUGAR CARTA, ATAQUE VS DEFENSA Y EFECTOS AUTOMATIZADOS               */
   /* ======================================================================== */
 
-  async jugarCarta(cartaId, { quemar = false } = {}) {
+  async jugarCarta(cartaId, { quemar = false, modo = "usar" } = {}) {
     const { mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mano || !enJuego || !descarte || !quemadas) return null;
 
@@ -369,6 +369,9 @@ export class SistemaActor extends Actor {
       ui.notifications.error("La carta seleccionada no está en tu mano.");
       return null;
     }
+
+    // Si el modo es "usar-y-quemar", forzar quemado de la carta tras usarla
+    if (modo === "usar-y-quemar") quemar = true;
 
     const auto = carta.system.automatizacion ?? {};
     const bonoTirada = Number(auto.bonoTirada) || 0;
@@ -521,6 +524,76 @@ export class SistemaActor extends Actor {
     }
 
     return roll;
+  }
+
+  /* ======================================================================== */
+  /*  DESCARTAR Y QUEMAR CARTAS SIN TIRAR                                     */
+  /* ======================================================================== */
+
+  /**
+   * Descarta una carta de la mano sin realizar tirada, anunciándolo en el chat.
+   * La carta se mueve a la pila de Descarte.
+   * @param {string} cartaId - ID de la carta en la mano del actor.
+   */
+  async descartarCarta(cartaId) {
+    const { mano, descarte } = this.system.pilasDocumentos;
+    if (!mano || !descarte) return null;
+
+    const carta = mano.cards.get(cartaId);
+    if (!carta) {
+      ui.notifications.error("La carta seleccionada no está en tu mano.");
+      return null;
+    }
+
+    await this._moverCartaEntrePilas(mano, descarte, carta.id);
+    this.prepareData();
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-carta-jugada">
+          <h3>📥 ${carta.name}</h3>
+          <p><strong>Acción:</strong> Descartada sin tirar</p>
+          <p><strong>Palo:</strong> ${carta.system.palo.toUpperCase()} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
+          <p><small>La carta ha sido enviada al Descarte sin realizar ninguna tirada.</small></p>
+        </div>
+      `
+    });
+
+    return carta;
+  }
+
+  /**
+   * Quema una carta de la mano sin realizar tirada, anunciándolo en el chat.
+   * La carta se mueve a la pila de Cartas Quemadas.
+   * @param {string} cartaId - ID de la carta en la mano del actor.
+   */
+  async quemarCarta(cartaId) {
+    const { mano, quemadas } = this.system.pilasDocumentos;
+    if (!mano || !quemadas) return null;
+
+    const carta = mano.cards.get(cartaId);
+    if (!carta) {
+      ui.notifications.error("La carta seleccionada no está en tu mano.");
+      return null;
+    }
+
+    await this._moverCartaEntrePilas(mano, quemadas, carta.id);
+    this.prepareData();
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-carta-jugada">
+          <h3>🔥 ${carta.name}</h3>
+          <p><strong>Acción:</strong> Quemada sin tirar</p>
+          <p><strong>Palo:</strong> ${carta.system.palo.toUpperCase()} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
+          <p><small>La carta ha sido quemada (enviada a Cartas Quemadas) sin realizar ninguna tirada.</small></p>
+        </div>
+      `
+    });
+
+    return carta;
   }
 
   /* ======================================================================== */
@@ -719,12 +792,12 @@ export class SistemaActor extends Actor {
 
   /**
    * Realiza una tirada directa de Criatura/PNJ (o habilidad activable) usando
-   * una característica (`vigor`, `destreza`, `ingenio`, `voluntad`) y un tipo de dado (`d4`-`d12`),
+   * una característica (`fisico`, `consciencia`, `social`, `misticismo`) y un tipo de dado (`d4`-`d12`),
    * comparando automáticamente contra la Defensa del objetivo seleccionado (`Ataque - Defensa`).
    *
    * @param {Object} opciones
    * @param {string} opciones.titulo - Nombre del ataque o acción.
-   * @param {string} [opciones.caracteristica="vigor"] - Característica que define el número de dados.
+   * @param {string} [opciones.caracteristica="fisico"] - Característica que define el número de dados.
    * @param {string} [opciones.tipoDado="d6"] - Tamaño del dado ('d4', 'd6', 'd8', 'd10', 'd12').
    * @param {number} [opciones.bonoTirada=0] - Bonificador plano sumado al total.
    * @param {boolean} [opciones.esAtaque=true] - Si es true, resta la Defensa del objetivo.
@@ -732,7 +805,7 @@ export class SistemaActor extends Actor {
    */
   async realizarAccionRapida({
     titulo = "Ataque",
-    caracteristica = "vigor",
+    caracteristica = "fisico",
     tipoDado = "d6",
     bonoTirada = 0,
     esAtaque = true,

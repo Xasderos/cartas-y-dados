@@ -11,10 +11,10 @@ export const SISTEMA_CONFIG = {
    * La clave debe coincidir con las propiedades de `actor.system.caracteristicas`.
    */
   caracteristicas: {
-    vigor: "CARTASYDADOS.Caracteristicas.Vigor",
-    destreza: "CARTASYDADOS.Caracteristicas.Destreza",
-    ingenio: "CARTASYDADOS.Caracteristicas.Ingenio",
-    voluntad: "CARTASYDADOS.Caracteristicas.Voluntad"
+    fisico: "CARTASYDADOS.Caracteristicas.Fisico",
+    consciencia: "CARTASYDADOS.Caracteristicas.Consciencia",
+    social: "CARTASYDADOS.Caracteristicas.Social",
+    misticismo: "CARTASYDADOS.Caracteristicas.Misticismo"
   },
 
   /**
@@ -25,22 +25,22 @@ export const SISTEMA_CONFIG = {
   palosCartas: {
     espadas: {
       etiqueta: "CARTASYDADOS.Palos.Espadas",
-      caracteristicaAsociada: "vigor",
+      caracteristicaAsociada: "fisico",
       acciones: "Ataques cuerpo a cuerpo y proezas de fuerza"
     },
     copas: {
       etiqueta: "CARTASYDADOS.Palos.Copas",
-      caracteristicaAsociada: "voluntad",
+      caracteristicaAsociada: "misticismo",
       acciones: "Interacción social, apoyo y canalización"
     },
     oros: {
       etiqueta: "CARTASYDADOS.Palos.Oros",
-      caracteristicaAsociada: "ingenio",
+      caracteristicaAsociada: "social",
       acciones: "Táctica, percepción, trampas y conocimientos"
     },
     bastos: {
       etiqueta: "CARTASYDADOS.Palos.Bastos",
-      caracteristicaAsociada: "destreza",
+      caracteristicaAsociada: "consciencia",
       acciones: "Movimiento, sigilo, defensa y ataques a distancia"
     }
   },
@@ -61,5 +61,11 @@ export const SISTEMA_CONFIG = {
   /**
    * Mano máxima base de cualquier personaje antes de aplicar nivel de clase u objetos.
    */
-  manoBasePorDefecto: 4
+  manoBasePorDefecto: 4,
+
+  /**\n   * Movimiento base en metros por turno antes de aplicar bonificadores de Físico.\n   * Fórmula: movimientoMax = movimientoBase + (caracteristicasTotales.fisico * 5)\n   */  
+  movimientoBase: 10,
+
+  /**\n   * Categoría de tamaño por defecto para nuevos actores.\n   * Opciones: Diminuto, Pequeño, Mediano, Grande, Enorme.\n   */  
+  tamanoBase: "Mediano"
 };

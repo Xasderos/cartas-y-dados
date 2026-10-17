@@ -80,7 +80,7 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
   // 5. Valor Inicial de Atributos (Jugadores)
   game.settings.register(SYSTEM_ID, "atributoInicialPJ", {
     name: "Valor Inicial de Características (Jugadores)",
-    hint: "Cantidad inicial de dados en Vigor, Destreza, Ingenio y Voluntad al crear un Personaje Jugador.",
+    hint: "Cantidad inicial de dados en Físico, Consciencia, Social y Misticismo al crear un Personaje Jugador.",
     scope: "world",
     config: true,
     type: Number,
@@ -107,6 +107,18 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
     config: true,
     type: Number,
     default: 4,
+    onChange: onUpdateCallback
+  });
+
+  // 8. Categoría de Tamaño Base
+  game.settings.register(SYSTEM_ID, "tamanoBase", {
+    name: "Categoría de Tamaño Base",
+    hint: "Categoría de tamaño por defecto para nuevos personajes y criaturas.",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: ["Diminuto", "Pequeño", "Mediano", "Grande", "Enorme"],
+    default: "Mediano",
     onChange: onUpdateCallback
   });
 }

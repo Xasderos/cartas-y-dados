@@ -72,7 +72,7 @@
 /* Rejilla de Cartas en Mano */
 .cyd-grid-cartas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 8px;
 }
 
@@ -85,6 +85,7 @@
   flex-direction: column;
   justify-content: space-between;
   gap: 6px;
+  min-height: 150px;
 }
 
 .cyd-carta-trinket {
@@ -98,6 +99,15 @@
   font-weight: bold;
   border-bottom: 1px solid var(--cyd-borde);
   padding-bottom: 4px;
+  gap: 6px;
+}
+
+.cyd-carta-titulo {
+  flex: 1;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cyd-carta-dado {
@@ -105,32 +115,66 @@
   color: #111;
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .cyd-carta-subtitulo {
   display: flex;
-  justify-content: space-between;
-  font-size: 0.76rem;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.7rem;
   color: var(--cyd-texto-suave);
 }
 
 .cyd-carta-efecto {
-  font-size: 0.82rem;
-  min-height: 38px;
+  font-size: 0.78rem;
+  min-height: 40px;
+  flex: 1;
   background: rgba(255, 255, 255, 0.03);
   padding: 5px;
   border-radius: 4px;
+  overflow: hidden;
 }
 
 .cyd-carta-acciones {
-  display: flex;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  margin-top: 4px;
 }
 
-.cyd-btn-jugar {
+.cyd-btn-jugar,
+.cyd-btn-jugar-quemar,
+.cyd-btn-descartar,
+.cyd-btn-quemar {
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cyd-btn-jugar,
+.cyd-btn-jugar-quemar {
   flex: 1;
-  font-weight: bold;
+}
+
+.cyd-btn-descartar,
+.cyd-btn-quemar {
+  opacity: 0.9;
+}
+
+.cyd-btn-descartar:hover {
+  opacity: 1;
+  background: rgba(52, 152, 219, 0.15);
+}
+
+.cyd-btn-quemar:hover {
+  opacity: 1;
+  background: rgba(231, 76, 60, 0.15);
 }
 
 .cyd-btn-quemar-especial {

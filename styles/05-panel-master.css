@@ -1,126 +1,17 @@
 /**
  * @file 05-panel-master.css
- * @description Cuadrícula compacta y controles para el Panel del Master.
+ * @description Estilos adicionales para el Panel del Master (clases no usadas por la plantilla actual, mantenidas para compatibilidad futura).
+ * Los estilos activos del panel están en 03-hojas-actor-item.css.
  */
 
-.cyd-gm-barra-dificultad {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.cyd-gm-control-numero {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cyd-gm-input-dificultad {
-  width: 54px;
-  text-align: center;
-  font-size: 1.15rem;
-  font-weight: bold;
-  color: var(--cyd-acento);
-}
-
-.cyd-gm-presets {
-  display: flex;
-  gap: 5px;
-}
-
-.cyd-gm-lista-personajes {
-  flex: 1;
-  overflow-y: auto;
-}
-
-/* Cuadrícula compacta: muestra de 3 a 4 jugadores por fila */
-.cyd-gm-grid-compacto {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
-  gap: 8px;
-}
-
-.cyd-gm-card-pj {
-  background: var(--cyd-bg-caja);
-  border: 1px solid var(--cyd-borde);
-  border-radius: 6px;
-  padding: 7px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.cyd-gm-card-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 4px;
-}
-
-.cyd-gm-avatar-mini {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  object-fit: cover;
-  border: 1px solid var(--cyd-acento);
-  cursor: pointer;
-}
-
-.cyd-gm-nombre {
-  flex: 1;
-  font-size: 0.88rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cyd-gm-cansancio-ctrl {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 0.78rem;
-}
-
-.cyd-gm-badges-vitales {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  text-align: center;
-  font-size: 0.78rem;
-}
-
-.cyd-gm-badge {
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-weight: bold;
-}
-
-.cyd-gm-pilas-mini {
-  display: flex;
-  justify-content: space-around;
-  font-size: 0.76rem;
-  color: var(--cyd-texto-suave);
-  background: rgba(0, 0, 0, 0.25);
-  padding: 2px 4px;
-  border-radius: 3px;
-}
-
-.cyd-gm-trinkets-mini {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-height: 20px;
-  align-items: center;
-}
-
+/* Placeholder: clases definidas pero no usadas por la plantilla actual de panel-master.hbs */
+.cyd-gm-card-pj,
+.cyd-gm-card-header,
+.cyd-gm-cansancio-ctrl,
+.cyd-gm-badges-vitales,
+.cyd-gm-badge,
+.cyd-gm-pilas-mini,
+.cyd-gm-trinkets-mini,
 .cyd-gm-chip-trinket {
-  font-size: 0.74rem;
-  background: rgba(46, 204, 113, 0.18);
-  border: 1px solid var(--cyd-exito);
-  padding: 1px 6px;
-  border-radius: 10px;
-  cursor: help;
+  /* Estilos de reserva - no aplicados actualmente */
 }

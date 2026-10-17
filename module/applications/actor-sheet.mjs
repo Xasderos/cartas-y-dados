@@ -31,6 +31,8 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       inicializarPilas: HojaPersonajeActor.#onInicializarPilas,
       robarTurno: HojaPersonajeActor.#onRobarTurno,
       jugarCarta: HojaPersonajeActor.#onJugarCarta,
+      descartarCarta: HojaPersonajeActor.#onDescartarCarta,
+      quemarCarta: HojaPersonajeActor.#onQuemarCarta,
       robarTrinket: HojaPersonajeActor.#onRobarTrinket,
       retirarTrinket: HojaPersonajeActor.#onRetirarTrinket,
       finCombate: HojaPersonajeActor.#onFinCombate,
@@ -42,7 +44,7 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       eliminarItem: HojaPersonajeActor.#onEliminarItem,
       generarMazoBase: HojaPersonajeActor.#onGenerarMazoBase,
       alternarEquipado: HojaPersonajeActor.#onAlternarEquipado,
-      usarHabilidad: HojaPersonajeActor.#onUsarHabilidad      
+      usarHabilidad: HojaPersonajeActor.#onUsarHabilidad
     }
   };
 
@@ -162,9 +164,9 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
 
   static async #onJugarCarta(event, target) {
     const cartaId = target.dataset.cartaId;
-    const forzarQuemar = target.dataset.quemar === "true";
+    const modo = target.dataset.modo || "usar";
     const dificultad = this.dificultadActual > 0 ? this.dificultadActual : null;
-    await this.document.jugarCarta(cartaId, { dificultad, quemar: forzarQuemar });
+    await this.document.jugarCarta(cartaId, { dificultad, modo });
     this.render();
   }
 
@@ -316,5 +318,17 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
   static async #onUsarHabilidad(event, target) {
     const itemId = target.dataset.itemId;
     await this.document.usarHabilidadItem(itemId);
+  }
+
+  static async #onDescartarCarta(event, target) {
+    const cartaId = target.dataset.cartaId;
+    await this.document.descartarCarta(cartaId);
+    this.render();
+  }
+
+  static async #onQuemarCarta(event, target) {
+    const cartaId = target.dataset.cartaId;
+    await this.document.quemarCarta(cartaId);
+    this.render();
   }
 }

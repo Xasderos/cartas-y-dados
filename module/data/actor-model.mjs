@@ -1,7 +1,7 @@
 /**
  * @file actor-model.mjs
  * @description Esquema de datos (TypeDataModel) para Actores en Foundry VTT v14.
- * - Calcula Salud Máxima Total = Salud Base + Vigor Total + Bonos (Raza/Origen/Clase/Equipo).
+ * - Calcula Salud Máxima Total = Salud Base + Físico Total + Bonos (Raza/Origen/Clase/Equipo).
  * - Añade dados configurables por característica de forma individual para los PNJs.
  */
 
@@ -64,34 +64,55 @@ export class BaseActorDataModel extends TypeDataModel {
       }),
 
       caracteristicas: new SchemaField({
-        vigor: new NumberField({
+        fisico: new NumberField({
           required: true,
           integer: true,
           initial: () => leerAjuste("atributoInicialPJ", 2),
           min: 1,
           max: 10
         }),
-        destreza: new NumberField({
+        consciencia: new NumberField({
           required: true,
           integer: true,
           initial: () => leerAjuste("atributoInicialPJ", 2),
           min: 1,
           max: 10
         }),
-        ingenio: new NumberField({
+        social: new NumberField({
           required: true,
           integer: true,
           initial: () => leerAjuste("atributoInicialPJ", 2),
           min: 1,
           max: 10
         }),
-        voluntad: new NumberField({
+        misticismo: new NumberField({
           required: true,
           integer: true,
           initial: () => leerAjuste("atributoInicialPJ", 2),
           min: 1,
           max: 10
         })
+      }),
+
+      movimiento: new SchemaField({
+        value: new NumberField({
+          required: true,
+          integer: true,
+          initial: 0,
+          min: 0
+        }),
+        max: new NumberField({
+          required: true,
+          integer: true,
+          initial: () => SISTEMA_CONFIG.movimientoBase,
+          min: 1
+        })
+      }),
+
+      categoriaTamano: new StringField({
+        required: true,
+        initial: () => leerAjuste("tamanoBase", "Mediano"),
+        choices: ["Diminuto", "Pequeño", "Mediano", "Grande", "Enorme"]
       }),
 
       manoConfig: new SchemaField({
@@ -121,7 +142,7 @@ export class BaseActorDataModel extends TypeDataModel {
 
   /**
    * Calcula todos los valores derivados sumando Raza, Origen, Clase, Equipo,
-   * Trinkets en Juego y la nueva fórmula de Salud Máxima (Base + Vigor + Otros).
+   * Trinkets en Juego y la nueva fórmula de Salud Máxima (Base + Físico + Otros).
    */
   prepareDerivedData() {
     super.prepareDerivedData();
@@ -132,7 +153,7 @@ export class BaseActorDataModel extends TypeDataModel {
     this.itemOrigen = items.find(i => i.type === "origen") ?? null;
     this.itemClase = items.find(i => i.type === "clase") ?? null;
 
-    const bonosCaract = { vigor: 0, destreza: 0, ingenio: 0, voluntad: 0 };
+    const bonosCaract = { fisico: 0, consciencia: 0, social: 0, misticismo: 0 };
     let bonoDefensa = 0;
     let bonoManoItems = 0;
     let bonoSaludOtros = 0;
@@ -144,10 +165,10 @@ export class BaseActorDataModel extends TypeDataModel {
       const b = item.system.bonificadores;
       if (!b) continue;
 
-      bonosCaract.vigor += b.vigor || 0;
-      bonosCaract.destreza += b.destreza || 0;
-      bonosCaract.ingenio += b.ingenio || 0;
-      bonosCaract.voluntad += b.voluntad || 0;
+      bonosCaract.fisico += b.fisico || 0;
+      bonosCaract.consciencia += b.consciencia || 0;
+      bonosCaract.social += b.social || 0;
+      bonosCaract.misticismo += b.misticismo || 0;
 
       bonoDefensa += b.defensa || 0;
       bonoManoItems += b.limiteMano || 0;
@@ -174,10 +195,10 @@ export class BaseActorDataModel extends TypeDataModel {
 
     this.bonificadoresCaracteristicas = bonosCaract;
     this.caracteristicasTotales = {
-      vigor: Math.max(1, this.caracteristicas.vigor + bonosCaract.vigor),
-      destreza: Math.max(1, this.caracteristicas.destreza + bonosCaract.destreza),
-      ingenio: Math.max(1, this.caracteristicas.ingenio + bonosCaract.ingenio),
-      voluntad: Math.max(1, this.caracteristicas.voluntad + bonosCaract.voluntad)
+      fisico: Math.max(1, this.caracteristicas.fisico + bonosCaract.fisico),
+      consciencia: Math.max(1, this.caracteristicas.consciencia + bonosCaract.consciencia),
+      social: Math.max(1, this.caracteristicas.social + bonosCaract.social),
+      misticismo: Math.max(1, this.caracteristicas.misticismo + bonosCaract.misticismo)
     };
 
     this.bonificadorDefensa = bonoDefensa;
@@ -194,12 +215,16 @@ export class BaseActorDataModel extends TypeDataModel {
       base + bonificadorClase + bonificadorObjetos + bonificadorAtributos
     );
 
-    // NUEVA REGLA: Salud Máxima = Base (salud.max) + Vigor Total + Otros Bonos (Raza/Origen/Clase/Equipo)
-    this.salud.bonoVigor = this.caracteristicasTotales.vigor;
+    // Movimiento máximo = Base [10] + (Físico Total * 5) metros
+    this.movimiento.value = this.movimiento.max ?? SISTEMA_CONFIG.movimientoBase;
+    this.movimiento.max = SISTEMA_CONFIG.movimientoBase + this.caracteristicasTotales.fisico * 5;
+
+    // NUEVA REGLA: Salud Máxima = Base (salud.max) + Físico Total + Otros Bonos (Raza/Origen/Clase/Equipo)
+    this.salud.bonoFisico = this.caracteristicasTotales.fisico;
     this.salud.bonoOtros = bonoSaludOtros;
     this.salud.maxTotal = Math.max(
       1,
-      this.salud.max + this.salud.bonoVigor + this.salud.bonoOtros
+      this.salud.max + this.salud.bonoFisico + this.salud.bonoOtros
     );
 
     this.cansancio.maxTotal = Math.max(1, this.cansancio.max + bonoCansancioMax);
@@ -246,10 +271,10 @@ export class PnjDataModel extends BaseActorDataModel {
       amenaza: new NumberField({ required: true, integer: true, initial: 1, min: 1 }),
       // Dado individual asignado a cada característica de la criatura
       dadosCaracteristicas: new SchemaField({
-        vigor: crearCampoDadoPnj(),
-        destreza: crearCampoDadoPnj(),
-        ingenio: crearCampoDadoPnj(),
-        voluntad: crearCampoDadoPnj()
+        fisico: crearCampoDadoPnj(),
+        consciencia: crearCampoDadoPnj(),
+        social: crearCampoDadoPnj(),
+        misticismo: crearCampoDadoPnj()
       })
     };
   }

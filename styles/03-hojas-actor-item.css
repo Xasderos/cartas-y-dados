@@ -8,21 +8,22 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 
 .cyd-gm-control-numero {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.88rem;
+  gap: 4px;
+  font-size: 0.82rem;
 }
 
 .cyd-gm-input-dificultad {
   width: 44px !important;
-  height: 26px !important;
+  height: 24px !important;
   text-align: center;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: bold;
   color: var(--cyd-acento);
 }
@@ -30,18 +31,19 @@
 .cyd-gm-presets {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex-wrap: wrap;
 }
 
 .cyd-gm-btn-icono,
 .cyd-gm-btn-tag {
   width: auto !important;
-  height: 26px !important;
+  height: 24px !important;
   min-height: 0 !important;
-  padding: 0 8px !important;
+  padding: 0 6px !important;
   margin: 0 !important;
-  font-size: 0.78rem !important;
-  line-height: 24px !important;
+  font-size: 0.72rem !important;
+  line-height: 22px !important;
 }
 
 .cyd-gm-lista-personajes {
@@ -49,37 +51,37 @@
   overflow-y: auto;
 }
 
-/* Cuadrícula de tarjetas resumen de jugadores (3 a 4 por fila) */
+/* Cuadrícula de tarjetas resumen de jugadores (más compacta) */
 .cyd-gm-grid-compacto {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 6px;
   align-items: start;
 }
 
 .cyd-gm-tile {
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--cyd-borde);
-  border-radius: 6px;
-  padding: 6px 8px;
+  border-radius: 5px;
+  padding: 5px 7px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .cyd-gm-tile-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 4px;
+  gap: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 3px;
 }
 
 .cyd-gm-actor-link {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
   overflow: hidden;
   flex: 1;
@@ -91,9 +93,9 @@
 }
 
 .cyd-gm-avatar-mini {
-  width: 26px;
-  height: 26px;
-  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
   object-fit: cover;
   border: 1px solid var(--cyd-acento);
   flex-shrink: 0;
@@ -101,7 +103,7 @@
 
 .cyd-gm-nombre {
   font-weight: bold;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -110,16 +112,16 @@
 .cyd-gm-cansancio-box {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 0.76rem;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.72rem;
 }
 
 .cyd-gm-mini-click {
   cursor: pointer;
-  padding: 0 3px;
+  padding: 0 2px;
   font-weight: bold;
   color: var(--cyd-acento);
   user-select: none;
@@ -132,7 +134,7 @@
 /* Filas de iconos y números */
 .cyd-gm-fila-iconos {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .cyd-gm-cols-2 {
@@ -144,39 +146,59 @@
 }
 
 .cyd-gm-stat-pill {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 4px;
-  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+  padding: 1px 3px;
   text-align: center;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .cyd-gm-zona-link {
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--cyd-borde);
-  border-radius: 4px;
-  padding: 3px 4px;
+  border-radius: 3px;
+  padding: 2px 3px;
   text-align: center;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .cyd-gm-zona-link:hover {
-  background: rgba(212, 175, 55, 0.18);
+  background: rgba(212, 175, 55, 0.15);
   border-color: var(--cyd-acento);
 }
 
 .cyd-gm-zona-activa {
   border-color: var(--cyd-exito);
-  background: rgba(46, 204, 113, 0.15);
+  background: rgba(46, 204, 113, 0.12);
 }
 
 .cyd-gm-sin-pilas {
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--cyd-acento);
   cursor: pointer;
-  padding: 4px;
+  padding: 3px;
+}
+
+/* Paneles más compactos */
+.cyd-hoja-contenedor > section.cyd-panel {
+  padding: 6px 8px;
+  gap: 6px;
+}
+
+.cyd-cabecera-seccion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--cyd-borde);
+  padding-bottom: 3px;
+  margin-bottom: 6px;
+}
+
+.cyd-cabecera-seccion h3 {
+  margin: 0;
+  font-size: 0.85rem;
 }

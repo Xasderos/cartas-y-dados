@@ -69,7 +69,7 @@ export class CartaAccionDataModel extends TypeDataModel {
     super.prepareDerivedData();
     const config = CONFIG.CARTASYDADOS ?? SISTEMA_CONFIG;
     this.tipoDado = config.dadoPorNumeroCarta[this.numero] ?? "d6";
-    this.caracteristicaAsociada = config.palosCartas[this.palo]?.caracteristicaAsociada ?? "vigor";
+    this.caracteristicaAsociada = config.palosCartas[this.palo]?.caracteristicaAsociada ?? "fisico";
   }
 }
 
@@ -128,6 +128,6 @@ export class CartaTrinketDataModel extends TypeDataModel {
     super.prepareDerivedData();
     const config = CONFIG.CARTASYDADOS ?? SISTEMA_CONFIG;
     this.tipoDado = config.dadoPorNumeroCarta[this.numero] ?? "d6";
-    this.caracteristicaAsociada = config.palosCartas[this.palo]?.caracteristicaAsociada ?? "ingenio";
+    this.caracteristicaAsociada = config.palosCartas[this.palo]?.caracteristicaAsociada ?? "social";
   }
 }

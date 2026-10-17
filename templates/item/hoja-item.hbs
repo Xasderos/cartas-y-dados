@@ -69,10 +69,10 @@
           <div class="cyd-recurso-caja">
             <span>Atributo</span>
             <select name="system.caracteristica">
-              <option value="vigor" {{#if (eq system.caracteristica "vigor")}}selected{{/if}}>Vigor</option>
-              <option value="destreza" {{#if (eq system.caracteristica "destreza")}}selected{{/if}}>Destreza</option>
-              <option value="ingenio" {{#if (eq system.caracteristica "ingenio")}}selected{{/if}}>Ingenio</option>
-              <option value="voluntad" {{#if (eq system.caracteristica "voluntad")}}selected{{/if}}>Voluntad</option>
+              <option value="fisico" {{#if (eq system.caracteristica "fisico")}}selected{{/if}}>Físico</option>
+              <option value="consciencia" {{#if (eq system.caracteristica "consciencia")}}selected{{/if}}>Consciencia</option>
+              <option value="social" {{#if (eq system.caracteristica "social")}}selected{{/if}}>Social</option>
+              <option value="misticismo" {{#if (eq system.caracteristica "misticismo")}}selected{{/if}}>Misticismo</option>
             </select>
           </div>
           <div class="cyd-recurso-caja">
@@ -98,20 +98,20 @@
 
     <div class="cyd-caracteristicas-grid">
       <div class="cyd-caract-tarjeta">
-        <span class="cyd-palo-icono">⚔️ Vigor</span>
-        <input type="number" name="system.bonificadores.vigor" value="{{system.bonificadores.vigor}}" />
+        <span class="cyd-palo-icono">⚔️ Físico</span>
+        <input type="number" name="system.bonificadores.fisico" value="{{system.bonificadores.fisico}}" />
       </div>
       <div class="cyd-caract-tarjeta">
-        <span class="cyd-palo-icono">🦯 Destreza</span>
-        <input type="number" name="system.bonificadores.destreza" value="{{system.bonificadores.destreza}}" />
+        <span class="cyd-palo-icono">🦯 Consciencia</span>
+        <input type="number" name="system.bonificadores.consciencia" value="{{system.bonificadores.consciencia}}" />
       </div>
       <div class="cyd-caract-tarjeta">
-        <span class="cyd-palo-icono">🪙 Ingenio</span>
-        <input type="number" name="system.bonificadores.ingenio" value="{{system.bonificadores.ingenio}}" />
+        <span class="cyd-palo-icono">🪙 Social</span>
+        <input type="number" name="system.bonificadores.social" value="{{system.bonificadores.social}}" />
       </div>
       <div class="cyd-caract-tarjeta">
-        <span class="cyd-palo-icono">🏆 Voluntad</span>
-        <input type="number" name="system.bonificadores.voluntad" value="{{system.bonificadores.voluntad}}" />
+        <span class="cyd-palo-icono">🏆 Misticismo</span>
+        <input type="number" name="system.bonificadores.misticismo" value="{{system.bonificadores.misticismo}}" />
       </div>
     </div>
 

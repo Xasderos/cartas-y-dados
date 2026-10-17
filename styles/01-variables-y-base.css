@@ -29,12 +29,130 @@
   height: 100%;
 }
 
+.cyd-cabecera {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 6px 8px;
+  background: var(--cyd-bg-panel);
+  border: 1px solid var(--cyd-borde);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.cyd-avatar {
+  width: 56px !important;
+  height: 56px !important;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid var(--cyd-acento);
+  flex-shrink: 0;
+}
+
+.cyd-cabecera-principal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cyd-fila-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cyd-nombre-actor {
+  width: 100%;
+  font-size: 1.1rem;
+  font-weight: bold;
+  background: transparent;
+  border: none;
+  color: var(--cyd-texto);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.cyd-trasfondo-barra {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cyd-slot-trasfondo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--cyd-bg-caja);
+  border: 1px solid var(--cyd-borde);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  flex: 1;
+  min-width: 120px;
+}
+
+.cyd-slot-etiqueta {
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+.cyd-link-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.cyd-recursos-barra {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.cyd-recurso-caja {
+  background: var(--cyd-bg-caja);
+  padding: 4px 6px;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.78rem;
+}
+
+.cyd-recurso-titulo {
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+.cyd-recurso-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cyd-recurso-inputs input {
+  width: 42px;
+  text-align: center;
+}
+
 .cyd-cuerpo-hoja {
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
   padding-right: 4px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* El <main> debe ser flex-container para que .cyd-cuerpo-hoja pueda hacer scroll */
+.cyd-hoja-contenedor > main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Utilidades de rejilla */
@@ -46,4 +164,108 @@
 
 .cyd-cols-3 {
   grid-template-columns: repeat(3, 1fr) !important;
+}
+
+/* Layout de dos columnas: atributos izquierda | contenido derecha */
+.cyd-layout-dos-columnas {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+/* Sidebar de atributos (izquierda, debajo del avatar) */
+.cyd-sidebar-atributos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cyd-sidebar-atributos .cyd-cabecera-seccion {
+  padding: 0 0 4px 0;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--cyd-borde);
+}
+
+.cyd-sidebar-atributos .cyd-cabecera-seccion h3 {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.cyd-atributo-tarjeta {
+  background: var(--cyd-bg-caja);
+  border: 1px solid var(--cyd-borde);
+  border-radius: 4px;
+  padding: 5px 7px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.cyd-atributo-icono {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cyd-atributo-fila-valores {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cyd-atributo-fila-valores input {
+  width: 36px;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.cyd-atributo-total {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--cyd-acento);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Botón de tirada directa de atributo PNJ */
+.cyd-btn-atributo-pnj {
+  background: var(--cyd-bg-boton, #4a5568);
+  border: 1px solid var(--cyd-borde);
+  border-radius: 3px;
+  color: var(--cyd-color-texto, #e2e8f0);
+  padding: 1px 5px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.cyd-btn-atributo-pnj:hover {
+  background: var(--cyd-acento, #d4a843);
+  color: #000;
+}
+
+/* Contenido derecho */
+.cyd-contenido-derecha {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Panel Movimiento y Tamaño */
+.cyd-panel-movimiento-tamano {
+  margin-top: 6px;
+}
+
+.cyd-recurso-total {
+  font-size: 0.72rem;
+  opacity: 0.8;
+  margin-left: 4px;
 }

@@ -47,9 +47,55 @@
         </div>
       </div>
 
-      {{!-- Recursos vitales con sus máximos modificados por Raza/Origen/Clase/Equipo --}}
-      <div class="cyd-recursos-barra" style="grid-template-columns: repeat(4, 1fr);">
-        <div class="cyd-recurso-caja" data-tooltip="Base: {{system.salud.max}} | Vigor: +{{system.salud.bonoVigor}} | Otros: +{{system.salud.bonoOtros}} | Total: {{system.salud.maxTotal}}">
+          </div>
+  </header>
+
+  <main class="cyd-cuerpo-hoja">
+
+  {{!-- ================= 2. LAYOUT DOS COLUMNAS: ATRIBUTOS IZQUIERDA | CONTENIDO DERECHA ================= --}}
+  <div class="cyd-layout-dos-columnas">
+
+    {{!-- COLUMNA IZQUIERDA: ATRIBUTOS (debajo del avatar) ================= --}}
+    <aside class="cyd-sidebar-atributos">
+      <div class="cyd-cabecera-seccion">
+        <h3>📊 Características</h3>
+      </div>
+      <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.fisico}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.fisico}}">
+        <span class="cyd-atributo-icono">⚔️ Espadas — Físico</span>
+        <div class="cyd-atributo-fila-valores">
+          <input type="number" name="system.caracteristicas.fisico" value="{{system.caracteristicas.fisico}}" min="1" max="10" title="Valor Base" />
+          <span class="cyd-atributo-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.fisico}}</span>
+        </div>
+      </div>
+      <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.consciencia}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.consciencia}}">
+        <span class="cyd-atributo-icono">🦯 Bastos — Consciencia</span>
+        <div class="cyd-atributo-fila-valores">
+          <input type="number" name="system.caracteristicas.consciencia" value="{{system.caracteristicas.consciencia}}" min="1" max="10" title="Valor Base" />
+          <span class="cyd-atributo-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.consciencia}}</span>
+        </div>
+      </div>
+      <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.social}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.social}}">
+        <span class="cyd-atributo-icono">🪙 Oros — Social</span>
+        <div class="cyd-atributo-fila-valores">
+          <input type="number" name="system.caracteristicas.social" value="{{system.caracteristicas.social}}" min="1" max="10" title="Valor Base" />
+          <span class="cyd-atributo-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.social}}</span>
+        </div>
+      </div>
+      <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.misticismo}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.misticismo}}">
+        <span class="cyd-atributo-icono">🏆 Copas — Misticismo</span>
+        <div class="cyd-atributo-fila-valores">
+          <input type="number" name="system.caracteristicas.misticismo" value="{{system.caracteristicas.misticismo}}" min="1" max="10" title="Valor Base" />
+          <span class="cyd-atributo-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.misticismo}}</span>
+        </div>
+      </div>
+    </aside>
+
+    {{!-- COLUMNA DERECHA: RECURSOS, MOVIMIENTO, PILAS, CARTAS, EQUIPO ================= --}}
+    <section class="cyd-contenido-derecha">
+
+      {{!-- Recursos vitales ================= --}}
+      <div class="cyd-recursos-barra" style="grid-template-columns: repeat(4, 1fr); gap: 6px;">
+        <div class="cyd-recurso-caja" data-tooltip="Base: {{system.salud.max}} | Físico: +{{system.salud.bonoFisico}} | Otros: +{{system.salud.bonoOtros}} | Total: {{system.salud.maxTotal}}">
           <span class="cyd-recurso-titulo">❤️ Salud</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.salud.value" value="{{system.salud.value}}" />
@@ -80,45 +126,33 @@
           </div>
         </div>
       </div>
-    </div>
-  </header>
 
-  {{!-- ================= 2. CARACTERÍSTICAS (BASE + BONOS DE RAZA/ORIGEN/CLASE/EQUIPO) ================= --}}
-  <section class="cyd-caracteristicas-grid">
-    <div class="cyd-caract-tarjeta" data-tooltip="Base: {{system.caracteristicas.vigor}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.vigor}}">
-      <span class="cyd-palo-icono">⚔️ Espadas — Vigor</span>
-      <div class="cyd-caract-fila-valores">
-        <input type="number" name="system.caracteristicas.vigor" value="{{system.caracteristicas.vigor}}" min="1" max="10" title="Valor Base" />
-        <span class="cyd-caract-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.vigor}}</span>
+      {{!-- ================= 3. MOVIMIENTO Y TAMAÑO ================= --}}
+      <section class="cyd-panel cyd-panel-movimiento-tamano">
+    <div class="cyd-cabecera-seccion">
+      <h3>🏃 Movimiento y Tamaño</h3>
+    </div>
+    <div class="cyd-recursos-barra" style="grid-template-columns: repeat(2, 1fr); gap: 8px;">
+      <div class="cyd-recurso-caja" data-tooltip="Movimiento máximo: Base [{{system.movimiento.max}}] + (Físico Total [{{system.caracteristicasTotales.fisico}}] × 5) metros">
+        <span class="cyd-recurso-titulo">🏃 Movimiento</span>
+        <div class="cyd-recurso-inputs">
+          <input type="number" name="system.movimiento.value" value="{{system.movimiento.value}}" min="0" style="width: 60px;" />
+          <span class="cyd-recurso-total">/ {{system.movimiento.max}} m</span>
+        </div>
       </div>
-    </div>
-
-    <div class="cyd-caract-tarjeta" data-tooltip="Base: {{system.caracteristicas.destreza}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.destreza}}">
-      <span class="cyd-palo-icono">🦯 Bastos — Destreza</span>
-      <div class="cyd-caract-fila-valores">
-        <input type="number" name="system.caracteristicas.destreza" value="{{system.caracteristicas.destreza}}" min="1" max="10" title="Valor Base" />
-        <span class="cyd-caract-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.destreza}}</span>
-      </div>
-    </div>
-
-    <div class="cyd-caract-tarjeta" data-tooltip="Base: {{system.caracteristicas.ingenio}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.ingenio}}">
-      <span class="cyd-palo-icono">🪙 Oros — Ingenio</span>
-      <div class="cyd-caract-fila-valores">
-        <input type="number" name="system.caracteristicas.ingenio" value="{{system.caracteristicas.ingenio}}" min="1" max="10" title="Valor Base" />
-        <span class="cyd-caract-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.ingenio}}</span>
-      </div>
-    </div>
-
-    <div class="cyd-caract-tarjeta" data-tooltip="Base: {{system.caracteristicas.voluntad}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.voluntad}}">
-      <span class="cyd-palo-icono">🏆 Copas — Voluntad</span>
-      <div class="cyd-caract-fila-valores">
-        <input type="number" name="system.caracteristicas.voluntad" value="{{system.caracteristicas.voluntad}}" min="1" max="10" title="Valor Base" />
-        <span class="cyd-caract-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.voluntad}}</span>
+      <div class="cyd-recurso-caja" data-tooltip="Categoría de tamaño de la criatura">
+        <span class="cyd-recurso-titulo">📏 Tamaño</span>
+        <select name="system.categoriaTamano" style="width: 100%;">
+          <option value="Diminuto" {{#if (eq system.categoriaTamano "Diminuto")}}selected{{/if}}>Diminuto</option>
+          <option value="Pequeño" {{#if (eq system.categoriaTamano "Pequeño")}}selected{{/if}}>Pequeño</option>
+          <option value="Mediano" {{#if (eq system.categoriaTamano "Mediano")}}selected{{/if}}>Mediano</option>
+          <option value="Grande" {{#if (eq system.categoriaTamano "Grande")}}selected{{/if}}>Grande</option>
+          <option value="Enorme" {{#if (eq system.categoriaTamano "Enorme")}}selected{{/if}}>Enorme</option>
+        </select>
       </div>
     </div>
   </section>
 
-  <main class="cyd-cuerpo-hoja">
     {{#unless pilasInicializadas}}
       <div class="cyd-aviso-inicializar">
         <p>Este personaje aún no tiene sus pilas de cartas vinculadas en el mundo.</p>
@@ -234,11 +268,17 @@
                   </div>
                   <div class="cyd-carta-efecto">{{{carta.efecto}}}</div>
                   <footer class="cyd-carta-acciones">
-                    <button type="button" class="cyd-btn-jugar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-quemar="false">
-                      🎲 Jugar ({{carta.cantidadDados}}{{carta.tipoDado}})
+                    <button type="button" class="cyd-btn-jugar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-modo="usar">
+                      🎲 Usar
                     </button>
-                    <button type="button" class="cyd-btn-quemar-especial" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-quemar="true" data-tooltip="Quemar como acción especial">
-                      🔥
+                    <button type="button" class="cyd-btn-descartar" data-action="descartarCarta" data-carta-id="{{carta.id}}" data-tooltip="Descartar sin tirar (se anuncia en el chat)">
+                      📥 Descartar
+                    </button>
+                    <button type="button" class="cyd-btn-quemar" data-action="quemarCarta" data-carta-id="{{carta.id}}" data-tooltip="Quemar sin tirar (se anuncia en el chat)">
+                      🔥 Quemar
+                    </button>
+                    <button type="button" class="cyd-btn-jugar-quemar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-modo="usar-y-quemar">
+                      🎲🔥 Usar y Quemar
                     </button>
                   </footer>
                 </article>
@@ -324,7 +364,10 @@
         </section>
 
       </div>
-
     {{/unless}}
+    </section>
+
+  </div>
+
   </main>
 </div>

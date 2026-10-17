@@ -27,7 +27,6 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
       title: "Ficha de Criatura / PNJ"
     },
     actions: {
-      tiradaAtributoPnj: HojaPnjActor.#onTiradaAtributoPnj,
       usarHabilidad: HojaPnjActor.#onUsarHabilidad,
       crearItemPnj: HojaPnjActor.#onCrearItemPnj,
       editarItem: HojaPnjActor.#onEditarItem,
@@ -37,11 +36,14 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
       inicializarPilasJefe: HojaPnjActor.#onInicializarPilasJefe,
       robarTurno: HojaPnjActor.#onRobarTurno,
       jugarCarta: HojaPnjActor.#onJugarCarta,
+      descartarCarta: HojaPnjActor.#onDescartarCarta,
+      quemarCarta: HojaPnjActor.#onQuemarCarta,
       finCombate: HojaPnjActor.#onFinCombate,
       descansar: HojaPnjActor.#onDescansar,
       abrirPila: HojaPnjActor.#onAbrirPila,
       crearCartaEnMazo: HojaPnjActor.#onCrearCartaEnMazo,
-      generarMazoBase: HojaPnjActor.#onGenerarMazoBase
+      generarMazoBase: HojaPnjActor.#onGenerarMazoBase,
+      tiradaAtributoPnj: HojaPnjActor.#onTiradaAtributoPnj
     }
   };
 
@@ -108,24 +110,8 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   /* ======================================================================== */
-  /*  ACCIONES DE ATRIBUTOS E ITEMS DEL PNJ                                   */
+  /*  ACCIONES DE ITEMS DEL PNJ                                               */
   /* ======================================================================== */
-
-  /**
-   * Realiza una tirada usando el valor total de la característica elegida
-   * y el tipo de dado individual configurado para esa característica.
-   */
-  static async #onTiradaAtributoPnj(event, target) {
-    const caracteristica = target.dataset.caracteristica || "vigor";
-    const tipoDado = this.document.system.dadosCaracteristicas?.[caracteristica] ?? "d6";
-
-    await this.document.realizarAccionRapida({
-      titulo: `Ataque de ${caracteristica.toUpperCase()}`,
-      caracteristica,
-      tipoDado,
-      esAtaque: true
-    });
-  }
 
   static async #onUsarHabilidad(event, target) {
     await this.document.usarHabilidadItem(target.dataset.itemId);
@@ -165,6 +151,67 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
     }
   }
 
+  /**
+   * Permite al PNJ lanzar un atributo directamente sin necesidad de una carta.
+   * Usa el valor de la característica y el tipo de dado configurado.
+   */
+  static async #onTiradaAtributoPnj(event, target) {
+    const actor = this.document;
+    const caracteristica = target.dataset.caracteristica;
+    const tipoDado = target.dataset.dado || "d6";
+
+    const sistema = actor.system;
+    const valorBase = sistema.caracteristicas?.[caracteristica] ?? 1;
+    const caracteristicaTotal = sistema.caracteristicasTotales?.[caracteristica] ?? valorBase;
+
+    const nombresCaracteristicas = {
+      fisico: "⚔️ Físico (Espadas)",
+      consciencia: "🦯 Consciencia (Bastos)",
+      social: "🪙 Social (Oros)",
+      misticismo: "🏆 Misticismo (Copas)"
+    };
+    const nombreCaract = nombresCaracteristicas[caracteristica] || caracteristica;
+
+    const formula = `${valorBase}${tipoDado}`;
+    const roll = new Roll(formula, actor.getRollData());
+    await roll.evaluate();
+
+    let contenidoHtml = "";
+    const dificultadMaster = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
+
+    if (dificultadMaster > 0) {
+      const exito = roll.total >= dificultadMaster;
+      const textoExito = exito ? "✅ ¡ÉXITO!" : "❌ FALLO";
+      contenidoHtml = `
+        <div class="cyd-resolucion-caja">
+          <p>🎲 <strong>Dificultad del Master (${dificultadMaster}):</strong> ${textoExito} (Total: ${roll.total})</p>
+        </div>
+      `;
+    } else {
+      contenidoHtml = `
+        <div class="cyd-resolucion-caja">
+          <p>🎲 <strong>Resultado:</strong> ${roll.total}</p>
+        </div>
+      `;
+    }
+
+    const chatData = {
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      flavor: `${actor.name} lanza ${nombreCaract} — ${valorBase}${tipoDado} (${caracteristicaTotal} dados totales)`,
+      content: `
+        <div class="cyd-chat-tirada-pnj">
+          <h4>🎲 Tirada de Atributo: ${nombreCaract}</h4>
+          <p><strong>Fórmula:</strong> ${formula} = <strong>${roll.total}</strong></p>
+          ${contenidoHtml}
+        </div>
+      `,
+      rolls: [roll]
+    };
+
+    await ChatMessage.create(chatData);
+  }
+
   /* ======================================================================== */
   /*  ACCIONES DEL MAZO DE JEFE (INTEGRADO EN LA FICHA DEL PNJ)               */
   /* ======================================================================== */
@@ -182,8 +229,8 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onJugarCarta(event, target) {
     const cartaId = target.dataset.cartaId;
-    const forzarQuemar = target.dataset.quemar === "true";
-    await this.document.jugarCarta(cartaId, { quemar: forzarQuemar });
+    const modo = target.dataset.modo || "usar";
+    await this.document.jugarCarta(cartaId, { modo });
     this.render();
   }
 
@@ -215,6 +262,18 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onGenerarMazoBase() {
     await this.document.generarMazoInicialDePrueba();
+    this.render();
+  }
+
+  static async #onDescartarCarta(event, target) {
+    const cartaId = target.dataset.cartaId;
+    await this.document.descartarCarta(cartaId);
+    this.render();
+  }
+
+  static async #onQuemarCarta(event, target) {
+    const cartaId = target.dataset.cartaId;
+    await this.document.quemarCarta(cartaId);
     this.render();
   }
 }

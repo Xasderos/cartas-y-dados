@@ -19,7 +19,7 @@ export async function poblarCompendiosDelSistema() {
         type: "raza",
         system: {
           rasgoRacial: "Adaptabilidad Táctica (+1 al Límite de Mano)",
-          bonificadores: { vigor: 0, destreza: 0, ingenio: 1, voluntad: 0, defensa: 0, limiteMano: 1, saludMax: 0, cansancioMax: 1 },
+          bonificadores: { fisico: 0, consciencia: 0, social: 1, misticismo: 0, defensa: 0, limiteMano: 1, saludMax: 0, cansancioMax: 1 },
           descripcion: "<p>Los humanos destacan por su capacidad de improvisación, manteniendo una carta adicional en su mano.</p>"
         }
       },
@@ -28,7 +28,7 @@ export async function poblarCompendiosDelSistema() {
         type: "raza",
         system: {
           rasgoRacial: "Coraza Natural (+1 Defensa, +3 Salud Máx.)",
-          bonificadores: { vigor: 1, destreza: 0, ingenio: 0, voluntad: 0, defensa: 1, limiteMano: 0, saludMax: 3, cansancioMax: 2 },
+          bonificadores: { fisico: 1, consciencia: 0, social: 0, misticismo: 0, defensa: 1, limiteMano: 0, saludMax: 3, cansancioMax: 2 },
           descripcion: "<p>Forjados en las profundidades volcánicas, soportan el agotamiento y los golpes como ninguna otra raza.</p>"
         }
       },
@@ -37,7 +37,7 @@ export async function poblarCompendiosDelSistema() {
         type: "origen",
         system: {
           beneficioTrasfondo: "Disciplina Marcial (+1 Defensa)",
-          bonificadores: { vigor: 1, destreza: 0, ingenio: 0, voluntad: 0, defensa: 1, limiteMano: 0, saludMax: 2, cansancioMax: 0 },
+          bonificadores: { fisico: 1, consciencia: 0, social: 0, misticismo: 0, defensa: 1, limiteMano: 0, saludMax: 2, cansancioMax: 0 },
           descripcion: "<p>Años patrullando las fronteras te han enseñado a mantener la guardia alta.</p>"
         }
       },
@@ -45,8 +45,8 @@ export async function poblarCompendiosDelSistema() {
         name: "Erudito del Gremio",
         type: "origen",
         system: {
-          beneficioTrasfondo: "Mente Analítica (+1 Ingenio, +1 Mano)",
-          bonificadores: { vigor: 0, destreza: 0, ingenio: 1, voluntad: 0, defensa: 0, limiteMano: 1, saludMax: 0, cansancioMax: 0 },
+          beneficioTrasfondo: "Mente Analítica (+1 Social, +1 Mano)",
+          bonificadores: { fisico: 0, consciencia: 0, social: 1, misticismo: 0, defensa: 0, limiteMano: 1, saludMax: 0, cansancioMax: 0 },
           descripcion: "<p>El estudio de grimorios y tácticas amplía tus opciones cada turno.</p>"
         }
       },
@@ -56,7 +56,7 @@ export async function poblarCompendiosDelSistema() {
         system: {
           nivel: 1,
           paloAfin: "espadas",
-          bonificadores: { vigor: 1, destreza: 0, ingenio: 0, voluntad: 0, defensa: 1, limiteMano: 0, saludMax: 4, cansancioMax: 1 },
+          bonificadores: { fisico: 1, consciencia: 0, social: 0, misticismo: 0, defensa: 1, limiteMano: 0, saludMax: 4, cansancioMax: 1 },
           descripcion: "<p>Especialista en el palo de Espadas y el combate directo.</p>"
         }
       },
@@ -66,7 +66,7 @@ export async function poblarCompendiosDelSistema() {
         system: {
           nivel: 1,
           paloAfin: "copas",
-          bonificadores: { vigor: 0, destreza: 0, ingenio: 0, voluntad: 1, defensa: 0, limiteMano: 1, saludMax: 2, cansancioMax: 2 },
+          bonificadores: { fisico: 0, consciencia: 0, social: 0, misticismo: 1, defensa: 0, limiteMano: 1, saludMax: 2, cansancioMax: 2 },
           descripcion: "<p>Canalizador espiritual afín al palo de Copas y al uso de Trinkets.</p>"
         }
       }
@@ -85,7 +85,7 @@ export async function poblarCompendiosDelSistema() {
         system: {
           equipado: true,
           cantidad: 1,
-          bonificadores: { vigor: 0, destreza: 0, ingenio: 0, voluntad: 0, defensa: 2, limiteMano: 0, saludMax: 0, cansancioMax: 0 },
+          bonificadores: { fisico: 0, consciencia: 0, social: 0, misticismo: 0, defensa: 2, limiteMano: 0, saludMax: 0, cansancioMax: 0 },
           descripcion: "<p>Otorga +2 a la Defensa mientras está equipada.</p>"
         }
       },
@@ -95,7 +95,7 @@ export async function poblarCompendiosDelSistema() {
         system: {
           equipado: true,
           cantidad: 1,
-          bonificadores: { vigor: 0, destreza: 0, ingenio: 0, voluntad: 0, defensa: 0, limiteMano: 1, saludMax: 0, cansancioMax: 0 },
+          bonificadores: { fisico: 0, consciencia: 0, social: 0, misticismo: 0, defensa: 0, limiteMano: 1, saludMax: 0, cansancioMax: 0 },
           descripcion: "<p>Aumenta en +1 tu Límite de Mano Máxima.</p>"
         }
       },
@@ -106,7 +106,7 @@ export async function poblarCompendiosDelSistema() {
           origenHabilidad: "criatura",
           esActivable: true,
           esAtaque: true,
-          caracteristica: "vigor",
+          caracteristica: "fisico",
           tipoDado: "d8",
           bonoTirada: 1,
           descripcion: "<p>Ataque feroz de criatura que suma +1 al total.</p>"
@@ -153,14 +153,14 @@ export async function poblarCompendiosDelSistema() {
           amenaza: 1,
           salud: { value: 10, max: 10 },
           defensa: 5,
-          caracteristicas: { vigor: 2, destreza: 2, ingenio: 1, voluntad: 1 },
+          caracteristicas: { fisico: 2, consciencia: 2, social: 1, misticismo: 1 },
           biografia: "<p>Se oculta tras su escudo de madera y ataca en grupo.</p>"
         },
         items: [
           {
             name: "Lanza Oxidada",
             type: "habilidad",
-            system: { esActivable: true, esAtaque: true, caracteristica: "destreza", tipoDado: "d6", bonoTirada: 1, descripcion: "<p>Estocada rápida (+1 al ataque).</p>" }
+            system: { esActivable: true, esAtaque: true, caracteristica: "consciencia", tipoDado: "d6", bonoTirada: 1, descripcion: "<p>Estocada rápida (+1 al ataque).</p>" }
           }
         ]
       },
@@ -171,14 +171,14 @@ export async function poblarCompendiosDelSistema() {
           amenaza: 3,
           salud: { value: 24, max: 24 },
           defensa: 8,
-          caracteristicas: { vigor: 3, destreza: 1, ingenio: 1, voluntad: 2 },
+          caracteristicas: { fisico: 3, consciencia: 1, social: 1, misticismo: 2 },
           biografia: "<p>Criatura acorazada de alta Defensa. Requiere ataques potentes o cartas quemadas para perforar su armadura.</p>"
         },
         items: [
           {
             name: "Puño Sísmico",
             type: "habilidad",
-            system: { esActivable: true, esAtaque: true, caracteristica: "vigor", tipoDado: "d10", bonoTirada: 2, descripcion: "<p>Impacto demoledor de piedra.</p>" }
+            system: { esActivable: true, esAtaque: true, caracteristica: "fisico", tipoDado: "d10", bonoTirada: 2, descripcion: "<p>Impacto demoledor de piedra.</p>" }
           }
         ]
       }

@@ -20,10 +20,10 @@ function esquemaBonificadoresPersonaje() {
   return {
     bonificadores: new SchemaField({
       // Modificadores a las 4 características (afectan al número de dados lanzados por palo)
-      vigor: new NumberField({ required: true, integer: true, initial: 0 }),
-      destreza: new NumberField({ required: true, integer: true, initial: 0 }),
-      ingenio: new NumberField({ required: true, integer: true, initial: 0 }),
-      voluntad: new NumberField({ required: true, integer: true, initial: 0 }),
+      fisico: new NumberField({ required: true, integer: true, initial: 0 }),
+      consciencia: new NumberField({ required: true, integer: true, initial: 0 }),
+      social: new NumberField({ required: true, integer: true, initial: 0 }),
+      misticismo: new NumberField({ required: true, integer: true, initial: 0 }),
 
       // Modificadores a Defensa, Mano Máxima, Salud y Cansancio
       defensa: new NumberField({ required: true, integer: true, initial: 0 }),
@@ -107,8 +107,8 @@ export class HabilidadDataModel extends TypeDataModel {
       esAtaque: new BooleanField({ required: true, initial: true }),
       caracteristica: new StringField({
         required: true,
-        initial: "vigor",
-        choices: ["vigor", "destreza", "ingenio", "voluntad"]
+        initial: "fisico",
+        choices: ["fisico", "consciencia", "social", "misticismo"]
       }),
       tipoDado: new StringField({
         required: true,

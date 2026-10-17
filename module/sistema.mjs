@@ -33,7 +33,7 @@ Hooks.once("init", () => {
   CONFIG.Combat.documentClass = SistemaCombat;
 
   CONFIG.Combat.initiative = {
-    formula: "1d10 + @caracteristicasTotales.destreza",
+    formula: "1d10 + @caracteristicasTotales.consciencia",
     decimals: 2
   };
 
@@ -112,14 +112,43 @@ Hooks.on("getSceneControlButtons", controls => {
     icon: "fas fa-crown",
     button: true,
     visible: true,
-    onChange: () => PanelMasterApp.mostrar(),
-    onClick: () => PanelMasterApp.mostrar()
+    onChange: () => PanelMasterApp.mostrar()
   };
 
   if (Array.isArray(tokenControls.tools)) {
     tokenControls.tools.push(herramientaGM);
   } else if (tokenControls.tools && typeof tokenControls.tools === "object") {
     tokenControls.tools.panelMasterCyD = herramientaGM;
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Organización de Actores en Carpetas (Jugadores / PNJs)                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Cuando se crea un Actor, lo mueve automáticamente a la carpeta correspondiente:
+ *  - tipo "personaje"  → carpeta "Jugadores"
+ *  - tipo "pnj"        → carpeta "PNJs"
+ * Las carpetas se crean si aún no existen.
+ */
+Hooks.on("createActor", async (actor) => {
+  if (!game.user?.isGM) return;
+
+  const folderName = actor.type === "personaje" ? "Jugadores" : "PNJs";
+  const folderColor = actor.type === "personaje" ? "#2ecc71" : "#e74c3c";
+
+  let carpeta = game.folders.find(f => f.type === "Actor" && f.name === folderName);
+  if (!carpeta) {
+    carpeta = await Folder.create({
+      name: folderName,
+      type: "Actor",
+      color: folderColor
+    });
+  }
+
+  if (actor.folder !== carpeta.id) {
+    await actor.update({ folder: carpeta.id });
   }
 });
 
