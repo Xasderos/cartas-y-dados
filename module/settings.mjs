@@ -121,4 +121,15 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
     default: "Mediano",
     onChange: onUpdateCallback
   });
+
+  // 9. Movimiento Base Predeterminado
+  game.settings.register(SYSTEM_ID, "movimientoBase", {
+    name: "Movimiento Base Predeterminado",
+    hint: "Metros de movimiento base por defecto para nuevos personajes y criaturas. El Movimiento Máximo = Base + (Físico × 5). Puede editarse individualmente en cada ficha.",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 10,
+    onChange: onUpdateCallback
+  });
 }

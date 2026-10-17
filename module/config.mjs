@@ -25,21 +25,25 @@ export const SISTEMA_CONFIG = {
   palosCartas: {
     espadas: {
       etiqueta: "CARTASYDADOS.Palos.Espadas",
+      abreviado: "FISC",
       caracteristicaAsociada: "fisico",
       acciones: "Ataques cuerpo a cuerpo y proezas de fuerza"
     },
     copas: {
       etiqueta: "CARTASYDADOS.Palos.Copas",
+      abreviado: "MIST",
       caracteristicaAsociada: "misticismo",
       acciones: "Interacción social, apoyo y canalización"
     },
     oros: {
       etiqueta: "CARTASYDADOS.Palos.Oros",
+      abreviado: "SOC",
       caracteristicaAsociada: "social",
       acciones: "Táctica, percepción, trampas y conocimientos"
     },
     bastos: {
       etiqueta: "CARTASYDADOS.Palos.Bastos",
+      abreviado: "CONS",
       caracteristicaAsociada: "consciencia",
       acciones: "Movimiento, sigilo, defensa y ataques a distancia"
     }
@@ -63,9 +67,25 @@ export const SISTEMA_CONFIG = {
    */
   manoBasePorDefecto: 4,
 
-  /**\n   * Movimiento base en metros por turno antes de aplicar bonificadores de Físico.\n   * Fórmula: movimientoMax = movimientoBase + (caracteristicasTotales.fisico * 5)\n   */  
+  /**
+   * Movimiento base en metros por turno (por defecto: ajuste world "movimientoBase").
+   * Fórmula: movimiento.max = movimiento.base + (caracteristicasTotales.fisico * 5)
+   */
   movimientoBase: 10,
 
-  /**\n   * Categoría de tamaño por defecto para nuevos actores.\n   * Opciones: Diminuto, Pequeño, Mediano, Grande, Enorme.\n   */  
+  /**
+   * Categoría de tamaño por defecto para nuevos actores (ajuste world "tamanoBase").
+   * Opciones: Diminuto, Pequeño, Mediano, Grande, Enorme.
+   */
   tamanoBase: "Mediano"
 };
+
+/**
+ * Devuelve la abreviatura corta de un palo para mostrarla en chat, fichas y diálogos.
+ * @param {string} clavePalo - Clave interna del palo ("espadas", "bastos", "oros", "copas").
+ * @returns {string} "FISC", "CONS", "SOC" o "MIST" (o la clave en mayúsculas si es desconocida).
+ */
+export function abreviadoPalo(clavePalo) {
+  return SISTEMA_CONFIG.palosCartas[clavePalo]?.abreviado
+    ?? String(clavePalo ?? "").toUpperCase();
+}

@@ -20,10 +20,10 @@
       <div class="cyd-recurso-caja">
         <span>Palo</span>
         <select name="system.palo">
-          <option value="espadas" {{#if (eq system.palo "espadas")}}selected{{/if}}>⚔️ Espadas (Físico)</option>
-          <option value="bastos" {{#if (eq system.palo "bastos")}}selected{{/if}}>🦯 Bastos (Consciencia)</option>
-          <option value="oros" {{#if (eq system.palo "oros")}}selected{{/if}}>🪙 Oros (Social)</option>
-          <option value="copas" {{#if (eq system.palo "copas")}}selected{{/if}}>🏆 Copas (Misticismo)</option>
+          <option value="espadas" {{#if (eq system.palo "espadas")}}selected{{/if}}>⚔️ FISC (Físico)</option>
+          <option value="bastos" {{#if (eq system.palo "bastos")}}selected{{/if}}>🦯 CONS (Consciencia)</option>
+          <option value="oros" {{#if (eq system.palo "oros")}}selected{{/if}}>🪙 SOC (Social)</option>
+          <option value="copas" {{#if (eq system.palo "copas")}}selected{{/if}}>🏆 MIST (Misticismo)</option>
         </select>
       </div>
 
@@ -94,17 +94,17 @@
       <div class="cyd-cabecera-seccion">
         <h3>⚡ Efecto de la Acción</h3>
       </div>
-      <textarea name="system.efecto" rows="6" style="width: 100%; flex: 1; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 8px;">{{system.efecto}}</textarea>
+      <textarea name="system.efecto" rows="4" style="width: 100%; flex: 1; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 6px;">{{system.efecto}}</textarea>
     </section>
   {{else}}
-    <section class="cyd-panel-mano" style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+    <section class="cyd-panel-mano" style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
       <div>
         <strong>✨ Efecto Permanente (Pasivo):</strong>
-        <textarea name="system.efectoPermanente" rows="3" style="width: 100%; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 6px;">{{system.efectoPermanente}}</textarea>
+        <textarea name="system.efectoPermanente" rows="2" style="width: 100%; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 5px;">{{system.efectoPermanente}}</textarea>
       </div>
       <div>
         <strong>🟢 Efecto al Jugar (Mientras está En Juego):</strong>
-        <textarea name="system.efectoAlJugar" rows="3" style="width: 100%; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 6px;">{{system.efectoAlJugar}}</textarea>
+        <textarea name="system.efectoAlJugar" rows="2" style="width: 100%; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 5px;">{{system.efectoAlJugar}}</textarea>
       </div>
     </section>
   {{/if}}

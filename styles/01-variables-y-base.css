@@ -259,6 +259,24 @@
   min-width: 0;
 }
 
+/* Select compacto de dado individual (sidebar de PNJ, v0.8.1) */
+.cyd-select-dado-individual {
+  height: 22px;
+  padding: 0 2px;
+  font-size: 0.72rem;
+  width: auto;
+}
+
+/* Sidebar PNJ: la etiqueta del atributo ocupa su propia línea para que
+   quepan el valor, el select del dado y el botón de tirada */
+.sheet.pnj .cyd-atributo-tarjeta {
+  flex-wrap: wrap;
+}
+
+.sheet.pnj .cyd-atributo-icono {
+  width: 100%;
+}
+
 /* Panel Movimiento y Tamaño */
 .cyd-panel-movimiento-tamano {
   margin-top: 6px;

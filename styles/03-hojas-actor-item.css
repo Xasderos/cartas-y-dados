@@ -202,3 +202,94 @@
   margin: 0;
   font-size: 0.85rem;
 }
+
+/* ======================================================================== */
+/*  HOJAS DE ITEM Y CARTA COMPACTAS (v0.8.1)                                */
+/* ======================================================================== */
+
+.sheet.item .cyd-hoja-contenedor,
+.sheet.card .cyd-hoja-contenedor {
+  gap: 6px;
+}
+
+.sheet.item .cyd-cabecera,
+.sheet.card .cyd-cabecera {
+  padding: 4px 6px;
+  gap: 8px;
+}
+
+.sheet.item .cyd-avatar,
+.sheet.card .cyd-avatar {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+.sheet.item .cyd-panel-controles,
+.sheet.item .cyd-panel-mano,
+.sheet.card .cyd-panel-controles,
+.sheet.card .cyd-panel-mano {
+  padding: 5px 7px;
+  gap: 4px;
+}
+
+.sheet.item .cyd-recursos-barra,
+.sheet.card .cyd-recursos-barra {
+  gap: 5px;
+}
+
+.sheet.item .cyd-recurso-caja,
+.sheet.card .cyd-recurso-caja {
+  padding: 2px 5px;
+  gap: 1px;
+}
+
+.sheet.item .cyd-recurso-caja input[type="number"],
+.sheet.card .cyd-recurso-caja input[type="number"] {
+  width: 38px !important;
+  height: 22px !important;
+  padding: 0 2px !important;
+  font-size: 0.78rem;
+}
+
+.sheet.item .cyd-recurso-caja input[type="text"],
+.sheet.card .cyd-recurso-caja input[type="text"],
+.sheet.item .cyd-campo-linea input,
+.sheet.card .cyd-campo-linea input {
+  height: 22px !important;
+  padding: 1px 4px !important;
+  font-size: 0.78rem;
+}
+
+.sheet.item select,
+.sheet.card select {
+  height: 22px !important;
+  padding: 0 2px !important;
+  font-size: 0.76rem;
+}
+
+.sheet.item textarea,
+.sheet.card textarea {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  padding: 4px 6px !important;
+}
+
+.sheet.item .cyd-caract-tarjeta,
+.sheet.card .cyd-caract-tarjeta {
+  padding: 3px 6px;
+  gap: 4px;
+}
+
+.sheet.item .cyd-caract-tarjeta input,
+.sheet.card .cyd-caract-tarjeta input {
+  width: 40px !important;
+  height: 22px !important;
+  padding: 0 2px !important;
+  font-size: 0.78rem;
+}
+
+.sheet.item .cyd-cabecera-seccion,
+.sheet.card .cyd-cabecera-seccion {
+  margin-bottom: 4px;
+  padding-bottom: 2px;
+}

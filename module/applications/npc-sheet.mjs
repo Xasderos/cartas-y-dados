@@ -5,6 +5,8 @@
  * e integra las zonas del Mazo de Jefe (Mano, Mazo, Descarte y Quemadas) directamente en la ficha.
  */
 
+import { abreviadoPalo } from "../config.mjs";
+
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -87,6 +89,7 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
             id: c.id,
             nombre: c.name,
             palo: c.system.palo,
+            paloAbrev: abreviadoPalo(c.system.palo),
             numero: c.system.numero,
             tipoDado: c.system.tipoDado,
             caracteristica: c.system.caracteristicaAsociada,
@@ -165,10 +168,10 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
     const caracteristicaTotal = sistema.caracteristicasTotales?.[caracteristica] ?? valorBase;
 
     const nombresCaracteristicas = {
-      fisico: "⚔️ Físico (Espadas)",
-      consciencia: "🦯 Consciencia (Bastos)",
-      social: "🪙 Social (Oros)",
-      misticismo: "🏆 Misticismo (Copas)"
+      fisico: "⚔️ Físico (FISC)",
+      consciencia: "🦯 Consciencia (CONS)",
+      social: "🪙 Social (SOC)",
+      misticismo: "🏆 Misticismo (MIST)"
     };
     const nombreCaract = nombresCaracteristicas[caracteristica] || caracteristica;
 

@@ -37,44 +37,72 @@
 
       {{!-- FÍSICO --}}
       <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.fisico}}">
-        <span class="cyd-atributo-icono">⚔️ Físico (Espadas)</span>
+        <span class="cyd-atributo-icono">⚔️ Físico (FISC)</span>
         <div class="cyd-atributo-fila-valores">
           <input type="number" name="system.caracteristicas.fisico" value="{{system.caracteristicas.fisico}}" min="1" max="10" title="Valor Base" />
+          <select name="system.dadosCaracteristicas.fisico" class="cyd-select-dado-individual" title="Tamaño de dado de Físico">
+            <option value="d4" {{#if (eq system.dadosCaracteristicas.fisico "d4")}}selected{{/if}}>d4</option>
+            <option value="d6" {{#if (eq system.dadosCaracteristicas.fisico "d6")}}selected{{/if}}>d6</option>
+            <option value="d8" {{#if (eq system.dadosCaracteristicas.fisico "d8")}}selected{{/if}}>d8</option>
+            <option value="d10" {{#if (eq system.dadosCaracteristicas.fisico "d10")}}selected{{/if}}>d10</option>
+            <option value="d12" {{#if (eq system.dadosCaracteristicas.fisico "d12")}}selected{{/if}}>d12</option>
+          </select>
           <button type="button" class="cyd-btn-atributo-pnj" data-action="tiradaAtributoPnj" data-caracteristica="fisico" data-dado="{{system.dadosCaracteristicas.fisico}}" data-tooltip="Tirar atributo Físico directamente">
-            🎲 {{system.dadosCaracteristicas.fisico}}
+            🎲 Tirar
           </button>
         </div>
       </div>
 
       {{!-- CONSCIENCIA --}}
       <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.consciencia}}">
-        <span class="cyd-atributo-icono">🦯 Consciencia (Bastos)</span>
+        <span class="cyd-atributo-icono">🦯 Consciencia (CONS)</span>
         <div class="cyd-atributo-fila-valores">
           <input type="number" name="system.caracteristicas.consciencia" value="{{system.caracteristicas.consciencia}}" min="1" max="10" title="Valor Base" />
+          <select name="system.dadosCaracteristicas.consciencia" class="cyd-select-dado-individual" title="Tamaño de dado de Consciencia">
+            <option value="d4" {{#if (eq system.dadosCaracteristicas.consciencia "d4")}}selected{{/if}}>d4</option>
+            <option value="d6" {{#if (eq system.dadosCaracteristicas.consciencia "d6")}}selected{{/if}}>d6</option>
+            <option value="d8" {{#if (eq system.dadosCaracteristicas.consciencia "d8")}}selected{{/if}}>d8</option>
+            <option value="d10" {{#if (eq system.dadosCaracteristicas.consciencia "d10")}}selected{{/if}}>d10</option>
+            <option value="d12" {{#if (eq system.dadosCaracteristicas.consciencia "d12")}}selected{{/if}}>d12</option>
+          </select>
           <button type="button" class="cyd-btn-atributo-pnj" data-action="tiradaAtributoPnj" data-caracteristica="consciencia" data-dado="{{system.dadosCaracteristicas.consciencia}}" data-tooltip="Tirar atributo Consciencia directamente">
-            🎲 {{system.dadosCaracteristicas.consciencia}}
+            🎲 Tirar
           </button>
         </div>
       </div>
 
       {{!-- SOCIAL --}}
       <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.social}}">
-        <span class="cyd-atributo-icono">🪙 Social (Oros)</span>
+        <span class="cyd-atributo-icono">🪙 Social (SOC)</span>
         <div class="cyd-atributo-fila-valores">
           <input type="number" name="system.caracteristicas.social" value="{{system.caracteristicas.social}}" min="1" max="10" title="Valor Base" />
+          <select name="system.dadosCaracteristicas.social" class="cyd-select-dado-individual" title="Tamaño de dado de Social">
+            <option value="d4" {{#if (eq system.dadosCaracteristicas.social "d4")}}selected{{/if}}>d4</option>
+            <option value="d6" {{#if (eq system.dadosCaracteristicas.social "d6")}}selected{{/if}}>d6</option>
+            <option value="d8" {{#if (eq system.dadosCaracteristicas.social "d8")}}selected{{/if}}>d8</option>
+            <option value="d10" {{#if (eq system.dadosCaracteristicas.social "d10")}}selected{{/if}}>d10</option>
+            <option value="d12" {{#if (eq system.dadosCaracteristicas.social "d12")}}selected{{/if}}>d12</option>
+          </select>
           <button type="button" class="cyd-btn-atributo-pnj" data-action="tiradaAtributoPnj" data-caracteristica="social" data-dado="{{system.dadosCaracteristicas.social}}" data-tooltip="Tirar atributo Social directamente">
-            🎲 {{system.dadosCaracteristicas.social}}
+            🎲 Tirar
           </button>
         </div>
       </div>
 
       {{!-- MISTICISMO --}}
       <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.misticismo}}">
-        <span class="cyd-atributo-icono">🏆 Misticismo (Copas)</span>
+        <span class="cyd-atributo-icono">🏆 Misticismo (MIST)</span>
         <div class="cyd-atributo-fila-valores">
           <input type="number" name="system.caracteristicas.misticismo" value="{{system.caracteristicas.misticismo}}" min="1" max="10" title="Valor Base" />
+          <select name="system.dadosCaracteristicas.misticismo" class="cyd-select-dado-individual" title="Tamaño de dado de Misticismo">
+            <option value="d4" {{#if (eq system.dadosCaracteristicas.misticismo "d4")}}selected{{/if}}>d4</option>
+            <option value="d6" {{#if (eq system.dadosCaracteristicas.misticismo "d6")}}selected{{/if}}>d6</option>
+            <option value="d8" {{#if (eq system.dadosCaracteristicas.misticismo "d8")}}selected{{/if}}>d8</option>
+            <option value="d10" {{#if (eq system.dadosCaracteristicas.misticismo "d10")}}selected{{/if}}>d10</option>
+            <option value="d12" {{#if (eq system.dadosCaracteristicas.misticismo "d12")}}selected{{/if}}>d12</option>
+          </select>
           <button type="button" class="cyd-btn-atributo-pnj" data-action="tiradaAtributoPnj" data-caracteristica="misticismo" data-dado="{{system.dadosCaracteristicas.misticismo}}" data-tooltip="Tirar atributo Misticismo directamente">
-            🎲 {{system.dadosCaracteristicas.misticismo}}
+            🎲 Tirar
           </button>
         </div>
       </div>
@@ -129,8 +157,15 @@
     <div class="cyd-cabecera-seccion">
       <h3>🏃 Movimiento y Tamaño</h3>
     </div>
-    <div class="cyd-recursos-barra" style="grid-template-columns: repeat(2, 1fr); gap: 8px;">
-      <div class="cyd-recurso-caja" data-tooltip="Movimiento máximo: Base [{{system.movimiento.max}}] + (Físico Total [{{system.caracteristicasTotales.fisico}}] × 5) metros">
+    <div class="cyd-recursos-barra" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
+      <div class="cyd-recurso-caja" data-tooltip="Base de Movimiento editable en esta ficha. El Máximo = Base + (Físico × 5) metros">
+        <span class="cyd-recurso-titulo">⚙️ Mov. Base</span>
+        <div class="cyd-recurso-inputs">
+          <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" style="width: 60px;" />
+          <span class="cyd-recurso-total">m</span>
+        </div>
+      </div>
+      <div class="cyd-recurso-caja" data-tooltip="Movimiento máximo: Base [{{system.movimiento.base}}] + (Físico Total [{{system.caracteristicasTotales.fisico}}] × 5) metros">
         <span class="cyd-recurso-titulo">🏃 Movimiento</span>
         <div class="cyd-recurso-inputs">
           <input type="number" name="system.movimiento.value" value="{{system.movimiento.value}}" min="0" style="width: 60px;" />
@@ -194,7 +229,7 @@
                   <span class="cyd-carta-dado">{{carta.cantidadDados}}{{carta.tipoDado}}</span>
                 </header>
                 <div class="cyd-carta-subtitulo">
-                  <span>Palo: <strong>{{carta.palo}}</strong> ({{carta.caracteristica}})</span>
+                  <span>Palo: <strong>{{carta.paloAbrev}}</strong> ({{carta.caracteristica}})</span>
                   {{#if carta.seQuema}}<span>🔥 Se Quema</span>{{/if}}
                 </div>
                 <div class="cyd-carta-efecto">{{{carta.efecto}}}</div>

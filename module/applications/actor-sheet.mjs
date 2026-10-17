@@ -4,6 +4,8 @@
  * Clase, Objetos equipables y creador visual de Cartas/Trinkets.
  */
 
+import { abreviadoPalo } from "../config.mjs";
+
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -75,6 +77,7 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
           tipo: c.type,
           esTrinket: c.type === "trinket",
           palo: c.system.palo,
+          paloAbrev: abreviadoPalo(c.system.palo),
           numero: c.system.numero,
           tipoDado: c.system.tipoDado,
           caracteristica: c.system.caracteristicaAsociada,
@@ -88,7 +91,7 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       const tooltipHtml = `
         <div style='text-align:left; max-width:260px;'>
           <strong>${t.nombre}</strong> <em>(${t.etiquetaEstado})</em><hr/>
-          <p><strong>Palo:</strong> ${t.palo.toUpperCase()} | <strong>Dado:</strong> ${t.tipoDado}</p>
+          <p><strong>Palo:</strong> ${abreviadoPalo(t.palo)} | <strong>Dado:</strong> ${t.tipoDado}</p>
           ${t.efectoPermanente ? `<p><strong>Pasivo:</strong> ${t.efectoPermanente}</p>` : ""}
           ${t.efectoAlJugar ? `<p><strong>Al Jugar:</strong> ${t.efectoAlJugar}</p>` : ""}
         </div>
@@ -186,10 +189,10 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
 
     const preId = target.dataset.trinketId || "";
     const opcionesMano = mano.cards.contents
-      .map(c => `<option value="${c.id}">${c.name} (${c.system.palo.toUpperCase()} - ${c.system.tipoDado})</option>`)
+      .map(c => `<option value="${c.id}">${c.name} (${abreviadoPalo(c.system.palo)} - ${c.system.tipoDado})</option>`)
       .join("");
     const opcionesTrinkets = trinketsDisponibles
-      .map(t => `<option value="${t.idOriginal}" ${t.idOriginal === preId ? "selected" : ""}>${t.nombre} (${t.palo.toUpperCase()} - ${t.tipoDado})</option>`)
+      .map(t => `<option value="${t.idOriginal}" ${t.idOriginal === preId ? "selected" : ""}>${t.nombre} (${abreviadoPalo(t.palo)} - ${t.tipoDado})</option>`)
       .join("");
 
     const seleccion = await DialogV2.prompt({

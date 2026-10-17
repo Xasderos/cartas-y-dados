@@ -57,7 +57,7 @@ export async function poblarCompendiosDelSistema() {
           nivel: 1,
           paloAfin: "espadas",
           bonificadores: { fisico: 1, consciencia: 0, social: 0, misticismo: 0, defensa: 1, limiteMano: 0, saludMax: 4, cansancioMax: 1 },
-          descripcion: "<p>Especialista en el palo de Espadas y el combate directo.</p>"
+          descripcion: "<p>Especialista en el palo FISC y el combate directo.</p>"
         }
       },
       {
@@ -67,7 +67,7 @@ export async function poblarCompendiosDelSistema() {
           nivel: 1,
           paloAfin: "copas",
           bonificadores: { fisico: 0, consciencia: 0, social: 0, misticismo: 1, defensa: 0, limiteMano: 1, saludMax: 2, cansancioMax: 2 },
-          descripcion: "<p>Canalizador espiritual afín al palo de Copas y al uso de Trinkets.</p>"
+          descripcion: "<p>Canalizador espiritual afín al palo MIST y al uso de Trinkets.</p>"
         }
       }
     ], { pack: packTrasfondos.collection });

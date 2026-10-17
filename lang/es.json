@@ -18,10 +18,10 @@
   },
   "CARTASYDADOS": {
     "Palos": {
-      "Espadas": "Espadas",
-      "Copas": "Copas",
-      "Oros": "Oros",
-      "Bastos": "Bastos"
+      "Espadas": "FISC",
+      "Copas": "MIST",
+      "Oros": "SOC",
+      "Bastos": "CONS"
     },
     "Caracteristicas": {
       "Fisico": "Físico",

@@ -6,6 +6,8 @@
  * entre Mazo, Mano, En Juego, Descarte y Quemadas, recalculando la Defensa en tiempo real.
  */
 
+import { abreviadoPalo } from "../config.mjs";
+
 export class SistemaActor extends Actor {
 
   /* ======================================================================== */
@@ -504,7 +506,7 @@ export class SistemaActor extends Actor {
     const saborChat = `
       <div class="cyd-carta-jugada">
         <h3>${carta.system.esAtaque ? "⚔️" : "🃏"} ${carta.name} <small>(${etiquetaDestino})</small></h3>
-        <p><strong>Palo:</strong> ${carta.system.palo.toUpperCase()} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
+        <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
         ${bloqueResolucionHtml}
         ${htmlEfectosAuto}
         ${efectoHtml ? `<div class="cyd-efecto">${efectoHtml}</div>` : ""}
@@ -554,7 +556,7 @@ export class SistemaActor extends Actor {
         <div class="cyd-carta-jugada">
           <h3>📥 ${carta.name}</h3>
           <p><strong>Acción:</strong> Descartada sin tirar</p>
-          <p><strong>Palo:</strong> ${carta.system.palo.toUpperCase()} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
+          <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
           <p><small>La carta ha sido enviada al Descarte sin realizar ninguna tirada.</small></p>
         </div>
       `
@@ -587,7 +589,7 @@ export class SistemaActor extends Actor {
         <div class="cyd-carta-jugada">
           <h3>🔥 ${carta.name}</h3>
           <p><strong>Acción:</strong> Quemada sin tirar</p>
-          <p><strong>Palo:</strong> ${carta.system.palo.toUpperCase()} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
+          <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
           <p><small>La carta ha sido quemada (enviada a Cartas Quemadas) sin realizar ninguna tirada.</small></p>
         </div>
       `

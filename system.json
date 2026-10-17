@@ -2,7 +2,7 @@
   "id": "cartas-y-dados",
   "title": "Sistema de Rol: Cartas y Dados",
   "description": "Sistema de rol personalizado para Foundry VTT v14 que combina mecánicas de mazos de cartas y tiradas de dados sin módulos externos.",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "compatibility": {
     "minimum": "14",
     "verified": "14.369",

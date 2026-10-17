@@ -95,6 +95,12 @@ export class BaseActorDataModel extends TypeDataModel {
       }),
 
       movimiento: new SchemaField({
+        base: new NumberField({
+          required: true,
+          integer: true,
+          initial: () => leerAjuste("movimientoBase", SISTEMA_CONFIG.movimientoBase),
+          min: 0
+        }),
         value: new NumberField({
           required: true,
           integer: true,
@@ -215,9 +221,12 @@ export class BaseActorDataModel extends TypeDataModel {
       base + bonificadorClase + bonificadorObjetos + bonificadorAtributos
     );
 
-    // Movimiento máximo = Base [10] + (Físico Total * 5) metros
-    this.movimiento.value = this.movimiento.max ?? SISTEMA_CONFIG.movimientoBase;
-    this.movimiento.max = SISTEMA_CONFIG.movimientoBase + this.caracteristicasTotales.fisico * 5;
+    // Movimiento máximo = Base editable (ajuste world "movimientoBase") + (Físico Total * 5) metros
+    const baseMov = Number.isFinite(Number(this.movimiento.base))
+      ? Number(this.movimiento.base)
+      : SISTEMA_CONFIG.movimientoBase;
+    this.movimiento.value = this.movimiento.max ?? (baseMov + this.caracteristicasTotales.fisico * 5);
+    this.movimiento.max = baseMov + this.caracteristicasTotales.fisico * 5;
 
     // NUEVA REGLA: Salud Máxima = Base (salud.max) + Físico Total + Otros Bonos (Raza/Origen/Clase/Equipo)
     this.salud.bonoFisico = this.caracteristicasTotales.fisico;

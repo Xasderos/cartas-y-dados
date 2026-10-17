@@ -5,3 +5,5 @@
 # Cartas y Dados (Cards & Dice) - Foundry VTT System
 
 A custom game system for Foundry VTT that blends card-based action selection with dice-rolling mechanics.
+
+**Current version:** 0.8.1
