@@ -1,0 +1,100 @@
+{{!--
+  Plantilla del Panel del Master con Cuadrícula Visual de Iconos y Números.
+--}}
+<div class="cyd-hoja-contenedor">
+
+  {{!-- 1. BARRA SUPERIOR: DIFICULTAD + ACCIONES GLOBALES --}}
+  <section class="cyd-panel">
+    <div class="cyd-gm-barra-dificultad">
+      <div class="cyd-gm-control-numero" data-tooltip="Dificultad Global del Master">
+        <strong>🎯 Dificultad:</strong>
+        <button type="button" class="cyd-gm-btn-icono" data-action="ajustarDificultad" data-delta="-1">➖</button>
+        <input type="number" class="cyd-gm-input-dificultad" value="{{dificultadActual}}" min="0" />
+        <button type="button" class="cyd-gm-btn-icono" data-action="ajustarDificultad" data-delta="1">➕</button>
+      </div>
+
+      <div class="cyd-gm-presets">
+        <button type="button" class="cyd-gm-btn-tag" data-action="fijarDificultad" data-valor="5">5</button>
+        <button type="button" class="cyd-gm-btn-tag" data-action="fijarDificultad" data-valor="8">8</button>
+        <button type="button" class="cyd-gm-btn-tag" data-action="fijarDificultad" data-valor="12">12</button>
+        <button type="button" class="cyd-gm-btn-tag" data-action="fijarDificultad" data-valor="16">16</button>
+      </div>
+
+      <div class="cyd-gm-presets">
+        <button type="button" class="cyd-gm-btn-tag" data-action="robarGrupo" data-tooltip="Todo el grupo roba hasta su Mano Máxima">🎴 Robar</button>
+        <button type="button" class="cyd-gm-btn-tag" data-action="finCombateGrupo" data-tooltip="Fin de Escena/Combate: Barajar Mano, Descarte y Trinkets">🔄 Fin Escena</button>
+        <button type="button" class="cyd-gm-btn-tag" data-action="descansoGrupo" data-tooltip="Descanso Completo del Grupo">🏕️ Descanso</button>
+        <button type="button" class="cyd-gm-btn-tag" data-action="poblarCompendios" data-tooltip="Poblar Compendios Base">📦</button>
+      </div>
+    </div>
+  </section>
+
+  {{!-- 2. CUADRÍCULA VISUAL DE ESTADO DEL GRUPO (ICONOS Y NÚMEROS) --}}
+  <section class="cyd-panel cyd-gm-lista-personajes">
+    {{#if personajes.length}}
+      <div class="cyd-gm-grid-compacto">
+        {{#each personajes as |pj|}}
+          <article class="cyd-gm-tile">
+
+            {{!-- Cabecera: Clic en avatar o nombre abre la Ficha del Personaje --}}
+            <header class="cyd-gm-tile-header">
+              <div class="cyd-gm-actor-link" data-action="abrirFichaActor" data-actor-id="{{pj.id}}" data-tooltip="Abrir ficha de {{pj.nombre}}">
+                <img src="{{pj.img}}" class="cyd-gm-avatar-mini" />
+                <span class="cyd-gm-nombre">{{pj.nombre}}</span>
+              </div>
+
+              {{!-- Control rápido de Cansancio --}}
+              <div class="cyd-gm-cansancio-box" data-tooltip="Cansancio de {{pj.nombre}}">
+                <span class="cyd-gm-mini-click" data-action="ajustarCansancio" data-actor-id="{{pj.id}}" data-delta="-1">−</span>
+                <strong>⚡{{pj.cansancioActual}}/{{pj.cansancioMax}}</strong>
+                <span class="cyd-gm-mini-click" data-action="ajustarCansancio" data-actor-id="{{pj.id}}" data-delta="1">+</span>
+              </div>
+            </header>
+
+            {{!-- Fila 1: Estadísticas Vitales (Salud y Defensa) --}}
+            <div class="cyd-gm-fila-iconos cyd-gm-cols-2">
+              <div class="cyd-gm-stat-pill" data-tooltip="Salud Actual / Salud Máxima Total">
+                ❤️ <strong>{{pj.saludActual}}/{{pj.saludMax}}</strong>
+              </div>
+              <div class="cyd-gm-stat-pill" data-tooltip="Defensa Total">
+                🛡️ <strong>{{pj.defensaTotal}}</strong>
+              </div>
+            </div>
+
+            {{!-- Fila 2: Enlaces Directos a las 6 Zonas de Cartas --}}
+            {{#if pj.inicializado}}
+              <div class="cyd-gm-fila-iconos cyd-gm-cols-3">
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pj.id}}" data-pila="mano" data-tooltip="Abrir Mano ({{pj.manoActual}}/{{pj.limiteMano}})">
+                  ✋ <strong>{{pj.manoActual}}/{{pj.limiteMano}}</strong>
+                </div>
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pj.id}}" data-pila="mazo" data-tooltip="Abrir Mazo de Juego ({{pj.mazoDisponibles}}/{{pj.mazoTotal}})">
+                  📚 <strong>{{pj.mazoDisponibles}}/{{pj.mazoTotal}}</strong>
+                </div>
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pj.id}}" data-pila="descarte" data-tooltip="Abrir Descarte ({{pj.descarteActual}})">
+                  📥 <strong>{{pj.descarteActual}}</strong>
+                </div>
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pj.id}}" data-pila="quemadas" data-tooltip="Abrir Cartas Quemadas ({{pj.quemadasActual}})">
+                  🔥 <strong>{{pj.quemadasActual}}</strong>
+                </div>
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pj.id}}" data-pila="trinkets" data-tooltip="Abrir Mazo de Trinkets ({{pj.trinketsDisponibles}}/{{pj.trinketsTotal}})">
+                  🔮 <strong>{{pj.trinketsDisponibles}}/{{pj.trinketsTotal}}</strong>
+                </div>
+                <div class="cyd-gm-zona-link {{#if pj.enJuegoActual}}cyd-gm-zona-activa{{/if}}" data-action="abrirPilaActor" data-actor-id="{{pj.id}}" data-pila="enJuego" data-tooltip="Trinkets En Juego: {{pj.nombresEnJuego}} (Clic para abrir)">
+                  🟢 <strong>{{pj.enJuegoActual}}</strong>
+                </div>
+              </div>
+            {{else}}
+              <div class="cyd-gm-sin-pilas" data-action="abrirFichaActor" data-actor-id="{{pj.id}}">
+                ⚠️ Abrir ficha para inicializar pilas
+              </div>
+            {{/if}}
+
+          </article>
+        {{/each}}
+      </div>
+    {{else}}
+      <p class="cyd-texto-vacio">No hay actores de tipo "Personaje Jugador" creados en el mundo.</p>
+    {{/if}}
+  </section>
+
+</div>

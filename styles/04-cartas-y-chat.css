@@ -1,0 +1,138 @@
+/**
+ * @file 04-cartas-y-chat.css
+ * @description Estilos para la barra de Trinkets, Mano de Cartas y Mensajes en el Chat.
+ */
+
+.cyd-acciones-turno {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.cyd-resumen-pilas {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: var(--cyd-bg-caja);
+  padding: 5px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+.cyd-chip-pila {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.cyd-chip-pila:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Barra de Trinkets */
+.cyd-panel-trinkets {
+  background: var(--cyd-bg-panel);
+  border: 1px solid var(--cyd-trinket);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cyd-lista-pildoras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.cyd-pildora-trinket {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--cyd-bg-caja);
+  border: 1px solid var(--cyd-borde);
+  padding: 3px 9px;
+  border-radius: 14px;
+  font-size: 0.82rem;
+  cursor: help;
+}
+
+.cyd-estado-enJuego {
+  border-color: var(--cyd-exito);
+  background: rgba(46, 204, 113, 0.15);
+}
+
+.cyd-estado-quemado {
+  border-color: var(--cyd-peligro);
+  opacity: 0.7;
+}
+
+/* Rejilla de Cartas en Mano */
+.cyd-grid-cartas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 8px;
+}
+
+.cyd-carta-item {
+  background: #161b20;
+  border: 2px solid var(--cyd-acento);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.cyd-carta-trinket {
+  border-color: var(--cyd-trinket);
+}
+
+.cyd-carta-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  border-bottom: 1px solid var(--cyd-borde);
+  padding-bottom: 4px;
+}
+
+.cyd-carta-dado {
+  background: var(--cyd-acento);
+  color: #111;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.cyd-carta-subtitulo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: var(--cyd-texto-suave);
+}
+
+.cyd-carta-efecto {
+  font-size: 0.82rem;
+  min-height: 38px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.cyd-carta-acciones {
+  display: flex;
+  gap: 5px;
+}
+
+.cyd-btn-jugar {
+  flex: 1;
+  font-weight: bold;
+}
+
+.cyd-btn-quemar-especial {
+  width: 34px;
+}

@@ -1,0 +1,145 @@
+{{!--
+  Plantilla unificada para editar Raza, Origen, Clase, Objeto y Habilidad en Foundry VTT v14.
+--}}
+<div class="cyd-hoja-contenedor">
+  <header class="cyd-cabecera">
+    <img class="cyd-avatar" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+    <div class="cyd-cabecera-principal">
+      <div class="cyd-fila-titulo">
+        <input type="text" name="name" value="{{item.name}}" class="cyd-nombre-actor" placeholder="Nombre..." />
+        <span class="cyd-badge-nivel">{{tipoEtiqueta}}</span>
+      </div>
+
+      {{!-- Campos específicos según el subtipo de Item --}}
+      {{#if esRaza}}
+        <div class="cyd-campo-linea">
+          <label>Rasgo Racial Clave:</label>
+          <input type="text" name="system.rasgoRacial" value="{{system.rasgoRacial}}" placeholder="Ej. Visión Nocturna, Sangre Férrea..." />
+        </div>
+      {{/if}}
+
+      {{#if esOrigen}}
+        <div class="cyd-campo-linea">
+          <label>Beneficio de Origen:</label>
+          <input type="text" name="system.beneficioTrasfondo" value="{{system.beneficioTrasfondo}}" placeholder="Ej. Contactos en el Gremio, Erudito..." />
+        </div>
+      {{/if}}
+
+      {{#if esClase}}
+        <div class="cyd-recursos-barra">
+          <div class="cyd-recurso-caja">
+            <span>Nivel de Clase</span>
+            <input type="number" name="system.nivel" value="{{system.nivel}}" min="1" max="20" style="width: 50px;" />
+          </div>
+          <div class="cyd-recurso-caja">
+            <span>Palo Afín</span>
+            <select name="system.paloAfin">
+              <option value="espadas" {{#if (eq system.paloAfin "espadas")}}selected{{/if}}>⚔️ Espadas</option>
+              <option value="bastos" {{#if (eq system.paloAfin "bastos")}}selected{{/if}}>🦯 Bastos</option>
+              <option value="oros" {{#if (eq system.paloAfin "oros")}}selected{{/if}}>🪙 Oros</option>
+              <option value="copas" {{#if (eq system.paloAfin "copas")}}selected{{/if}}>🏆 Copas</option>
+            </select>
+          </div>
+        </div>
+      {{/if}}
+
+      {{#if esObjeto}}
+        <div class="cyd-recursos-barra">
+          <label class="cyd-recurso-caja">
+            <span>¿Equipado?</span>
+            <input type="checkbox" name="system.equipado" {{checked system.equipado}} />
+          </label>
+          <label class="cyd-recurso-caja">
+            <span>Cantidad</span>
+            <input type="number" name="system.cantidad" value="{{system.cantidad}}" min="0" style="width: 50px;" />
+          </label>
+        </div>
+      {{/if}}
+
+      {{#if esHabilidad}}
+        <div class="cyd-recursos-barra" style="grid-template-columns: repeat(4, 1fr);">
+          <label class="cyd-recurso-caja">
+            <span>🎲 ¿Tira Dados?</span>
+            <input type="checkbox" name="system.esActivable" {{checked system.esActivable}} />
+          </label>
+          <label class="cyd-recurso-caja">
+            <span>⚔️ ¿Es Ataque?</span>
+            <input type="checkbox" name="system.esAtaque" {{checked system.esAtaque}} />
+          </label>
+          <div class="cyd-recurso-caja">
+            <span>Atributo</span>
+            <select name="system.caracteristica">
+              <option value="vigor" {{#if (eq system.caracteristica "vigor")}}selected{{/if}}>Vigor</option>
+              <option value="destreza" {{#if (eq system.caracteristica "destreza")}}selected{{/if}}>Destreza</option>
+              <option value="ingenio" {{#if (eq system.caracteristica "ingenio")}}selected{{/if}}>Ingenio</option>
+              <option value="voluntad" {{#if (eq system.caracteristica "voluntad")}}selected{{/if}}>Voluntad</option>
+            </select>
+          </div>
+          <div class="cyd-recurso-caja">
+            <span>Dado</span>
+            <select name="system.tipoDado">
+              <option value="d4" {{#if (eq system.tipoDado "d4")}}selected{{/if}}>d4</option>
+              <option value="d6" {{#if (eq system.tipoDado "d6")}}selected{{/if}}>d6</option>
+              <option value="d8" {{#if (eq system.tipoDado "d8")}}selected{{/if}}>d8</option>
+              <option value="d10" {{#if (eq system.tipoDado "d10")}}selected{{/if}}>d10</option>
+              <option value="d12" {{#if (eq system.tipoDado "d12")}}selected{{/if}}>d12</option>
+            </select>
+          </div>
+        </div>
+      {{/if}}
+    </div>
+  </header>
+
+  {{!-- Bloque de Influencia en el Personaje (Bonificadores) --}}
+  <section class="cyd-panel-controles">
+    <div class="cyd-cabecera-seccion">
+      <h3>📊 Modificadores sobre el Personaje</h3>
+    </div>
+
+    <div class="cyd-caracteristicas-grid">
+      <div class="cyd-caract-tarjeta">
+        <span class="cyd-palo-icono">⚔️ Vigor</span>
+        <input type="number" name="system.bonificadores.vigor" value="{{system.bonificadores.vigor}}" />
+      </div>
+      <div class="cyd-caract-tarjeta">
+        <span class="cyd-palo-icono">🦯 Destreza</span>
+        <input type="number" name="system.bonificadores.destreza" value="{{system.bonificadores.destreza}}" />
+      </div>
+      <div class="cyd-caract-tarjeta">
+        <span class="cyd-palo-icono">🪙 Ingenio</span>
+        <input type="number" name="system.bonificadores.ingenio" value="{{system.bonificadores.ingenio}}" />
+      </div>
+      <div class="cyd-caract-tarjeta">
+        <span class="cyd-palo-icono">🏆 Voluntad</span>
+        <input type="number" name="system.bonificadores.voluntad" value="{{system.bonificadores.voluntad}}" />
+      </div>
+    </div>
+
+    <div class="cyd-recursos-barra" style="margin-top: 8px; grid-template-columns: repeat(4, 1fr);">
+      <div class="cyd-recurso-caja">
+        <span>🛡️ Defensa</span>
+        <input type="number" name="system.bonificadores.defensa" value="{{system.bonificadores.defensa}}" style="width: 44px;" />
+      </div>
+      <div class="cyd-recurso-caja">
+        <span>✋ Mano Máx.</span>
+        <input type="number" name="system.bonificadores.limiteMano" value="{{system.bonificadores.limiteMano}}" style="width: 44px;" />
+      </div>
+      <div class="cyd-recurso-caja">
+        <span>❤️ Salud Máx.</span>
+        <input type="number" name="system.bonificadores.saludMax" value="{{system.bonificadores.saludMax}}" style="width: 44px;" />
+      </div>
+      <div class="cyd-recurso-caja">
+        <span>⚡ Cansancio</span>
+        <input type="number" name="system.bonificadores.cansancioMax" value="{{system.bonificadores.cansancioMax}}" style="width: 44px;" />
+      </div>
+    </div>
+  </section>
+
+  {{!-- Descripción / Reglas --}}
+  <section class="cyd-panel-mano" style="flex: 1; display: flex; flex-direction: column;">
+    <div class="cyd-cabecera-seccion">
+      <h3>📝 Descripción y Reglas</h3>
+    </div>
+    <textarea name="system.descripcion" rows="6" style="width: 100%; flex: 1; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 8px; border-radius: 4px;">{{system.descripcion}}</textarea>
+  </section>
+</div>

@@ -1,0 +1,49 @@
+/**
+ * @file 01-variables-y-base.css
+ * @description Variables globales (paleta de colores) y estructura general de ventanas ApplicationV2.
+ */
+
+:root {
+  --cyd-bg-oscuro: #1b2026;
+  --cyd-bg-panel: #262e38;
+  --cyd-bg-caja: rgba(0, 0, 0, 0.28);
+  --cyd-borde: #3e4a59;
+  --cyd-acento: #d4af37;
+  --cyd-trinket: #9b59b6;
+  --cyd-exito: #2ecc71;
+  --cyd-peligro: #e74c3c;
+  --cyd-texto: #f0f3f5;
+  --cyd-texto-suave: #aeb8c4;
+}
+
+.cartas-y-dados .window-content {
+  background: var(--cyd-bg-oscuro);
+  color: var(--cyd-texto);
+  padding: 10px;
+}
+
+.cyd-hoja-contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.cyd-cuerpo-hoja {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Utilidades de rejilla */
+.cyd-dos-columnas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cyd-cols-3 {
+  grid-template-columns: repeat(3, 1fr) !important;
+}

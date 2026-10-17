@@ -1,0 +1,93 @@
+{
+  "id": "cartas-y-dados",
+  "title": "Sistema de Rol: Cartas y Dados",
+  "description": "Sistema de rol personalizado para Foundry VTT v14 que combina mecánicas de mazos de cartas y tiradas de dados sin módulos externos.",
+  "version": "0.8.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14.369",
+    "maximum": "14"
+  },
+  "authors": [
+    {
+      "name": "Tu Nombre"
+    }
+  ],
+  "esmodules": [
+    "module/sistema.mjs"
+  ],
+  "styles": [
+    "styles/01-variables-y-base.css",
+    "styles/02-componentes.css",
+    "styles/03-hojas-actor-item.css",
+    "styles/04-cartas-y-chat.css",
+    "styles/05-panel-master.css"
+  ],
+  "languages": [
+    {
+      "lang": "es",
+      "name": "Español",
+      "path": "lang/es.json"
+    }
+  ],
+  "documentTypes": {
+    "Actor": {
+      "personaje": {},
+      "pnj": {}
+    },
+    "Item": {
+      "raza": {},
+      "origen": {},
+      "clase": {},
+      "objeto": {},
+      "habilidad": {}
+    },
+    "Card": {
+      "accion": {},
+      "trinket": {}
+    }
+  },
+  "packs": [
+    {
+      "name": "trasfondos-y-clases",
+      "label": "Razas, Orígenes y Clases",
+      "type": "Item",
+      "path": "packs/trasfondos-y-clases",
+      "system": "cartas-y-dados"
+    },
+    {
+      "name": "equipo-y-habilidades",
+      "label": "Equipo y Habilidades",
+      "type": "Item",
+      "path": "packs/equipo-y-habilidades",
+      "system": "cartas-y-dados"
+    },
+    {
+      "name": "mazos-y-cartas",
+      "label": "Biblioteca de Cartas y Trinkets",
+      "type": "Cards",
+      "path": "packs/mazos-y-cartas",
+      "system": "cartas-y-dados"
+    },
+    {
+      "name": "bestiario",
+      "label": "Bestiario (Criaturas y PNJs)",
+      "type": "Actor",
+      "path": "packs/bestiario",
+      "system": "cartas-y-dados"
+    }
+  ],
+  "htmlFields": [
+    "biografia",
+    "descripcion",
+    "efecto",
+    "efectoPermanente",
+    "efectoAlJugar"
+  ],
+  "grid": {
+    "distance": 1,
+    "units": "m"
+  },
+  "primaryTokenAttribute": "salud",
+  "secondaryTokenAttribute": "cansancio"
+}

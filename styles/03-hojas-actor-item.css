@@ -1,0 +1,182 @@
+/**
+ * @file 05-panel-master.css
+ * @description Cuadrícula visual de iconos y números para el Panel del Master en Foundry VTT v14.
+ */
+
+.cyd-gm-barra-dificultad {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.cyd-gm-control-numero {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.88rem;
+}
+
+.cyd-gm-input-dificultad {
+  width: 44px !important;
+  height: 26px !important;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--cyd-acento);
+}
+
+.cyd-gm-presets {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cyd-gm-btn-icono,
+.cyd-gm-btn-tag {
+  width: auto !important;
+  height: 26px !important;
+  min-height: 0 !important;
+  padding: 0 8px !important;
+  margin: 0 !important;
+  font-size: 0.78rem !important;
+  line-height: 24px !important;
+}
+
+.cyd-gm-lista-personajes {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Cuadrícula de tarjetas resumen de jugadores (3 a 4 por fila) */
+.cyd-gm-grid-compacto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.cyd-gm-tile {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--cyd-borde);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cyd-gm-tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+}
+
+.cyd-gm-actor-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  flex: 1;
+}
+
+.cyd-gm-actor-link:hover .cyd-gm-nombre {
+  color: var(--cyd-acento);
+  text-decoration: underline;
+}
+
+.cyd-gm-avatar-mini {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid var(--cyd-acento);
+  flex-shrink: 0;
+}
+
+.cyd-gm-nombre {
+  font-weight: bold;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cyd-gm-cansancio-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.76rem;
+}
+
+.cyd-gm-mini-click {
+  cursor: pointer;
+  padding: 0 3px;
+  font-weight: bold;
+  color: var(--cyd-acento);
+  user-select: none;
+}
+
+.cyd-gm-mini-click:hover {
+  color: #fff;
+}
+
+/* Filas de iconos y números */
+.cyd-gm-fila-iconos {
+  display: grid;
+  gap: 4px;
+}
+
+.cyd-gm-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.cyd-gm-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.cyd-gm-stat-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  padding: 2px 4px;
+  text-align: center;
+  font-size: 0.78rem;
+}
+
+.cyd-gm-zona-link {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--cyd-borde);
+  border-radius: 4px;
+  padding: 3px 4px;
+  text-align: center;
+  font-size: 0.76rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.cyd-gm-zona-link:hover {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: var(--cyd-acento);
+}
+
+.cyd-gm-zona-activa {
+  border-color: var(--cyd-exito);
+  background: rgba(46, 204, 113, 0.15);
+}
+
+.cyd-gm-sin-pilas {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--cyd-acento);
+  cursor: pointer;
+  padding: 4px;
+}

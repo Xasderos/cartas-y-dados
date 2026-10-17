@@ -1,0 +1,11 @@
+/**
+ * @file sistema.css
+ * @description Punto de entrada de hojas de estilo para Foundry VTT v14.
+ * Importa la arquitectura CSS dividida por responsabilidades para facilitar su mantenimiento.
+ */
+
+@import url("./01-variables-y-base.css");
+@import url("./02-componentes.css");
+@import url("./03-hojas-actor-item.css");
+@import url("./04-cartas-y-chat.css");
+@import url("./05-panel-master.css");

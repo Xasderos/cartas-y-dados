@@ -1,0 +1,111 @@
+/**
+ * @file 02-componentes.css
+ * @description Componentes reutilizables: paneles, botones, cajas de recursos, píldoras e inputs.
+ */
+
+.cyd-panel,
+.cyd-panel-controles,
+.cyd-panel-mano {
+  background: var(--cyd-bg-panel);
+  border: 1px solid var(--cyd-borde);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cyd-panel-flex {
+  flex: 1;
+}
+
+.cyd-cabecera-seccion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--cyd-borde);
+  padding-bottom: 4px;
+}
+
+.cyd-cabecera-seccion h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* Cajas de recursos (Salud, Defensa, Cansancio, Mano) */
+.cyd-recursos-barra {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.cyd-recurso-caja {
+  background: var(--cyd-bg-caja);
+  padding: 5px 8px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.cyd-recurso-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cyd-recurso-inputs input {
+  width: 42px;
+  text-align: center;
+}
+
+/* Botones y enlaces */
+.cyd-btn-mini {
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.cyd-btn-micro {
+  padding: 0 5px;
+  font-size: 0.7rem;
+  line-height: 1.1;
+}
+
+.cyd-link-item {
+  cursor: pointer;
+  color: var(--cyd-acento);
+}
+
+.cyd-link-item:hover {
+  text-decoration: underline;
+}
+
+.cyd-texto-vacio {
+  font-size: 0.8rem;
+  color: var(--cyd-texto-suave);
+  font-style: italic;
+  margin: 2px 0;
+}
+
+.cyd-textarea {
+  width: 100%;
+  flex: 1;
+  background: #14181d;
+  color: var(--cyd-texto);
+  border: 1px solid var(--cyd-borde);
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.cyd-inline-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.cyd-inline-control select {
+  width: 64px;
+}

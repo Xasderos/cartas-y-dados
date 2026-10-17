@@ -1,0 +1,281 @@
+{{!--
+  Plantilla táctica para Criaturas y PNJs en Foundry VTT v14 (ApplicationV2).
+  - Selector de dado individual por cada característica.
+  - Mazo de Jefe integrado (Mano, Mazo, Descarte y Quemadas visibles y usables, sin Trinkets).
+--}}
+<div class="cyd-hoja-contenedor">
+
+  {{!-- 1. CABECERA DE LA CRIATURA --}}
+  <header class="cyd-cabecera">
+    <img class="cyd-avatar" src="{{actor.img}}" data-edit="img" title="{{actor.name}}" />
+    <div class="cyd-cabecera-principal">
+      <div class="cyd-fila-titulo">
+        <input type="text" name="name" value="{{actor.name}}" class="cyd-nombre-actor" placeholder="Nombre de la Criatura / PNJ" />
+        <label class="cyd-badge-nivel" data-tooltip="Nivel de Amenaza del PNJ">
+          💀 Amenaza <input type="number" name="system.amenaza" value="{{system.amenaza}}" min="1" />
+        </label>
+        {{#unless tieneMazoJefe}}
+          <button type="button" class="cyd-btn-mini" data-action="inicializarPilasJefe" data-tooltip="Crea e integra un Mazo de Jefe en esta ficha">
+            🃏 Activar Mazo de Jefe
+          </button>
+        {{/unless}}
+      </div>
+
+      <div class="cyd-recursos-barra {{#unless tieneMazoJefe}}cyd-cols-3{{/unless}}">
+        <div class="cyd-recurso-caja" data-tooltip="Base: {{system.salud.max}} + Vigor: {{system.salud.bonoVigor}} + Bonos: {{system.salud.bonoOtros}} = {{system.salud.maxTotal}}">
+          <span>❤️ Salud</span>
+          <div class="cyd-recurso-inputs">
+            <input type="number" name="system.salud.value" value="{{system.salud.value}}" />
+            <span>/ {{system.salud.maxTotal}}</span>
+            <small data-tooltip="Salud Base">(Base: <input type="number" name="system.salud.max" value="{{system.salud.max}}" style="width:34px;" />)</small>
+          </div>
+        </div>
+
+        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo: +{{system.bonificadorDefensa}}">
+          <span>🛡️ Defensa</span>
+          <div class="cyd-recurso-inputs">
+            <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" />
+            <span>({{system.defensaTotal}})</span>
+          </div>
+        </div>
+
+        <div class="cyd-recurso-caja">
+          <span>⚡ Cansancio</span>
+          <div class="cyd-recurso-inputs">
+            <input type="number" name="system.cansancio.value" value="{{system.cansancio.value}}" />
+            <span>/ {{system.cansancio.maxTotal}}</span>
+          </div>
+        </div>
+
+        {{#if tieneMazoJefe}}
+          <div class="cyd-recurso-caja">
+            <span>✋ Mano Jefe</span>
+            <div class="cyd-recurso-inputs">
+              <strong>{{contadoresPilas.manoActual}} / {{system.limiteMano}}</strong>
+            </div>
+          </div>
+        {{/if}}
+      </div>
+    </div>
+  </header>
+
+  {{!-- 2. CARACTERÍSTICAS CON SELECTOR DE DADO INDIVIDUAL POR ATRIBUTO --}}
+  <section class="cyd-panel">
+    <div class="cyd-caracteristicas-grid">
+
+      {{!-- VIGOR --}}
+      <div class="cyd-caract-tarjeta">
+        <span class="cyd-palo-icono">⚔️ Vigor (Espadas)</span>
+        <div class="cyd-caract-fila-valores">
+          <input type="number" name="system.caracteristicas.vigor" value="{{system.caracteristicas.vigor}}" min="1" max="10" title="Valor Base" />
+          <select name="system.dadosCaracteristicas.vigor" class="cyd-select-dado-individual" title="Tipo de dado de Vigor">
+            <option value="d4" {{#if (eq system.dadosCaracteristicas.vigor "d4")}}selected{{/if}}>d4</option>
+            <option value="d6" {{#if (eq system.dadosCaracteristicas.vigor "d6")}}selected{{/if}}>d6</option>
+            <option value="d8" {{#if (eq system.dadosCaracteristicas.vigor "d8")}}selected{{/if}}>d8</option>
+            <option value="d10" {{#if (eq system.dadosCaracteristicas.vigor "d10")}}selected{{/if}}>d10</option>
+            <option value="d12" {{#if (eq system.dadosCaracteristicas.vigor "d12")}}selected{{/if}}>d12</option>
+          </select>
+        </div>
+        <button type="button" class="cyd-btn-mini" style="width:100%;" data-action="tiradaAtributoPnj" data-caracteristica="vigor">
+          ⚔️ Tirar {{system.caracteristicasTotales.vigor}}{{system.dadosCaracteristicas.vigor}}
+        </button>
+      </div>
+
+      {{!-- DESTREZA --}}
+      <div class="cyd-caract-tarjeta">
+        <span class="cyd-palo-icono">🦯 Destreza (Bastos)</span>
+        <div class="cyd-caract-fila-valores">
+          <input type="number" name="system.caracteristicas.destreza" value="{{system.caracteristicas.destreza}}" min="1" max="10" title="Valor Base" />
+          <select name="system.dadosCaracteristicas.destreza" class="cyd-select-dado-individual" title="Tipo de dado de Destreza">
+            <option value="d4" {{#if (eq system.dadosCaracteristicas.destreza "d4")}}selected{{/if}}>d4</option>
+            <option value="d6" {{#if (eq system.dadosCaracteristicas.destreza "d6")}}selected{{/if}}>d6</option>
+            <option value="d8" {{#if (eq system.dadosCaracteristicas.destreza "d8")}}selected{{/if}}>d8</option>
+            <option value="d10" {{#if (eq system.dadosCaracteristicas.destreza "d10")}}selected{{/if}}>d10</option>
+            <option value="d12" {{#if (eq system.dadosCaracteristicas.destreza "d12")}}selected{{/if}}>d12</option>
+          </select>
+        </div>
+        <button type="button" class="cyd-btn-mini" style="width:100%;" data-action="tiradaAtributoPnj" data-caracteristica="destreza">
+          ⚔️ Tirar {{system.caracteristicasTotales.destreza}}{{system.dadosCaracteristicas.destreza}}
+        </button>
+      </div>
+
+      {{!-- INGENIO --}}
+      <div class="cyd-caract-tarjeta">
+        <span class="cyd-palo-icono">🪙 Ingenio (Oros)</span>
+        <div class="cyd-caract-fila-valores">
+          <input type="number" name="system.caracteristicas.ingenio" value="{{system.caracteristicas.ingenio}}" min="1" max="10" title="Valor Base" />
+          <select name="system.dadosCaracteristicas.ingenio" class="cyd-select-dado-individual" title="Tipo de dado de Ingenio">
+            <option value="d4" {{#if (eq system.dadosCaracteristicas.ingenio "d4")}}selected{{/if}}>d4</option>
+            <option value="d6" {{#if (eq system.dadosCaracteristicas.ingenio "d6")}}selected{{/if}}>d6</option>
+            <option value="d8" {{#if (eq system.dadosCaracteristicas.ingenio "d8")}}selected{{/if}}>d8</option>
+            <option value="d10" {{#if (eq system.dadosCaracteristicas.ingenio "d10")}}selected{{/if}}>d10</option>
+            <option value="d12" {{#if (eq system.dadosCaracteristicas.ingenio "d12")}}selected{{/if}}>d12</option>
+          </select>
+        </div>
+        <button type="button" class="cyd-btn-mini" style="width:100%;" data-action="tiradaAtributoPnj" data-caracteristica="ingenio">
+          ⚔️ Tirar {{system.caracteristicasTotales.ingenio}}{{system.dadosCaracteristicas.ingenio}}
+        </button>
+      </div>
+
+      {{!-- VOLUNTAD --}}
+      <div class="cyd-caract-tarjeta">
+        <span class="cyd-palo-icono">🏆 Voluntad (Copas)</span>
+        <div class="cyd-caract-fila-valores">
+          <input type="number" name="system.caracteristicas.voluntad" value="{{system.caracteristicas.voluntad}}" min="1" max="10" title="Valor Base" />
+          <select name="system.dadosCaracteristicas.voluntad" class="cyd-select-dado-individual" title="Tipo de dado de Voluntad">
+            <option value="d4" {{#if (eq system.dadosCaracteristicas.voluntad "d4")}}selected{{/if}}>d4</option>
+            <option value="d6" {{#if (eq system.dadosCaracteristicas.voluntad "d6")}}selected{{/if}}>d6</option>
+            <option value="d8" {{#if (eq system.dadosCaracteristicas.voluntad "d8")}}selected{{/if}}>d8</option>
+            <option value="d10" {{#if (eq system.dadosCaracteristicas.voluntad "d10")}}selected{{/if}}>d10</option>
+            <option value="d12" {{#if (eq system.dadosCaracteristicas.voluntad "d12")}}selected{{/if}}>d12</option>
+          </select>
+        </div>
+        <button type="button" class="cyd-btn-mini" style="width:100%;" data-action="tiradaAtributoPnj" data-caracteristica="voluntad">
+          ⚔️ Tirar {{system.caracteristicasTotales.voluntad}}{{system.dadosCaracteristicas.voluntad}}
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <main class="cyd-cuerpo-hoja">
+
+    {{!-- 3. ZONA DE MAZO DE JEFE (SOLO SI ESTÁ ACTIVO; SIN TRINKETS) --}}
+    {{#if tieneMazoJefe}}
+      <section class="cyd-panel-controles">
+        <div class="cyd-acciones-turno cyd-cols-3">
+          <button type="button" data-action="robarTurno">🎴 Robar Turno (Jefe)</button>
+          <button type="button" data-action="finCombate">🔄 Fin Combate (Barajar Todo)</button>
+          <button type="button" data-action="descansar">🏕️ Reiniciar / Descansar</button>
+        </div>
+
+        <div class="cyd-resumen-pilas">
+          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="mazo" data-tooltip="Abrir Mazo del Jefe">
+            📚 Mazo: <strong>{{contadoresPilas.mazoDisponibles}}/{{contadoresPilas.mazoTotal}}</strong>
+          </span>
+          <button type="button" class="cyd-btn-mini" data-action="crearCartaEnMazo">+ Carta</button>
+          {{#if (eq contadoresPilas.mazoTotal 0)}}
+            <button type="button" class="cyd-btn-mini" data-action="generarMazoBase">🎁 Mazo Base</button>
+          {{/if}}
+          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="mano" data-tooltip="Abrir Mano del Jefe">
+            ✋ Mano: <strong>{{contadoresPilas.manoActual}}/{{system.limiteMano}}</strong>
+          </span>
+          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="descarte" data-tooltip="Abrir Descarte del Jefe">
+            📥 Descarte: <strong>{{contadoresPilas.descarteActual}}</strong>
+          </span>
+          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="quemadas" data-tooltip="Abrir Quemadas del Jefe">
+            🔥 Quemadas: <strong>{{contadoresPilas.quemadasActual}}</strong>
+          </span>
+        </div>
+      </section>
+
+      <section class="cyd-panel-mano">
+        <div class="cyd-cabecera-seccion">
+          <h3>✋ Mano del Jefe ({{contadoresPilas.manoActual}} / {{system.limiteMano}})</h3>
+          <small>🎯 Pulsa <strong>T</strong> sobre un PJ antes de jugar una carta de ataque</small>
+        </div>
+
+        {{#if cartasEnMano.length}}
+          <div class="cyd-grid-cartas">
+            {{#each cartasEnMano as |carta|}}
+              <article class="cyd-carta-item">
+                <header class="cyd-carta-cabecera">
+                  <span class="cyd-carta-titulo">{{carta.nombre}}</span>
+                  <span class="cyd-carta-dado">{{carta.cantidadDados}}{{carta.tipoDado}}</span>
+                </header>
+                <div class="cyd-carta-subtitulo">
+                  <span>Palo: <strong>{{carta.palo}}</strong> ({{carta.caracteristica}})</span>
+                  {{#if carta.seQuema}}<span>🔥 Se Quema</span>{{/if}}
+                </div>
+                <div class="cyd-carta-efecto">{{{carta.efecto}}}</div>
+                <footer class="cyd-carta-acciones">
+                  <button type="button" class="cyd-btn-jugar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-quemar="false">
+                    🎲 Jugar ({{carta.cantidadDados}}{{carta.tipoDado}})
+                  </button>
+                  <button type="button" class="cyd-btn-quemar-especial" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-quemar="true" data-tooltip="Quemar carta">
+                    🔥
+                  </button>
+                </footer>
+              </article>
+            {{/each}}
+          </div>
+        {{else}}
+          <p class="cyd-texto-vacio">Mano vacía. Pulsa "🎴 Robar Turno (Jefe)" para robar cartas.</p>
+        {{/if}}
+      </section>
+    {{/if}}
+
+    {{!-- 4. PANELES SEPARADOS: HABILIDADES Y EQUIPO --}}
+    <div class="cyd-dos-columnas">
+
+      <section class="cyd-panel">
+        <div class="cyd-cabecera-seccion">
+          <h3>🐾 Ataques y Habilidades</h3>
+          <button type="button" class="cyd-btn-mini" data-action="crearItemPnj" data-tipo="habilidad">+ Habilidad</button>
+        </div>
+
+        {{#if habilidades.length}}
+          <div class="cyd-lista-items">
+            {{#each habilidades as |hab|}}
+              <div class="cyd-fila-item" data-tooltip="{{hab.system.descripcion}}">
+                <div class="cyd-fila-item-info">
+                  <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{hab.id}}">{{hab.name}}</strong>
+                  <small>{{hab.system.caracteristica}} ({{hab.system.tipoDado}}{{#if hab.system.bonoTirada}}+{{hab.system.bonoTirada}}{{/if}})</small>
+                </div>
+                <div class="cyd-fila-item-acciones">
+                  <button type="button" class="cyd-btn-mini" data-action="usarHabilidad" data-item-id="{{hab.id}}">
+                    {{#if hab.system.esAtaque}}⚔️{{else}}⚡{{/if}}
+                  </button>
+                  <button type="button" class="cyd-btn-mini" data-action="eliminarItem" data-item-id="{{hab.id}}">✕</button>
+                </div>
+              </div>
+            {{/each}}
+          </div>
+        {{else}}
+          <p class="cyd-texto-vacio">Sin habilidades registradas.</p>
+        {{/if}}
+      </section>
+
+      <section class="cyd-panel">
+        <div class="cyd-cabecera-seccion">
+          <h3>🎒 Equipo y Objetos</h3>
+          <button type="button" class="cyd-btn-mini" data-action="crearItemPnj" data-tipo="objeto">+ Objeto</button>
+        </div>
+
+        {{#if objetos.length}}
+          <div class="cyd-lista-items">
+            {{#each objetos as |obj|}}
+              <div class="cyd-fila-item {{#if obj.system.equipado}}cyd-item-equipado{{/if}}" data-tooltip="{{obj.system.descripcion}}">
+                <div class="cyd-fila-item-info">
+                  <button type="button" class="cyd-btn-mini" data-action="alternarEquipado" data-item-id="{{obj.id}}">
+                    {{#if obj.system.equipado}}🛡️{{else}}⚪{{/if}}
+                  </button>
+                  <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{obj.id}}">{{obj.name}}</strong>
+                  <small>
+                    {{#if obj.system.bonificadores.defensa}}(🛡️+{{obj.system.bonificadores.defensa}}){{/if}}
+                    {{#if obj.system.bonificadores.saludMax}}(❤️+{{obj.system.bonificadores.saludMax}}){{/if}}
+                  </small>
+                </div>
+                <div class="cyd-fila-item-acciones">
+                  <span class="cyd-tag-cantidad">x{{obj.system.cantidad}}</span>
+                  <button type="button" class="cyd-btn-mini" data-action="eliminarItem" data-item-id="{{obj.id}}">✕</button>
+                </div>
+              </div>
+            {{/each}}
+          </div>
+        {{else}}
+          <p class="cyd-texto-vacio">Sin objetos ni armaduras.</p>
+        {{/if}}
+      </section>
+
+    </div>
+
+    {{!-- 5. NOTAS DEL MASTER --}}
+    <section class="cyd-panel cyd-panel-flex">
+      <div class="cyd-cabecera-seccion">
+        <h3>📝 Comportamiento / Notas</h3>
+      </div>
+      <textarea name="system.biografia" rows="2" class="cyd-textarea">{{system.biografia}}</textarea>
+    </section>
+  </main>
+</div>

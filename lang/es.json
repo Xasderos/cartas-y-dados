@@ -1,0 +1,27 @@
+{
+  "TYPES": {
+    "Actor": {
+      "personaje": "Personaje Jugador",
+      "pnj": "Personaje No Jugador"
+    },
+    "Item": {
+      "raza": "Raza",
+      "origen": "Origen",
+      "clase": "Clase",
+      "objeto": "Objeto / Equipo",
+      "habilidad": "Habilidad / Rasgo"
+    },
+    "Card": {
+      "accion": "Carta de Acción",
+      "trinket": "Trinket"
+    }
+  },
+  "CARTASYDADOS": {
+    "Palos": {
+      "Espadas": "Espadas",
+      "Copas": "Copas",
+      "Oros": "Oros",
+      "Bastos": "Bastos"
+    }
+  }
+}
