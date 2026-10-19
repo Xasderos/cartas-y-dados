@@ -133,8 +133,8 @@ export class SistemaActor extends Actor {
       }
     ];
 
-    await mazo.createEmbeddedDocuments("Card", cartasAccionBase);
-    await trinkets.createEmbeddedDocuments("Card", trinketsBase);
+    await mazo.createEmbeddedDocuments("Card", cartasAccionBase.map(c => this._normalizarPayloadCarta(c)));
+    await trinkets.createEmbeddedDocuments("Card", trinketsBase.map(c => this._normalizarPayloadCarta(c)));
     await mazo.shuffle({ chatNotification: false });
     await trinkets.shuffle({ chatNotification: false });
 
@@ -186,7 +186,8 @@ export class SistemaActor extends Actor {
 
     let creadas = [];
     if (datosNuevasCartas.length > 0) {
-      creadas = await pilaDestino.createEmbeddedDocuments("Card", datosNuevasCartas);
+      const normalizadas = datosNuevasCartas.map(c => this._normalizarPayloadCarta(c));
+      creadas = await pilaDestino.createEmbeddedDocuments("Card", normalizadas);
     }
 
     this.prepareData();
@@ -210,7 +211,7 @@ export class SistemaActor extends Actor {
     delete datosCopia._id;
     datosCopia.drawn = false;
 
-    const [cartaCreada] = await pilaDestino.createEmbeddedDocuments("Card", [datosCopia]);
+    const [cartaCreada] = await pilaDestino.createEmbeddedDocuments("Card", [this._normalizarPayloadCarta(datosCopia)]);
     await pilaOrigen.deleteEmbeddedDocuments("Card", [carta.id]);
 
     // Recalcular inmediatamente las propiedades derivadas del Actor (ej. Defensa por Trinkets en juego)
@@ -276,19 +277,48 @@ export class SistemaActor extends Actor {
       await mazo.updateEmbeddedDocuments("Card", updatesMazo);
     }
     if (nuevasParaMazo.length > 0 && mazo) {
-      await mazo.createEmbeddedDocuments("Card", nuevasParaMazo);
+      await mazo.createEmbeddedDocuments("Card", nuevasParaMazo.map(c => this._normalizarPayloadCarta(c)));
     }
     if (updatesTrinkets.length > 0 && trinkets) {
       await trinkets.updateEmbeddedDocuments("Card", updatesTrinkets);
     }
     if (nuevasParaTrinkets.length > 0 && trinkets) {
-      await trinkets.createEmbeddedDocuments("Card", nuevasParaTrinkets);
+      await trinkets.createEmbeddedDocuments("Card", nuevasParaTrinkets.map(c => this._normalizarPayloadCarta(c)));
     }
     if (idsABorrarDePila.length > 0) {
       await pilaOrigen.deleteEmbeddedDocuments("Card", idsABorrarDePila);
     }
 
     this.prepareData();
+  }
+
+  /**
+   * Normaliza el payload de datos de una Card para crear/mover entre pilas,
+   * asegurando que `name`, `face`, `faces` y `back` estén sincronizados y
+   * sin valores "Unknown", evitando que Foundry VTT v14 sobrescriba el nombre.
+   * @param {object} datosCarta - Datos crudos de la carta.
+   * @returns {object} Payload con name, face: 0, faces y back sincronizados.
+   */
+  _normalizarPayloadCarta(datosCarta) {
+    const nombreLimpio = nombreVisibleCarta(datosCarta);
+    const imgCarta = datosCarta.img || datosCarta.faces?.[0]?.img || "icons/svg/card-hand.svg";
+    return {
+      ...datosCarta,
+      name: nombreLimpio,
+      face: 0,
+      faces: [
+        {
+          ...(datosCarta.faces?.[0] ?? {}),
+          name: nombreLimpio,
+          img: imgCarta
+        }
+      ],
+      back: {
+        ...(datosCarta.back ?? {}),
+        name: nombreLimpio,
+        img: datosCarta.back?.img || imgCarta
+      }
+    };
   }
 
   /* ======================================================================== */

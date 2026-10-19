@@ -21,6 +21,7 @@ import { HojaCartaSistema } from "./applications/card-sheet.mjs";
 import { PanelMasterApp } from "./applications/gm-panel.mjs";
 import { HojaPnjActor } from "./applications/npc-sheet.mjs";
 import { registrarAjustesDelSistema } from "./settings.mjs";
+import { limpiarNombreCarta, nombreVisibleCarta } from "./config.mjs";
 
 const { DocumentSheetConfig } = foundry.applications.apps;
 
@@ -35,6 +36,12 @@ Hooks.once("init", () => {
   CONFIG.Combat.initiative = {
     formula: "1d10 + @caracteristicasTotales.consciencia",
     decimals: 2
+  };
+
+  // Registrar etiquetas de subtipos de Card para Foundry v14
+  CONFIG.Card.typeLabels = {
+    accion: "TYPES.Card.accion",
+    trinket: "TYPES.Card.trinket"
   };
 
   // Registrar todas las opciones configurables del sistema (Salud, Defensa, Cansancio PJ/PNJ, Mano, etc.)
@@ -68,6 +75,59 @@ Hooks.once("init", () => {
     accion: CartaAccionDataModel,
     trinket: CartaTrinketDataModel
   });
+});
+
+/**
+ * Sanea los nombres de todas las cartas existentes en el mundo para eliminar
+ * cualquier aparición de "Unknown" y sincronizar name, faces y back.
+ * Se ejecuta una sola vez al iniciar el mundo (Hook ready) solo para el GM.
+ */
+async function sanearNombresCartasExistentes() {
+  if (!game.user?.isGM) return;
+  const nombreIMG = "icons/svg/card-hand.svg";
+  for (const pila of game.cards.contents) {
+    if (!pila.cards || pila.cards.size === 0) continue;
+    const updates = [];
+    for (const carta of pila.cards) {
+      const nombreCorregido = nombreVisibleCarta(carta);
+      const necesitaActualizacion =
+        /^unknown/i.test(String(carta.name ?? "")) ||
+        /^unknown/i.test(String(carta._source?.name ?? "")) ||
+        carta.face === null ||
+        !carta.faces?.[0] ||
+        carta.faces[0].name !== nombreCorregido;
+      if (!necesitaActualizacion) continue;
+      updates.push({
+        _id: carta.id,
+        name: nombreCorregido,
+        face: 0,
+        faces: [
+          {
+            ...(carta.faces?.[0] ?? {}),
+            name: nombreCorregido,
+            img: carta.img || nombreIMG
+          }
+        ],
+        back: {
+          ...(carta.back ?? {}),
+          name: nombreCorregido
+        }
+      });
+    }
+    if (updates.length > 0) {
+      await pila.updateEmbeddedDocuments("Card", updates);
+    }
+  }
+  // Recalcular datos derivados de todos los actores
+  for (const actor of game.actors) {
+    actor.prepareData();
+    if (actor.sheet?.rendered) actor.sheet.render();
+  }
+}
+
+Hooks.once("ready", async () => {
+  await sanearNombresCartasExistentes();
+
 
   // Hoja predeterminada para Personajes Jugadores (y opcional para PNJs Jefes)
   DocumentSheetConfig.registerSheet(Actor, "cartas-y-dados", HojaPersonajeActor, {

@@ -4,6 +4,36 @@
  * con Razas, Orígenes, Clases, Equipo, Ataques de Criatura, Mazos de Cartas/Trinkets y Bestiario.
  */
 
+import { nombreVisibleCarta } from "./config.mjs";
+
+/**
+ * Normaliza el payload de una Card para asegurar name, face, faces y back sincronizados
+ * y sin valores "Unknown".
+ * @param {object} datosCarta - Datos crudos de la carta.
+ * @returns {object} Payload normalizado.
+ */
+function normalizarPayloadCarta(datosCarta) {
+  const nombreLimpio = nombreVisibleCarta(datosCarta);
+  const imgCarta = datosCarta.img || datosCarta.faces?.[0]?.img || "icons/svg/card-hand.svg";
+  return {
+    ...datosCarta,
+    name: nombreLimpio,
+    face: 0,
+    faces: [
+      {
+        ...(datosCarta.faces?.[0] ?? {}),
+        name: nombreLimpio,
+        img: imgCarta
+      }
+    ],
+    back: {
+      ...(datosCarta.back ?? {}),
+      name: nombreLimpio,
+      img: datosCarta.back?.img || imgCarta
+    }
+  };
+}
+
 export async function poblarCompendiosDelSistema() {
   if (!game.user.isGM) return;
 
@@ -126,16 +156,16 @@ export async function poblarCompendiosDelSistema() {
     ], { pack: packCartas.collection });
 
     await mazoEstandar.createEmbeddedDocuments("Card", [
-      { name: "Estocada Directa", type: "accion", system: { palo: "espadas", numero: 2, esAtaque: true, seQuema: false, efecto: "<p>Ataque cuerpo a cuerpo fiable.</p>" } },
-      { name: "Tajo Pesado", type: "accion", system: { palo: "espadas", numero: 3, esAtaque: true, seQuema: false, automatizacion: { bonoTirada: 1 }, efecto: "<p>Golpe contundente (+1 al ataque).</p>" } },
-      { name: "Disparo Rápido", type: "accion", system: { palo: "bastos", numero: 2, esAtaque: true, seQuema: false, efecto: "<p>Ataque veloz a distancia.</p>" } },
-      { name: "Maniobra Táctica", type: "accion", system: { palo: "oros", numero: 2, esAtaque: false, seQuema: false, automatizacion: { robarCartas: 1 }, efecto: "<p>Roba +1 carta adicional.</p>" } },
-      { name: "Aliento Recuperador", type: "accion", system: { palo: "copas", numero: 2, esAtaque: false, seQuema: false, automatizacion: { curacion: 3, cambioCansancio: -1 }, efecto: "<p>Cura 3 de Salud y reduce 1 de Cansancio.</p>" } }
+      normalizarPayloadCarta({ name: "Estocada Directa", type: "accion", system: { palo: "espadas", numero: 2, esAtaque: true, seQuema: false, efecto: "<p>Ataque cuerpo a cuerpo fiable.</p>" } }),
+      normalizarPayloadCarta({ name: "Tajo Pesado", type: "accion", system: { palo: "espadas", numero: 3, esAtaque: true, seQuema: false, automatizacion: { bonoTirada: 1 }, efecto: "<p>Golpe contundente (+1 al ataque).</p>" } }),
+      normalizarPayloadCarta({ name: "Disparo Rápido", type: "accion", system: { palo: "bastos", numero: 2, esAtaque: true, seQuema: false, efecto: "<p>Ataque veloz a distancia.</p>" } }),
+      normalizarPayloadCarta({ name: "Maniobra Táctica", type: "accion", system: { palo: "oros", numero: 2, esAtaque: false, seQuema: false, automatizacion: { robarCartas: 1 }, efecto: "<p>Roba +1 carta adicional.</p>" } }),
+      normalizarPayloadCarta({ name: "Aliento Recuperador", type: "accion", system: { palo: "copas", numero: 2, esAtaque: false, seQuema: false, automatizacion: { curacion: 3, cambioCansancio: -1 }, efecto: "<p>Cura 3 de Salud y reduce 1 de Cansancio.</p>" } })
     ]);
 
     await mazoTrinkets.createEmbeddedDocuments("Card", [
-      { name: "Égida de Hierro", type: "trinket", system: { palo: "espadas", numero: 2, realizaTirada: false, esAtaque: false, bonoDefensaEnJuego: 2, efectoPermanente: "<p>Portarlo infunde aplomo.</p>", efectoAlJugar: "<p>Otorga <strong>+2 a tu Defensa</strong> mientras permanezca En Juego.</p>" } },
-      { name: "Cáliz de Brasas", type: "trinket", system: { palo: "copas", numero: 3, realizaTirada: true, esAtaque: true, bonoDefensaEnJuego: 0, automatizacion: { curacion: 2 }, efectoPermanente: "<p>Tibio al tacto.</p>", efectoAlJugar: "<p>Ataca con fuego espiritual y te cura 2 de Salud.</p>" } }
+      normalizarPayloadCarta({ name: "Égida de Hierro", type: "trinket", system: { palo: "espadas", numero: 2, realizaTirada: false, esAtaque: false, bonoDefensaEnJuego: 2, efectoPermanente: "<p>Portarlo infunde aplomo.</p>", efectoAlJugar: "<p>Otorga <strong>+2 a tu Defensa</strong> mientras permanezca En Juego.</p>" } }),
+      normalizarPayloadCarta({ name: "Cáliz de Brasas", type: "trinket", system: { palo: "copas", numero: 3, realizaTirada: true, esAtaque: true, bonoDefensaEnJuego: 0, automatizacion: { curacion: 2 }, efectoPermanente: "<p>Tibio al tacto.</p>", efectoAlJugar: "<p>Ataca con fuego espiritual y te cura 2 de Salud.</p>" } })
     ]);
 
     await packCartas.configure({ locked: true });

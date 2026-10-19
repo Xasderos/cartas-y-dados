@@ -99,29 +99,56 @@ export function abreviadoPalo(clavePalo) {
  * @param {string} base - Nombre base deseado (ej. "Nuevo Trinket").
  * @returns {string} Nombre garantizado como único dentro de la colección.
  */
+/**
+ * Limpia un nombre de carta eliminando cualquier prefijo o aparición residual de
+ * "Unknown" (case-insensitive). Devuelve string vacío si no hay nombre válido.
+ * @param {string} nombreRaw - Nombre crudo de la carta (puede ser undefined).
+ * @returns {string} Nombre limpio sin "Unknown", o string vacío si no hay nombre.
+ */
+export function limpiarNombreCarta(nombreRaw) {
+  if (typeof nombreRaw !== "string") return "";
+  return String(nombreRaw)
+    .replace(/^unknown\s*[:\-–—]?\s*/i, "")
+    .replace(/^unknown$/i, "")
+    .replace(/\s*unknown\s*/gi, " ")
+    .trim();
+}
+
+/**
+ * Genera un nombre único que no colisione con ninguno de los nombres existentes.
+ * Si `base` ya está en uso, añade un sufijo numérico incremental ("Base 2", "Base 3"...).
+ * Se usa al crear Trinkets y Cartas para que cada uno nazca con un nombre
+ * personalizado y diferenciable (v0.8.4).
+ * @param {Iterable<string>} nombresExistentes - Nombres ya presentes en la pila destino.
+ * @param {string} base - Nombre base deseado (ej. "Nuevo Trinket").
+ * @returns {string} Nombre garantizado como único dentro de la colección.
+ */
 export function generarNombreUnico(nombresExistentes, base) {
+  const raizLimpia = limpiarNombreCarta(base) || "Carta";
   const usados = new Set(
-    [...(nombresExistentes ?? [])].map(n => String(n ?? "").trim().toLowerCase())
+    [...(nombresExistentes ?? [])].map(n => limpiarNombreCarta(n))
   );
-  const raiz = String(base ?? "").trim() || "Carta";
-  if (!usados.has(raiz.toLowerCase())) return raiz;
+  if (!usados.has(raizLimpia.toLowerCase())) return raizLimpia;
   let i = 2;
-  while (usados.has(`${raiz} ${i}`.toLowerCase())) i++;
-  return `${raiz} ${i}`;
+  while (usados.has(`${raizLimpia} ${i}`.toLowerCase())) i++;
+  return `${raizLimpia} ${i}`;
 }
 
 /**
  * Devuelve siempre un nombre visible, identificativo y reconocible para una carta.
- * Si la carta tiene nombre propio lo devuelve tal cual; en caso contrario (nombre
- * vacío o ausente) construye un identificador descriptivo con tipo, palo y dado
- * para que jamás se muestre un genérico tipo "Unknown" o un vacío (v0.8.2).
+ * Si la carta tiene nombre propio lo devuelve limpio; en caso contrario (nombre
+ * vacío, ausente o que contenga "Unknown") construye un identificador descriptivo
+ * con tipo, palo y dado para que jamás se muestre un genérico tipo "Unknown" o un vacío.
  * @param {object} carta - Documento Card o datos con `name`, `type` y `system`.
  * @returns {string} Nombre garantizado no vacío y reconocible.
  */
 export function nombreVisibleCarta(carta) {
-  const nombre = String(carta?.name ?? "").trim();
-  if (nombre) return nombre;
-  const esTrinket = carta?.type === "trinket";
+  if (!carta) return "Carta (?)";
+  const nombreLimpio = limpiarNombreCarta(carta?.name)
+    || limpiarNombreCarta(carta?._source?.name)
+    || limpiarNombreCarta(carta?.faces?.[0]?.name);
+  if (nombreLimpio) return nombreLimpio;
+  const esTrinket = carta.type === "trinket";
   const etiqueta = esTrinket ? "Trinket" : "Carta";
   const palo = abreviadoPalo(carta?.system?.palo) || "?";
   const numero = Number(carta?.system?.numero) || "?";
