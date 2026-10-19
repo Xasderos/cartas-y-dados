@@ -29,7 +29,8 @@ export class HojaItemSistema extends HandlebarsApplicationMixin(ItemSheetV2) {
   /** @override */
   static PARTS = {
     main: {
-      template: "systems/cartas-y-dados/templates/item/hoja-item.hbs"
+      template: "systems/cartas-y-dados/templates/item/hoja-item.hbs",
+      scrollable: [".cyd-hoja-contenedor"]
     }
   };
 

@@ -38,17 +38,7 @@
         </select>
       </div>
 
-      <label class="cyd-recurso-caja" data-tooltip="Si está activo, resta la Defensa de la criatura objetivo para calcular el daño">
-        <span>⚔️ ¿Es Ataque?</span>
-        <input type="checkbox" name="system.esAtaque" {{checked system.esAtaque}} />
-      </label>
-
       {{#if esAccion}}
-        <label class="cyd-recurso-caja">
-          <span>🔥 ¿Se Quema?</span>
-          <input type="checkbox" name="system.seQuema" {{checked system.seQuema}} />
-        </label>
-      {{else}}
         <label class="cyd-recurso-caja">
           <span>🎲 ¿Lanza Dados?</span>
           <input type="checkbox" name="system.realizaTirada" {{checked system.realizaTirada}} />
