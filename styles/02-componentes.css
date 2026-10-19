@@ -109,3 +109,15 @@
 .cyd-inline-control select {
   width: 64px;
 }
+
+/* Aviso de nombre duplicado en la ficha de carta (v0.8.2): invita a usar
+   un nombre único y personalizado para diferenciar la carta en su pila */
+.cyd-aviso-duplicado {
+  margin: 2px 0 0 0;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  color: #f5c542;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 4px;
+}

@@ -5,7 +5,7 @@
  * e integra las zonas del Mazo de Jefe (Mano, Mazo, Descarte y Quemadas) directamente en la ficha.
  */
 
-import { abreviadoPalo } from "../config.mjs";
+import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -73,21 +73,23 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
 
     const contadoresPilas = tieneMazoJefe
       ? {
-          mazoDisponibles: pilas.mazo.availableCards.length,
-          mazoTotal: pilas.mazo.cards.size,
-          manoActual: pilas.mano.cards.size,
-          descarteActual: pilas.descarte.cards.size,
-          quemadasActual: pilas.quemadas.cards.size
-        }
+        mazoDisponibles: pilas.mazo.availableCards.length,
+        mazoTotal: pilas.mazo.cards.size,
+        manoActual: pilas.mano.cards.size,
+        descarteActual: pilas.descarte.cards.size,
+        quemadasActual: pilas.quemadas.cards.size
+      }
       : null;
 
-    // Cartas en mano del Jefe (excluyendo Trinkets)
+    // Cartas en mano del Jefe (excluyendo Trinkets). El nombre visible nunca
+    // muestra vacíos ni genéricos tipo "Unknown": usa un identificador
+    // descriptivo (tipo + palo + dado) como respaldo (v0.8.2).
     const cartasEnMano = tieneMazoJefe
       ? pilas.mano.cards.contents
           .filter(c => c.type === "accion")
           .map(c => ({
             id: c.id,
-            nombre: c.name,
+            nombre: nombreVisibleCarta(c),
             palo: c.system.palo,
             paloAbrev: abreviadoPalo(c.system.palo),
             numero: c.system.numero,
@@ -253,11 +255,15 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   static async #onCrearCartaEnMazo() {
-    const mazo = this.document.system.pilasDocumentos?.mazo;
+    const pilas = this.document.system.pilasDocumentos;
+    const mazo = pilas?.mazo;
     if (!mazo) return;
 
+    const nombresEnMazo = [...mazo.cards].map(c => c.name);
+    const nombreUnico = generarNombreUnico(nombresEnMazo, "Nueva Carta de Jefe");
+
     const [nuevaCarta] = await mazo.createEmbeddedDocuments("Card", [{
-      name: "Nueva Carta de Jefe",
+      name: nombreUnico,
       type: "accion"
     }]);
     if (nuevaCarta) nuevaCarta.sheet.render(true);

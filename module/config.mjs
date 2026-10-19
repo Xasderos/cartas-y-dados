@@ -89,3 +89,42 @@ export function abreviadoPalo(clavePalo) {
   return SISTEMA_CONFIG.palosCartas[clavePalo]?.abreviado
     ?? String(clavePalo ?? "").toUpperCase();
 }
+
+/**
+ * Genera un nombre único que no colisione con ninguno de los nombres existentes.
+ * Si `base` ya está en uso, añade un sufijo numérico incremental ("Base 2", "Base 3"...).
+ * Se usa al crear Trinkets y Cartas para que cada uno nazca con un nombre
+ * personalizado y diferenciable (v0.8.2).
+ * @param {Iterable<string>} nombresExistentes - Nombres ya presentes en la pila destino.
+ * @param {string} base - Nombre base deseado (ej. "Nuevo Trinket").
+ * @returns {string} Nombre garantizado como único dentro de la colección.
+ */
+export function generarNombreUnico(nombresExistentes, base) {
+  const usados = new Set(
+    [...(nombresExistentes ?? [])].map(n => String(n ?? "").trim().toLowerCase())
+  );
+  const raiz = String(base ?? "").trim() || "Carta";
+  if (!usados.has(raiz.toLowerCase())) return raiz;
+  let i = 2;
+  while (usados.has(`${raiz} ${i}`.toLowerCase())) i++;
+  return `${raiz} ${i}`;
+}
+
+/**
+ * Devuelve siempre un nombre visible, identificativo y reconocible para una carta.
+ * Si la carta tiene nombre propio lo devuelve tal cual; en caso contrario (nombre
+ * vacío o ausente) construye un identificador descriptivo con tipo, palo y dado
+ * para que jamás se muestre un genérico tipo "Unknown" o un vacío (v0.8.2).
+ * @param {object} carta - Documento Card o datos con `name`, `type` y `system`.
+ * @returns {string} Nombre garantizado no vacío y reconocible.
+ */
+export function nombreVisibleCarta(carta) {
+  const nombre = String(carta?.name ?? "").trim();
+  if (nombre) return nombre;
+  const esTrinket = carta?.type === "trinket";
+  const etiqueta = esTrinket ? "Trinket" : "Carta";
+  const palo = abreviadoPalo(carta?.system?.palo) || "?";
+  const numero = Number(carta?.system?.numero) || "?";
+  const dado = SISTEMA_CONFIG.dadoPorNumeroCarta?.[numero] ?? "?";
+  return `${etiqueta} ${palo}${numero} (${dado})`;
+}

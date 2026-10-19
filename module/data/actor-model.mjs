@@ -221,12 +221,14 @@ export class BaseActorDataModel extends TypeDataModel {
       base + bonificadorClase + bonificadorObjetos + bonificadorAtributos
     );
 
-    // Movimiento máximo = Base editable (ajuste world "movimientoBase") + (Físico Total * 5) metros
+    // Movimiento máximo = Base editable (ajuste world "movimientoBase") + (Físico Total * 5) metros.
+    // El campo `value` se sincroniza con `max` por compatibilidad con datos antiguos;
+    // en las fichas solo se muestra el cuadro editable de Base y el Total calculado (v0.8.2).
     const baseMov = Number.isFinite(Number(this.movimiento.base))
       ? Number(this.movimiento.base)
       : SISTEMA_CONFIG.movimientoBase;
-    this.movimiento.value = this.movimiento.max ?? (baseMov + this.caracteristicasTotales.fisico * 5);
     this.movimiento.max = baseMov + this.caracteristicasTotales.fisico * 5;
+    this.movimiento.value = this.movimiento.max;
 
     // NUEVA REGLA: Salud Máxima = Base (salud.max) + Físico Total + Otros Bonos (Raza/Origen/Clase/Equipo)
     this.salud.bonoFisico = this.caracteristicasTotales.fisico;

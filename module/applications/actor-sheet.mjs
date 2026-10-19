@@ -4,7 +4,7 @@
  * Clase, Objetos equipables y creador visual de Cartas/Trinkets.
  */
 
-import { abreviadoPalo } from "../config.mjs";
+import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -69,11 +69,13 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       pilas.mazo && pilas.mano && pilas.enJuego && pilas.descarte && pilas.quemadas && pilas.trinkets
     );
 
-    // Cartas en la mano usando caracteristicasTotales (Base + Raza + Origen + Clase + Equipo)
+    // Cartas en la mano usando caracteristicasTotales (Base + Raza + Origen + Clase + Equipo).
+    // El nombre visible nunca muestra vacíos ni genéricos tipo "Unknown": usa un
+    // identificador descriptivo (tipo + palo + dado) como respaldo (v0.8.2).
     const cartasEnMano = pilas.mano
       ? pilas.mano.cards.contents.map(c => ({
           id: c.id,
-          nombre: c.name,
+          nombre: nombreVisibleCarta(c),
           tipo: c.type,
           esTrinket: c.type === "trinket",
           palo: c.system.palo,
@@ -241,7 +243,9 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
 
   /**
    * Crea una nueva Carta de Acción (en el Mazo) o un nuevo Trinket (en el Mazo de Trinkets)
-   * y abre inmediatamente su editor visual ApplicationV2.
+   * con un nombre único y personalizable dentro de su pila ("Nuevo Trinket", "Nuevo Trinket 2"...),
+   * para que cada Trinket sea diferenciable desde su creación (v0.8.2).
+   * Abre inmediatamente su editor visual ApplicationV2 para personalizarlo.
    */
   static async #onCrearCartaEnMazo(event, target) {
     const tipoCarta = target.dataset.tipoCarta || "accion";
@@ -250,8 +254,12 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
 
     if (!pilaDestino) return;
 
+    const base = tipoCarta === "trinket" ? "Nuevo Trinket" : "Nueva Carta de Acción";
+    const nombresEnPila = [...pilaDestino.cards].map(c => c.name);
+    const nombreUnico = generarNombreUnico(nombresEnPila, base);
+
     const [nuevaCarta] = await pilaDestino.createEmbeddedDocuments("Card", [{
-      name: tipoCarta === "trinket" ? "Nuevo Trinket" : "Nueva Carta de Acción",
+      name: nombreUnico,
       type: tipoCarta
     }]);
 

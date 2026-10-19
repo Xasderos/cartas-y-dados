@@ -6,7 +6,7 @@
  * entre Mazo, Mano, En Juego, Descarte y Quemadas, recalculando la Defensa en tiempo real.
  */
 
-import { abreviadoPalo } from "../config.mjs";
+import { abreviadoPalo, nombreVisibleCarta } from "../config.mjs";
 
 export class SistemaActor extends Actor {
 
@@ -505,7 +505,7 @@ export class SistemaActor extends Actor {
 
     const saborChat = `
       <div class="cyd-carta-jugada">
-        <h3>${carta.system.esAtaque ? "⚔️" : "🃏"} ${carta.name} <small>(${etiquetaDestino})</small></h3>
+        <h3>${carta.system.esAtaque ? "⚔️" : "🃏"} ${nombreVisibleCarta(carta)} <small>(${etiquetaDestino})</small></h3>
         <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
         ${bloqueResolucionHtml}
         ${htmlEfectosAuto}
@@ -554,7 +554,7 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: `
         <div class="cyd-carta-jugada">
-          <h3>📥 ${carta.name}</h3>
+          <h3>📥 ${nombreVisibleCarta(carta)}</h3>
           <p><strong>Acción:</strong> Descartada sin tirar</p>
           <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
           <p><small>La carta ha sido enviada al Descarte sin realizar ninguna tirada.</small></p>
@@ -587,7 +587,7 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: `
         <div class="cyd-carta-jugada">
-          <h3>🔥 ${carta.name}</h3>
+          <h3>🔥 ${nombreVisibleCarta(carta)}</h3>
           <p><strong>Acción:</strong> Quemada sin tirar</p>
           <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
           <p><small>La carta ha sido quemada (enviada a Cartas Quemadas) sin realizar ninguna tirada.</small></p>
@@ -627,7 +627,7 @@ export class SistemaActor extends Actor {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<p>✨ <strong>${this.name}</strong> descarta <em>${cartaCoste.name}</em> y añade el Trinket <strong>${cartaTrinket.name}</strong> a su mano.</p>`
+      content: `<p>✨ <strong>${this.name}</strong> descarta <em>${nombreVisibleCarta(cartaCoste)}</em> y añade el Trinket <strong>${nombreVisibleCarta(cartaTrinket)}</strong> a su mano.</p>`
     });
   }
 
@@ -649,7 +649,7 @@ export class SistemaActor extends Actor {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<p><strong>${this.name}</strong> ${textoAccion} su Trinket activo <strong>${trinket.name}</strong>.</p>`
+      content: `<p><strong>${this.name}</strong> ${textoAccion} su Trinket activo <strong>${nombreVisibleCarta(trinket)}</strong>.</p>`
     });
   }
 
@@ -774,7 +774,7 @@ export class SistemaActor extends Actor {
       return {
         idOriginal: trinketOriginal.id,
         idEnPilaActual,
-        nombre: trinketOriginal.name,
+        nombre: nombreVisibleCarta(trinketOriginal),
         img: trinketOriginal.img,
         estado,
         etiquetaEstado,

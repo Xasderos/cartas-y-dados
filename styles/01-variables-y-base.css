@@ -287,3 +287,11 @@
   opacity: 0.8;
   margin-left: 4px;
 }
+
+/* Movimiento total calculado (solo lectura, v0.8.2): Base + (Físico × 5) */
+.cyd-recurso-total-grande {
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: var(--cyd-acento);
+  white-space: nowrap;
+}

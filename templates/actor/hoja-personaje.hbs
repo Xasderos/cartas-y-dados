@@ -133,18 +133,17 @@
       <h3>🏃 Movimiento y Tamaño</h3>
     </div>
     <div class="cyd-recursos-barra" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
-      <div class="cyd-recurso-caja" data-tooltip="Base de Movimiento editable en esta ficha. El Máximo = Base + (Físico × 5) metros">
+      <div class="cyd-recurso-caja" data-tooltip="Base de Movimiento editable en esta ficha. El Total = Base + (Físico × 5) metros">
         <span class="cyd-recurso-titulo">⚙️ Mov. Base</span>
         <div class="cyd-recurso-inputs">
           <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" style="width: 60px;" />
           <span class="cyd-recurso-total">m</span>
         </div>
       </div>
-      <div class="cyd-recurso-caja" data-tooltip="Movimiento máximo: Base [{{system.movimiento.base}}] + (Físico Total [{{system.caracteristicasTotales.fisico}}] × 5) metros">
-        <span class="cyd-recurso-titulo">🏃 Movimiento</span>
+      <div class="cyd-recurso-caja" data-tooltip="Movimiento total: Base [{{system.movimiento.base}}] + (Físico Total [{{system.caracteristicasTotales.fisico}}] × 5) metros">
+        <span class="cyd-recurso-titulo">🏃 Mov. Total</span>
         <div class="cyd-recurso-inputs">
-          <input type="number" name="system.movimiento.value" value="{{system.movimiento.value}}" min="0" style="width: 60px;" />
-          <span class="cyd-recurso-total">/ {{system.movimiento.max}} m</span>
+          <span class="cyd-recurso-total-grande">{{system.movimiento.max}} m</span>
         </div>
       </div>
       <div class="cyd-recurso-caja" data-tooltip="Categoría de tamaño de la criatura">

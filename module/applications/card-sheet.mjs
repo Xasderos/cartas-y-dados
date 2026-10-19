@@ -28,7 +28,8 @@ export class HojaCartaSistema extends HandlebarsApplicationMixin(DocumentSheetV2
   /** @override */
   static PARTS = {
     main: {
-      template: "systems/cartas-y-dados/templates/card/hoja-carta.hbs"
+      template: "systems/cartas-y-dados/templates/card/hoja-carta.hbs",
+      scrollable: [".cyd-hoja-contenedor"]
     }
   };
 
