@@ -27,25 +27,25 @@ export const SISTEMA_CONFIG = {
       etiqueta: "CARTASYDADOS.Palos.Espadas",
       abreviado: "FISC",
       caracteristicaAsociada: "fisico",
-      acciones: "Ataques cuerpo a cuerpo y proezas de fuerza"
+      acciones: "Combate, proezas de fuerza, agilidad, movimiento y sigilo"
     },
     copas: {
       etiqueta: "CARTASYDADOS.Palos.Copas",
       abreviado: "MIST",
       caracteristicaAsociada: "misticismo",
-      acciones: "Interacción social, apoyo y canalización"
+      acciones: "Habilidades, magia, rituales y canalización mística"
     },
     oros: {
       etiqueta: "CARTASYDADOS.Palos.Oros",
       abreviado: "SOC",
       caracteristicaAsociada: "social",
-      acciones: "Táctica, percepción, trampas y conocimientos"
+      acciones: "Interacción social, persuasión, engaño y liderazgo"
     },
     bastos: {
       etiqueta: "CARTASYDADOS.Palos.Bastos",
       abreviado: "CONS",
       caracteristicaAsociada: "consciencia",
-      acciones: "Movimiento, sigilo, defensa y ataques a distancia"
+      acciones: "Percepción, conocimientos, táctica e investigación"
     }
   },
 

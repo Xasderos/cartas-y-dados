@@ -139,6 +139,34 @@
     </div>
   </section>
 
+  {{!-- Automatización de la Habilidad (system.automatizacion + bonoTirada).
+        Se aplica al activarla mediante SistemaActor._aplicarAutomatizacionHabilidad(). --}}
+  {{#if esHabilidad}}
+    <section class="cyd-panel-controles">
+      <div class="cyd-cabecera-seccion">
+        <h3>⚙️ Automatización al Activar</h3>
+      </div>
+      <div class="cyd-recursos-barra" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="cyd-recurso-caja" title="Puntos de Salud que recupera el usuario (negativo = daño propio). Tope: Salud Máxima Total.">
+          <span>❤️ Curación</span>
+          <input type="number" name="system.automatizacion.curacion" value="{{system.automatizacion.curacion}}" step="1" style="width: 44px;" />
+        </div>
+        <div class="cyd-recurso-caja" title="Cambio en el Cansancio actual (positivo suma, negativo recupera). Mínimo 0.">
+          <span>⚡ Cansancio</span>
+          <input type="number" name="system.automatizacion.cambioCansancio" value="{{system.automatizacion.cambioCansancio}}" step="1" style="width: 44px;" />
+        </div>
+        <div class="cyd-recurso-caja" title="Cartas que se roban del Mazo a la Mano (requiere pilas inicializadas).">
+          <span>🃏 Robar</span>
+          <input type="number" name="system.automatizacion.robarCartas" value="{{system.automatizacion.robarCartas}}" min="0" step="1" style="width: 44px;" />
+        </div>
+        <div class="cyd-recurso-caja" title="Bonificador plano que se suma a la tirada de la habilidad.">
+          <span>🎲 Bono Tirada</span>
+          <input type="number" name="system.bonoTirada" value="{{system.bonoTirada}}" step="1" style="width: 44px;" />
+        </div>
+      </div>
+    </section>
+  {{/if}}
+
   {{!-- Descripción / Reglas --}}
   <section class="cyd-panel-mano" style="flex: 1; display: flex; flex-direction: column;">
     <div class="cyd-cabecera-seccion">

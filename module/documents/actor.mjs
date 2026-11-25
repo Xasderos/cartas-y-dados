@@ -932,11 +932,13 @@ export class SistemaActor extends Actor {
 
   /**
    * Ejecuta un Item de tipo 'habilidad' poseído por el Actor (PJ o PNJ).
-   * Las habilidades activables requieren consumir una Carta de Misticismo (Copas)
-   * de la mano (`system.palo === "copas"`). Si `requiereTirada === false` se aplica
-   * el efecto directamente sin lanzar dados; en caso contrario se lanzan
-   * `caracteristicasTotales.misticismo` dados del `tipoDado` de la carta elegida.
-   * La carta usada se mueve obligatoriamente de `mano` a `quemadas`.
+   * - PJ, o PNJ con Mazo de Jefe activo: la habilidad activable exige consumir una
+   *   Carta de Misticismo (Copas) de la mano (`system.palo === "copas"`); el dado lo
+   *   define la carta y esta se mueve obligatoriamente de `mano` a `quemadas`.
+   * - PNJ SIN Mazo de Jefe: se usa sin carta; el dado es el de Misticismo del PNJ
+   *   (`system.dadosCaracteristicas.misticismo`).
+   * Si `requiereTirada === false` se aplica el efecto directamente sin lanzar dados;
+   * en caso contrario se lanzan `caracteristicasTotales.misticismo` dados.
    * @param {string} itemId - ID del Item dentro de `this.items`.
    * @returns {Roll|null}
    */
@@ -956,27 +958,44 @@ export class SistemaActor extends Actor {
     const pilas = this.system.pilasDocumentos ?? {};
     const mano = pilas.mano ?? null;
     const quemadas = pilas.quemadas ?? null;
-    if (!mano || !quemadas) {
-      ui.notifications.warn("Tus pilas de cartas no están inicializadas. Inicialízalas antes de usar habilidades.");
-      return null;
-    }
 
-    // Exigir al menos una Carta de Acción de Misticismo (Copas) en la mano.
-    const cartasMisticismo = mano.cards.contents.filter(
-      c => c.type === "accion" && c.system.palo === "copas"
-    );
-    if (cartasMisticismo.length === 0) {
-      ui.notifications.warn(
-        "Necesitas tener al menos una carta de Misticismo (Copas) en la mano para usar una habilidad."
+    // Un PNJ sin Mazo de Jefe (mismo criterio que `HojaPnjActor`: mazo, mano, descarte
+    // y quemadas vinculadas) usa sus habilidades sin consumir carta de Misticismo.
+    const tieneMazoJefe = Boolean(pilas.mazo && pilas.mano && pilas.descarte && pilas.quemadas);
+    const requiereCarta = this.type !== "pnj" || tieneMazoJefe;
+
+    /** @type {Card|null} Carta de Misticismo consumida (null si no se requiere carta). */
+    let cartaElegida = null;
+    let numero = null;
+    let tipoDado;
+
+    if (requiereCarta) {
+      if (!mano || !quemadas) {
+        ui.notifications.warn("Tus pilas de cartas no están inicializadas. Inicialízalas antes de usar habilidades.");
+        return null;
+      }
+
+      // Exigir al menos una Carta de Acción de Misticismo (Copas) en la mano.
+      const cartasMisticismo = mano.cards.contents.filter(
+        c => c.type === "accion" && c.system.palo === "copas"
       );
-      return null;
+      if (cartasMisticismo.length === 0) {
+        ui.notifications.warn(
+          "Necesitas tener al menos una carta de Misticismo (Copas) en la mano para usar una habilidad."
+        );
+        return null;
+      }
+
+      cartaElegida = await this._elegirCartaMisticismo(cartasMisticismo, item.name);
+      if (!cartaElegida) return null; // El jugador canceló la selección.
+
+      numero = Number(cartaElegida.system.numero) || 1;
+      tipoDado = cartaElegida.system.tipoDado || SISTEMA_CONFIG.dadoPorNumeroCarta[numero] || "d6";
+    } else {
+      // PNJ sin Mazo de Jefe: el dado de Misticismo configurado en su ficha.
+      tipoDado = this.system.dadosCaracteristicas?.misticismo || "d6";
     }
 
-    const cartaElegida = await this._elegirCartaMisticismo(cartasMisticismo, item.name);
-    if (!cartaElegida) return null; // El jugador canceló la selección.
-
-    const numero = Number(cartaElegida.system.numero) || 1;
-    const tipoDado = cartaElegida.system.tipoDado || SISTEMA_CONFIG.dadoPorNumeroCarta[numero] || "d6";
     // `Number(undefined)` es NaN (no null), por eso se usa `||` en lugar de `??`.
     const cantidadDados =
       Number(this.system.caracteristicasTotales?.misticismo) ||
@@ -984,7 +1003,15 @@ export class SistemaActor extends Actor {
       1;
     const bonoTirada = Number(item.system.bonoTirada) || 0;
     const esAtaque = Boolean(item.system.esAtaque);
-    const nombreCarta = nombreVisibleCarta(cartaElegida);
+    const nombreCarta = cartaElegida ? nombreVisibleCarta(cartaElegida) : "";
+
+    // Líneas de chat que solo aparecen si se consumió una carta de Misticismo.
+    const lineaCartaUsada = cartaElegida
+      ? `<p><strong>Carta de Misticismo usada:</strong> ${nombreCarta} <small>MIST | ${tipoDado} (Valor ${numero})</small></p>`
+      : `<p><small>Sin Mazo de Jefe: habilidad usada sin consumir carta de Misticismo.</small></p>`;
+    const lineaQuemada = cartaElegida
+      ? `<p><small>🔥 La carta <strong>${nombreCarta}</strong> fue <strong>quemada</strong> y enviada a Cartas Quemadas.</small></p>`
+      : "";
 
     // Habilidad sin tirada: efecto directo, consumiendo la carta de Misticismo.
     if (item.system.requiereTirada === false) {
@@ -993,17 +1020,17 @@ export class SistemaActor extends Actor {
         content: `
           <div class="cyd-carta-jugada">
             <h3>⚡ ${item.name}</h3>
-            <p><strong>Carta de Misticismo usada:</strong> ${nombreCarta} <small>MIST | ${tipoDado} (Valor ${numero})</small></p>
+            ${lineaCartaUsada}
             <p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>
             ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
-            <p><small>🔥 La carta <strong>${nombreCarta}</strong> fue <strong>quemada</strong> y enviada a Cartas Quemadas.</small></p>
+            ${lineaQuemada}
           </div>
         `
       });
       // Automatización (curación, cambio de cansancio y robo de cartas) si está configurada.
       await this._aplicarAutomatizacionHabilidad(item);
 
-      await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
+      if (cartaElegida) await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
       this.prepareData();
       if (this.sheet?.rendered) this.sheet.render();
       return null;
@@ -1059,11 +1086,11 @@ export class SistemaActor extends Actor {
     const saborChat = `
       <div class="cyd-carta-jugada">
         <h3>⚡ ${item.name}</h3>
-        <p><strong>Carta de Misticismo usada:</strong> ${nombreCarta} <small>MIST | ${tipoDado} (Valor ${numero})</small></p>
+        ${lineaCartaUsada}
         <p><strong>Tirada:</strong> ${cantidadDados}${tipoDado}${bono > 0 ? ` + ${bono}` : ""} = <strong>${roll.total}</strong> (Misticismo × ${tipoDado})</p>
         ${bloqueResolucionHtml}
         ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
-        <p><small>🔥 La carta <strong>${nombreCarta}</strong> fue <strong>quemada</strong> y enviada a Cartas Quemadas.</small></p>
+        ${lineaQuemada}
       </div>
     `;
 
@@ -1073,7 +1100,7 @@ export class SistemaActor extends Actor {
     });
 
     // Quemar la carta usada: mano -> quemadas (motor propio de pilas, sin Cards#pass()).
-    await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
+    if (cartaElegida) await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
 
     // Automatización (curación, cambio de cansancio y robo de cartas) si está configurada.
     await this._aplicarAutomatizacionHabilidad(item);
