@@ -10,6 +10,12 @@ import { SISTEMA_CONFIG } from "./config.mjs";
 const SYSTEM_ID = "cartas-y-dados";
 
 /**
+ * Valores por defecto de los 7 botones de dificultad rápida del Panel del Master.
+ * @type {number[]}
+ */
+export const PRESETS_DIFICULTAD_POR_DEFECTO = [2, 5, 9, 12, 14, 17, 21];
+
+/**
  * Lee de forma segura un ajuste del sistema. Si aún no está inicializado,
  * devuelve el valor por defecto indicado.
  *
@@ -130,6 +136,17 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
     config: true,
     type: Number,
     default: 10,
+    onChange: onUpdateCallback
+  });
+
+  // 10. Valores de los botones de dificultad rápida del Panel del Master (7 botones).
+  //     Oculto en la configuración: se edita con clic derecho sobre cada botón del panel.
+  game.settings.register(SYSTEM_ID, "presetsDificultad", {
+    name: "Presets de Dificultad del Panel del Master",
+    scope: "world",
+    config: false,
+    type: Array,
+    default: [...PRESETS_DIFICULTAD_POR_DEFECTO],
     onChange: onUpdateCallback
   });
 }

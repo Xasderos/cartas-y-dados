@@ -1,12 +1,14 @@
 /**
  * @file gm-panel.mjs
  * @description Panel de Control del Master (ApplicationV2) para Foundry VTT v14.
- * Cuadrícula visual minimalista de iconos y números con enlaces directos a cada ficha y pila.
+ * Cuadrícula visual minimalista de iconos y números con enlaces directos a cada ficha y pila,
+ * con una sección para Personajes Jugadores y otra para PNJ (Mazo de Jefe opcional).
  */
 
 import { poblarCompendiosDelSistema } from "../compendios-base.mjs";
+import { PRESETS_DIFICULTAD_POR_DEFECTO } from "../settings.mjs";
 
-const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
 export class PanelMasterApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
@@ -53,7 +55,7 @@ export class PanelMasterApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static PARTS = {
     main: {
       template: "systems/cartas-y-dados/templates/apps/panel-master.hbs",
-      scrollable: [".cyd-gm-lista-personajes"]
+      scrollable: [".cyd-gm-zona-listas"]
     }
   };
 
@@ -61,6 +63,11 @@ export class PanelMasterApp extends HandlebarsApplicationMixin(ApplicationV2) {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const dificultadActual = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
+    const presetsDificultad = PanelMasterApp.#leerPresetsDificultad().map((valor, indice) => ({
+      valor,
+      indice,
+      activo: valor === dificultadActual
+    }));
 
     const personajes = game.actors
       .filter(a => a.type === "personaje")
@@ -97,16 +104,107 @@ export class PanelMasterApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
       });
 
+    const pnjs = game.actors
+      .filter(a => a.type === "pnj")
+      .map(actor => PanelMasterApp.#resumirPnj(actor));
+
     return {
       ...context,
       dificultadActual,
-      personajes
+      presetsDificultad,
+      personajes,
+      pnjs
     };
+  }
+
+  /**
+   * Construye el resumen compacto de un PNJ para la cuadrícula del Panel del Master.
+   * El Mazo de Jefe se considera activo si existen sus 4 pilas (mazo, mano, descarte,
+   * quemadas), con el mismo criterio que `HojaPnjActor`. Los PNJ no usan Trinkets.
+   * @param {Actor} actor - Actor de tipo `pnj`.
+   * @returns {object} Datos listos para `panel-master.hbs`.
+   */
+  static #resumirPnj(actor) {
+    actor.prepareData();
+    const sys = actor.system;
+    const pilas = sys.pilasDocumentos ?? {};
+    const tieneMazoJefe = Boolean(pilas.mazo && pilas.mano && pilas.descarte && pilas.quemadas);
+
+    return {
+      id: actor.id,
+      nombre: actor.name,
+      img: actor.img,
+      amenaza: sys.amenaza,
+      saludActual: sys.salud.value,
+      saludMax: sys.salud.maxTotal,
+      defensaTotal: sys.defensaTotal,
+      cansancioActual: sys.cansancio.value,
+      cansancioMax: sys.cansancio.maxTotal,
+      limiteMano: sys.limiteMano,
+      tieneMazoJefe,
+      manoActual: pilas.mano?.cards.size ?? 0,
+      mazoDisponibles: pilas.mazo?.availableCards.length ?? 0,
+      mazoTotal: pilas.mazo?.cards.size ?? 0,
+      descarteActual: pilas.descarte?.cards.size ?? 0,
+      quemadasActual: pilas.quemadas?.cards.size ?? 0
+    };
+  }
+
+  /**
+   * Lee los 7 valores de dificultad rápida del ajuste `presetsDificultad`,
+   * completando con los valores por defecto si el ajuste está incompleto o corrupto.
+   * @returns {number[]} Siempre 7 enteros >= 0.
+   */
+  static #leerPresetsDificultad() {
+    let guardados = [];
+    try {
+      guardados = game.settings.get("cartas-y-dados", "presetsDificultad") ?? [];
+    } catch (err) {
+      guardados = [];
+    }
+    return PRESETS_DIFICULTAD_POR_DEFECTO.map((porDefecto, i) => {
+      const valor = Number(guardados?.[i]);
+      return Number.isFinite(valor) && valor >= 0 ? Math.floor(valor) : porDefecto;
+    });
+  }
+
+  /**
+   * Clic derecho sobre un botón de dificultad rápida: abre un `DialogV2` para
+   * cambiar su valor y lo guarda en el ajuste de mundo `presetsDificultad`.
+   * @param {HTMLElement} boton - Botón `.cyd-gm-preset` con `data-indice`.
+   */
+  async _editarPresetDificultad(boton) {
+    const indice = Number(boton.dataset.indice);
+    const presets = PanelMasterApp.#leerPresetsDificultad();
+    if (!Number.isInteger(indice) || indice < 0 || indice >= presets.length) return;
+
+    const nuevoValor = await DialogV2.prompt({
+      window: { title: `Editar Dificultad Rápida ${indice + 1}`, icon: "fa-solid fa-bullseye" },
+      content: `<div class="form-group"><label>Valor de dificultad:</label><input type="number" name="valorPreset" value="${presets[indice]}" min="0" step="1" autofocus /></div>`,
+      ok: {
+        label: "Guardar",
+        icon: "fa-solid fa-floppy-disk",
+        callback: (event, button) => button.form.elements.valorPreset.value
+      },
+      rejectClose: false
+    });
+
+    if (nuevoValor === null || nuevoValor === undefined || nuevoValor === "") return;
+    const valor = Math.max(0, Math.floor(Number(nuevoValor) || 0));
+    presets[indice] = valor;
+    await game.settings.set("cartas-y-dados", "presetsDificultad", presets);
+    this.render();
   }
 
   /** @override */
   _onRender(context, options) {
     super._onRender(context, options);
+    for (const boton of this.element.querySelectorAll(".cyd-gm-preset")) {
+      boton.addEventListener("contextmenu", ev => {
+        ev.preventDefault();
+        this._editarPresetDificultad(boton);
+      });
+    }
     const inputDif = this.element.querySelector(".cyd-gm-input-dificultad");
     if (inputDif) {
       inputDif.addEventListener("change", async ev => {
@@ -135,7 +233,7 @@ export class PanelMasterApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Abre la Hoja de Personaje individual del jugador seleccionado.
+   * Abre la ficha individual del Actor seleccionado (PJ o PNJ).
    */
   static async #onAbrirFichaActor(event, target) {
     const actor = game.actors.get(target.dataset.actorId);

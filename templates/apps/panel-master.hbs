@@ -1,6 +1,6 @@
 {{!--
   Plantilla del Panel del Master: dificultad global, acciones de grupo y cuadrícula
-  compacta del estado de los Personajes Jugadores.
+  compacta del estado de los Personajes Jugadores y de los PNJ.
   Iconografía (v0.9.0): solo iconos Font Awesome y símbolos tipográficos, sin emojis.
 --}}
 <div class="cyd-hoja-contenedor">
@@ -20,10 +20,10 @@
           <button type="button" class="cyd-gm-btn-icono" data-action="ajustarDificultad" data-delta="1" data-tooltip="Aumentar"><i class="fa-solid fa-plus"></i></button>
         </div>
         <div class="cyd-gm-presets">
-          <button type="button" class="cyd-gm-btn-tag cyd-gm-preset" data-action="fijarDificultad" data-valor="5">5</button>
-          <button type="button" class="cyd-gm-btn-tag cyd-gm-preset" data-action="fijarDificultad" data-valor="8">8</button>
-          <button type="button" class="cyd-gm-btn-tag cyd-gm-preset" data-action="fijarDificultad" data-valor="12">12</button>
-          <button type="button" class="cyd-gm-btn-tag cyd-gm-preset" data-action="fijarDificultad" data-valor="16">16</button>
+          {{!-- 7 presets editables con clic derecho (ajuste de mundo "presetsDificultad") --}}
+          {{#each presetsDificultad as |preset|}}
+          <button type="button" class="cyd-gm-btn-tag cyd-gm-preset {{#if preset.activo}}cyd-gm-preset-activo{{/if}}" data-action="fijarDificultad" data-valor="{{preset.valor}}" data-indice="{{preset.indice}}" data-tooltip="Fijar dificultad {{preset.valor}} · Clic derecho para editar">{{preset.valor}}</button>
+          {{/each}}
         </div>
       </div>
 
@@ -40,6 +40,9 @@
       </div>
     </div>
   </section>
+
+  {{!-- Contenedor desplazable común a las dos cuadrículas (PJ y PNJ) --}}
+  <div class="cyd-gm-zona-listas">
 
   {{!-- 2. CUADRÍCULA VISUAL DE ESTADO DEL GRUPO --}}
   <section class="cyd-panel cyd-gm-lista-personajes">
@@ -113,5 +116,77 @@
       <p class="cyd-texto-vacio">No hay actores de tipo "Personaje Jugador" creados en el mundo.</p>
     {{/if}}
   </section>
+
+  {{!-- 3. CUADRÍCULA VISUAL DE PNJ --}}
+  <section class="cyd-panel cyd-gm-lista-personajes">
+    <div class="cyd-cabecera-seccion">
+      <h3><i class="fa-solid fa-skull"></i> PNJ</h3>
+    </div>
+
+    {{#if pnjs.length}}
+      <div class="cyd-gm-grid-compacto">
+        {{#each pnjs as |pnj|}}
+          <article class="cyd-gm-tile cyd-gm-tile-pnj">
+
+            {{!-- Cabecera: clic en avatar o nombre abre la Ficha del PNJ --}}
+            <header class="cyd-gm-tile-header">
+              <div class="cyd-gm-actor-link" data-action="abrirFichaActor" data-actor-id="{{pnj.id}}" data-tooltip="Abrir ficha de {{pnj.nombre}}">
+                <img src="{{pnj.img}}" class="cyd-gm-avatar-mini" />
+                <span class="cyd-gm-nombre">{{pnj.nombre}}</span>
+              </div>
+
+              {{!-- Control rápido de Cansancio --}}
+              <div class="cyd-gm-cansancio-box" data-tooltip="Cansancio de {{pnj.nombre}}">
+                <span class="cyd-gm-mini-click" data-action="ajustarCansancio" data-actor-id="{{pnj.id}}" data-delta="-1">−</span>
+                <i class="fa-solid fa-hourglass-half"></i>
+                <strong>{{pnj.cansancioActual}}/{{pnj.cansancioMax}}</strong>
+                <span class="cyd-gm-mini-click" data-action="ajustarCansancio" data-actor-id="{{pnj.id}}" data-delta="1">+</span>
+              </div>
+            </header>
+
+            {{!-- Fila 1: Amenaza, Salud y Defensa --}}
+            <div class="cyd-gm-fila-iconos cyd-gm-cols-3">
+              <div class="cyd-gm-stat-pill" data-tooltip="Amenaza">
+                <i class="fa-solid fa-skull"></i> <strong>{{pnj.amenaza}}</strong>
+              </div>
+              <div class="cyd-gm-stat-pill" data-tooltip="Salud Actual / Salud Máxima Total">
+                <i class="fa-solid fa-heart-pulse"></i> <strong>{{pnj.saludActual}}/{{pnj.saludMax}}</strong>
+              </div>
+              <div class="cyd-gm-stat-pill" data-tooltip="Defensa Total">
+                <i class="fa-solid fa-shield-halved"></i> <strong>{{pnj.defensaTotal}}</strong>
+              </div>
+            </div>
+
+            {{!-- Fila 2: Mazo de Jefe (4 zonas, sin Trinkets) o aviso de PNJ sin mazo --}}
+            {{#if pnj.tieneMazoJefe}}
+              <div class="cyd-gm-fila-iconos cyd-gm-cols-2">
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pnj.id}}" data-pila="mano" data-tooltip="Abrir Mano ({{pnj.manoActual}}/{{pnj.limiteMano}})">
+                  <i class="fa-solid fa-hand"></i> <strong>{{pnj.manoActual}}/{{pnj.limiteMano}}</strong>
+                </div>
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pnj.id}}" data-pila="mazo" data-tooltip="Abrir Mazo de Jefe ({{pnj.mazoDisponibles}}/{{pnj.mazoTotal}})">
+                  <i class="fa-solid fa-layer-group"></i> <strong>{{pnj.mazoDisponibles}}/{{pnj.mazoTotal}}</strong>
+                </div>
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pnj.id}}" data-pila="descarte" data-tooltip="Abrir Descarte ({{pnj.descarteActual}})">
+                  <i class="fa-solid fa-box-archive"></i> <strong>{{pnj.descarteActual}}</strong>
+                </div>
+                <div class="cyd-gm-zona-link" data-action="abrirPilaActor" data-actor-id="{{pnj.id}}" data-pila="quemadas" data-tooltip="Abrir Cartas Quemadas ({{pnj.quemadasActual}})">
+                  <i class="fa-solid fa-fire"></i> <strong>{{pnj.quemadasActual}}</strong>
+                </div>
+              </div>
+            {{else}}
+              <div class="cyd-gm-sin-mazo">
+                <i class="fa-solid fa-dice-d20"></i> Sin Mazo de Jefe
+              </div>
+            {{/if}}
+
+          </article>
+        {{/each}}
+      </div>
+    {{else}}
+      <p class="cyd-texto-vacio">No hay actores de tipo "PNJ" creados en el mundo.</p>
+    {{/if}}
+  </section>
+
+  </div>
 
 </div>

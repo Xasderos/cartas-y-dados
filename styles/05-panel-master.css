@@ -79,6 +79,12 @@
   font-weight: 600;
 }
 
+/* Preset que coincide con la dificultad actual */
+.cartas-y-dados .window-content button.cyd-gm-btn-tag.cyd-gm-preset-activo {
+  color: var(--cyd-oro);
+  border-color: var(--cyd-oro-linea);
+}
+
 .cartas-y-dados .window-content button.cyd-gm-btn-tag i {
   color: var(--cyd-azul);
 }
@@ -93,9 +99,18 @@
 /*  LISTA Y CUADRÍCULA DE PERSONAJES                                        */
 /* ======================================================================== */
 
-.cyd-gm-lista-personajes {
+/* Contenedor desplazable que agrupa las cuadrículas de PJ y PNJ */
+.cyd-gm-zona-listas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+}
+
+.cyd-gm-lista-personajes {
+  flex: 0 0 auto;
 }
 
 .cyd-gm-grid-compacto {
@@ -249,4 +264,29 @@
 
 .cyd-gm-sin-pilas i {
   color: var(--color-level-warning, #ee9b3a);
+}
+
+/* ======================================================================== */
+/*  CUADRÍCULA DE PNJ                                                       */
+/* ======================================================================== */
+
+/* Filete superior en tono de error para distinguir PNJ de PJ de un vistazo */
+.cyd-gm-tile-pnj {
+  border-top-color: color-mix(in srgb, var(--cyd-peligro) 55%, transparent);
+}
+
+.cyd-gm-sin-mazo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-tenue);
+  border: 1px dashed var(--cyd-borde-suave);
+  border-radius: 3px;
+}
+
+.cyd-gm-sin-mazo i {
+  color: var(--cyd-azul);
 }

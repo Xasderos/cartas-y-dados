@@ -4,7 +4,7 @@
 
 A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal card decks with dice rolls. No external modules required.
 
-**Current version:** 0.9.2 (beta)
+**Current version:** 0.9.4 (beta)
 
 ## How it plays
 - **Card + Dice (`XdY`):** a card's **suit** picks the Characteristic that sets how many dice you roll: Espadas → Physical (FISC), Bastos → Awareness (CONS), Oros → Social (SOC), Copas → Mysticism (MIST). Its **number (1–5)** sets the die: d4, d6, d8, d10, d12.
