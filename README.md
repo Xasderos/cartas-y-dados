@@ -6,7 +6,7 @@
 
 A custom tabletop RPG system for **Foundry VTT v14** (verified on `14.369`) that blends deck management with dice rolls. Every character owns its own decks of cards; playing a card decides *what* you do and *which dice* you roll. No external modules required.
 
-**Current version:** 0.9.0 (beta)
+**Current version:** 0.9.1 (beta)
 
 ---
 

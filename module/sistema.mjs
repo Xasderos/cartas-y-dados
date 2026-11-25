@@ -236,6 +236,66 @@ Hooks.on("createActor", async (actor) => {
 });
 
 /* -------------------------------------------------------------------------- */
+/*  Mantenimiento: limpieza de pilas y carpetas al eliminar un Actor          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Cuando se elimina un Actor del mundo (PJ o PNJ), borra los documentos `Cards`
+ * vinculados en `system.pilas` (Mazo, Mano, Descarte, Quemadas, Trinkets y En Juego)
+ * y, a continuación, las carpetas `Cards` que los contenían si quedan vacías.
+ *
+ * Salvaguardas:
+ *  - Solo lo ejecuta el GM activo (`game.users.activeGM`) para no duplicar borrados.
+ *  - Ignora Actores de compendio (`actor.pack`).
+ *  - No borra una pila que siga referenciada por otro Actor (p. ej. un Actor duplicado
+ *    que comparte los mismos IDs de pila).
+ *  - Solo borra una carpeta si ya no contiene pilas ni subcarpetas.
+ * @param {Actor} actor - El Actor eliminado.
+ */
+Hooks.on("deleteActor", async (actor) => {
+  if (actor.pack) return;
+  if (!game.users.activeGM?.isSelf) return;
+
+  const idsPilas = Object.values(actor.system?.pilas ?? {}).filter(Boolean);
+  if (!idsPilas.length) return;
+
+  // IDs de pilas que siguen en uso por otros Actores del mundo.
+  const idsEnUso = new Set();
+  for (const otro of game.actors) {
+    if (otro.id === actor.id) continue;
+    for (const id of Object.values(otro.system?.pilas ?? {})) {
+      if (id) idsEnUso.add(id);
+    }
+  }
+
+  const pilasABorrar = idsPilas
+    .filter(id => !idsEnUso.has(id))
+    .map(id => game.cards.get(id))
+    .filter(Boolean);
+  if (!pilasABorrar.length) return;
+
+  const idsCarpetas = new Set(pilasABorrar.map(p => p.folder?.id).filter(Boolean));
+
+  try {
+    await Cards.deleteDocuments(pilasABorrar.map(p => p.id));
+
+    const carpetasVacias = [...idsCarpetas]
+      .map(id => game.folders.get(id))
+      .filter(carpeta => carpeta
+        && carpeta.type === "Cards"
+        && !game.cards.some(c => c.folder?.id === carpeta.id)
+        && !game.folders.some(f => f.folder?.id === carpeta.id));
+    if (carpetasVacias.length) {
+      await Folder.deleteDocuments(carpetasVacias.map(c => c.id));
+    }
+
+    console.log(`Cartas y Dados | Eliminadas ${pilasABorrar.length} pilas y ${carpetasVacias.length} carpetas de "${actor.name}".`);
+  } catch (err) {
+    console.error(`Cartas y Dados | Error al limpiar las pilas de "${actor.name}":`, err);
+  }
+});
+
+/* -------------------------------------------------------------------------- */
 /*  Interactividad en Mensajes de Chat (Foundry v14 renderChatMessageHTML)    */
 /* -------------------------------------------------------------------------- */
 
