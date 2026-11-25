@@ -6,7 +6,7 @@
  * entre Mazo, Mano, En Juego, Descarte y Quemadas, recalculando la Defensa en tiempo real.
  */
 
-import { abreviadoPalo, nombreVisibleCarta } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, generarNombreMisticoUnico, nombreVisibleCarta } from "../config.mjs";
 
 export class SistemaActor extends Actor {
 
@@ -64,82 +64,79 @@ export class SistemaActor extends Actor {
   }
 
   /**
-   * Genera un mazo inicial de prueba con 6 Cartas de Acción y 2 Trinkets.
+   * Inicializa por completo un personaje según su Clase Base (v0.8.4):
+   * 1. Crea las 6 pilas de cartas si aún no existen.
+   * 2. Puebla el Mazo de Juego con 12 Cartas de Acción de nombres místicos únicos:
+   *    - 1x carta numero 1 (d4) de cada uno de los 4 palos (espadas, bastos, oros, copas).
+   *    - +3x cartas numero 1 (d4) adicionales del paloPrincipal (total: 4 d4 del palo principal).
+   *    - 1x carta numero 2 (d6) de cada uno de los 4 palos.
+   *    - 1x carta numero 3 (d8) del paloPrincipal.
+   *    (Para Tabula Rasa, sin palo principal, el Mazo queda vacío para personalización manual.)
+   * 3. Crea 1 carta tipo "trinket" con `system.nivel: 1` y el nombre del Trinket elegido,
+   *    sincronizando `name`, `face: 0`, `faces[0].name` y `back.name`.
+   * 4. Crea o actualiza en el Actor el Item de tipo "clase" con el nombre de la clase elegida.
+   * @param {string} claveClase - Clave de `SISTEMA_CONFIG.CLASES_BASE` (ej. "fortisCorpore").
+   * @param {string} nombreTrinket - Nombre del Trinket inicial elegido por el jugador.
    */
-  async generarMazoInicialDePrueba() {
+  async inicializarPersonajeConClase(claveClase, nombreTrinket) {
+    const configClase = SISTEMA_CONFIG.CLASES_BASE?.[claveClase];
+    if (!configClase) {
+      ui.notifications.warn(`Clase desconocida: "${claveClase}".`);
+      return;
+    }
+
+    // 1. Asegurar que las 6 pilas existen vinculadas al Actor en el mundo
+    await this.inicializarPilasDeJugador();
     const { mazo, trinkets } = this.system.pilasDocumentos;
     if (!mazo || !trinkets) return;
 
-    const cartasAccionBase = [
-      {
-        name: "Estocada Directa",
-        type: "accion",
-        system: { palo: "espadas", numero: 2, esAtaque: true, seQuema: false, efecto: "<p>Ataque cuerpo a cuerpo estándar.</p>" }
-      },
-      {
-        name: "Tajo Pesado",
-        type: "accion",
-        system: { palo: "espadas", numero: 3, esAtaque: true, seQuema: false, automatizacion: { bonoTirada: 1 }, efecto: "<p>Suma +1 al resultado del ataque.</p>" }
-      },
-      {
-        name: "Disparo Rápido",
-        type: "accion",
-        system: { palo: "bastos", numero: 2, esAtaque: true, seQuema: false, efecto: "<p>Ataque ágil a distancia.</p>" }
-      },
-      {
-        name: "Maniobra Táctica",
-        type: "accion",
-        system: { palo: "oros", numero: 2, esAtaque: false, seQuema: false, automatizacion: { robarCartas: 1 }, efecto: "<p>Analizas el terreno y <strong>robas +1 carta extra</strong>.</p>" }
-      },
-      {
-        name: "Aliento Recuperador",
-        type: "accion",
-        system: { palo: "copas", numero: 2, esAtaque: false, seQuema: false, automatizacion: { curacion: 3, cambioCansancio: -1 }, efecto: "<p>Recuperas <strong>3 de Salud</strong> y alivias <strong>1 de Cansancio</strong>.</p>" }
-      },
-      {
-        name: "Ejecución Fulminante",
-        type: "accion",
-        system: { palo: "espadas", numero: 5, esAtaque: true, seQuema: true, automatizacion: { bonoTirada: 2 }, efecto: "<p>Golpe devastador (+2 al ataque). <strong>Se quema tras usarse.</strong></p>" }
-      }
-    ];
+    // 2. Poblar el Mazo de Juego con las 12 Cartas de Acción de la clase
+    //    (solo si tiene palo principal y el Mazo está vacío, para evitar duplicados)
+    if (configClase.paloPrincipal && mazo.cards.size === 0) {
+      const todosLosPalos = ["espadas", "bastos", "oros", "copas"];
+      const distribucion = [];
 
-    const trinketsBase = [
-      {
-        name: "Égida de Hierro",
-        type: "trinket",
-        system: {
-          palo: "espadas",
-          numero: 2,
-          realizaTirada: false,
-          esAtaque: false,
-          bonoDefensaEnJuego: 2,
-          efectoPermanente: "<p>Portarlo infunde aplomo.</p>",
-          efectoAlJugar: "<p>Mientras esté <strong>En Juego</strong>, otorga <strong>+2 a tu Defensa</strong>.</p>"
-        }
-      },
-      {
-        name: "Cáliz de Brasas",
-        type: "trinket",
-        system: {
-          palo: "copas",
-          numero: 3,
-          realizaTirada: true,
-          esAtaque: true,
-          bonoDefensaEnJuego: 0,
-          automatizacion: { curacion: 2 },
-          efectoPermanente: "<p>Tibio al tacto.</p>",
-          efectoAlJugar: "<p>Realiza un ataque espiritual y te <strong>cura 2 de Salud</strong> al entrar en juego.</p>"
-        }
-      }
-    ];
+      // 1x carta d4 (numero 1) de cada palo
+      for (const palo of todosLosPalos) distribucion.push({ palo, numero: 1 });
+      // +3x cartas d4 (numero 1) adicionales del palo principal (4 d4 en total)
+      for (let i = 0; i < 3; i++) distribucion.push({ palo: configClase.paloPrincipal, numero: 1 });
+      // 1x carta d6 (numero 2) de cada palo
+      for (const palo of todosLosPalos) distribucion.push({ palo, numero: 2 });
+      // 1x carta d8 (numero 3) del palo principal
+      distribucion.push({ palo: configClase.paloPrincipal, numero: 3 });
 
-    await mazo.createEmbeddedDocuments("Card", cartasAccionBase.map(c => this._normalizarPayloadCarta(c)));
-    await trinkets.createEmbeddedDocuments("Card", trinketsBase.map(c => this._normalizarPayloadCarta(c)));
-    await mazo.shuffle({ chatNotification: false });
-    await trinkets.shuffle({ chatNotification: false });
+      const nombresMisticosUsados = new Set();
+      const payloadCartas = distribucion.map(({ palo, numero }) => {
+        const nombreMistico = generarNombreMisticoUnico(nombresMisticosUsados);
+        nombresMisticosUsados.add(nombreMistico);
+        return this._normalizarPayloadCarta({ name: nombreMistico, type: "accion", system: { palo, numero } });
+      });
+
+      await mazo.createEmbeddedDocuments("Card", payloadCartas);
+      await mazo.shuffle({ chatNotification: false });
+    }
+
+    // 3. Crear el Trinket inicial (Nivel 1, sin palo ni dado) si el Mazo de Trinkets está vacío
+    const trinketInicial = nombreTrinket || configClase.trinkets?.[0] || "Vasija vacía";
+    if (trinkets.cards.size === 0) {
+      const payloadTrinket = this._normalizarPayloadCarta({
+        name: trinketInicial,
+        type: "trinket",
+        system: { nivel: 1, realizaTirada: false, esAtaque: false, bonoDefensaEnJuego: 0 }
+      });
+      await trinkets.createEmbeddedDocuments("Card", [payloadTrinket]);
+    }
+
+    // 4. Crear o actualizar el Item de tipo 'clase' en el Actor con el nombre elegido
+    const itemClase = this.items.find(i => i.type === "clase");
+    if (itemClase) {
+      await itemClase.update({ name: configClase.nombre });
+    } else {
+      await this.createEmbeddedDocuments("Item", [{ name: configClase.nombre, type: "clase" }]);
+    }
 
     this.prepareData();
-    ui.notifications.info(`Se han añadido 6 Cartas de Acción y 2 Trinkets iniciales a ${this.name}.`);
+    ui.notifications.info(`${this.name} se une a la clase ${configClase.nombre} (Trinket inicial: "${trinketInicial}").`);
   }
 
   /* ======================================================================== */
@@ -392,6 +389,21 @@ export class SistemaActor extends Actor {
   /*  4. JUGAR CARTA, ATAQUE VS DEFENSA Y EFECTOS AUTOMATIZADOS               */
   /* ======================================================================== */
 
+  /**
+   * Devuelve el bloque HTML con la información mecánica de una carta para el chat.
+   * Las Cartas de Acción muestran Palo + Dado; los Trinkets muestran su Nivel
+   * (desde v0.8.4 los Trinkets ya no tienen palo ni número/dado).
+   * @param {Card} carta - Carta jugada, descartada o quemada.
+   * @returns {string} HTML con la información mecánica de la carta.
+   */
+  _infoCartaHtml(carta) {
+    if (carta.type === "trinket") {
+      const nivel = Number(carta.system?.nivel) || 1;
+      return `<p><strong>🔮 Trinket:</strong> Nv. ${nivel}</p>`;
+    }
+    return `<p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>`;
+  }
+
   async jugarCarta(cartaId, { quemar = false, modo = "usar" } = {}) {
     const { mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mano || !enJuego || !descarte || !quemadas) return null;
@@ -410,7 +422,10 @@ export class SistemaActor extends Actor {
 
     let roll = null;
     let bloqueResolucionHtml = "";
-    const debeTirar = carta.type === "accion" || (carta.type === "trinket" && carta.system.realizaTirada);
+
+    // Los Trinkets NO calculan ni lanzan dados XdY (v0.8.4): se mueven directamente
+    // a la pila `enJuego` ejecutando su automatización e indicando su Nivel en el chat.
+    const debeTirar = carta.type === "accion";
 
     if (debeTirar) {
       const claveCaract = carta.system.caracteristicaAsociada;
@@ -533,10 +548,12 @@ export class SistemaActor extends Actor {
       ? carta.system.efectoAlJugar
       : carta.system.efecto;
 
+    // Icono de cabecera: los Trinkets anuncian su entrada en juego con su Nivel (v0.8.4)
+    const iconoChat = carta.type === "trinket" ? "🔮" : carta.system.esAtaque ? "⚔️" : "🃏";
     const saborChat = `
       <div class="cyd-carta-jugada">
-        <h3>${carta.system.esAtaque ? "⚔️" : "🃏"} ${nombreVisibleCarta(carta)} <small>(${etiquetaDestino})</small></h3>
-        <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
+        <h3>${iconoChat} ${nombreVisibleCarta(carta)} <small>(${etiquetaDestino})</small></h3>
+        ${this._infoCartaHtml(carta)}
         ${bloqueResolucionHtml}
         ${htmlEfectosAuto}
         ${efectoHtml ? `<div class="cyd-efecto">${efectoHtml}</div>` : ""}
@@ -585,8 +602,8 @@ export class SistemaActor extends Actor {
       content: `
         <div class="cyd-carta-jugada">
           <h3>📥 ${nombreVisibleCarta(carta)}</h3>
-          <p><strong>Acción:</strong> Descartada sin tirar</p>
-          <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
+          <p><strong>${carta.type === "trinket" ? "🔮 Trinket" : "🃏 Acción"}:</strong> ${carta.type === "trinket" ? "Nv. " + (Number(carta.system.nivel) || 1) + " —" : ""} Descartad${carta.type === "trinket" ? "o" : "a"} sin tirar</p>
+          ${this._infoCartaHtml(carta)}
           <p><small>La carta ha sido enviada al Descarte sin realizar ninguna tirada.</small></p>
         </div>
       `
@@ -618,8 +635,8 @@ export class SistemaActor extends Actor {
       content: `
         <div class="cyd-carta-jugada">
           <h3>🔥 ${nombreVisibleCarta(carta)}</h3>
-          <p><strong>Acción:</strong> Quemada sin tirar</p>
-          <p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>
+          <p><strong>${carta.type === "trinket" ? "🔮 Trinket" : "🃏 Acción"}:</strong> ${carta.type === "trinket" ? "Nv. " + (Number(carta.system.nivel) || 1) + " —" : ""} Quemad${carta.type === "trinket" ? "o" : "a"} sin tirar</p>
+          ${this._infoCartaHtml(carta)}
           <p><small>La carta ha sido quemada (enviada a Cartas Quemadas) sin realizar ninguna tirada.</small></p>
         </div>
       `
@@ -808,9 +825,8 @@ export class SistemaActor extends Actor {
         img: trinketOriginal.img,
         estado,
         etiquetaEstado,
-        palo: trinketOriginal.system.palo,
-        numero: trinketOriginal.system.numero,
-        tipoDado: trinketOriginal.system.tipoDado,
+        // Los Trinkets ya no tienen palo ni dado: su escala es su Nivel (v0.8.4)
+        nivel: Number(trinketOriginal.system?.nivel) || 1,
         bonoDefensaEnJuego: Number(trinketOriginal.system.bonoDefensaEnJuego) || 0,
         efectoPermanente: trinketOriginal.system.efectoPermanente,
         efectoAlJugar: trinketOriginal.system.efectoAlJugar
@@ -915,28 +931,226 @@ export class SistemaActor extends Actor {
   }
 
   /**
-   * Ejecuta un Item de tipo 'habilidad' poseído por el Actor.
+   * Ejecuta un Item de tipo 'habilidad' poseído por el Actor (PJ o PNJ).
+   * Las habilidades activables requieren consumir una Carta de Misticismo (Copas)
+   * de la mano (`system.palo === "copas"`). Si `requiereTirada === false` se aplica
+   * el efecto directamente sin lanzar dados; en caso contrario se lanzan
+   * `caracteristicasTotales.misticismo` dados del `tipoDado` de la carta elegida.
+   * La carta usada se mueve obligatoriamente de `mano` a `quemadas`.
    * @param {string} itemId - ID del Item dentro de `this.items`.
+   * @returns {Roll|null}
    */
-  async usarHabilidadItem(itemId) {
+  async usarHabilidad(itemId) {
     const item = this.items.get(itemId);
-    if (!item) return;
+    if (!item) return null;
 
+    // Habilidad pasiva / no activable: solo se publica su efecto en el chat.
     if (!item.system.esActivable) {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this }),
         content: `<div class="cyd-carta-jugada"><h3>⚡ ${item.name}</h3><div>${item.system.descripcion || ""}</div></div>`
       });
-      return;
+      return null;
     }
 
-    return this.realizarAccionRapida({
-      titulo: item.name,
-      caracteristica: item.system.caracteristica,
-      tipoDado: item.system.tipoDado,
-      bonoTirada: item.system.bonoTirada,
-      esAtaque: item.system.esAtaque,
-      descripcion: item.system.descripcion
+    const pilas = this.system.pilasDocumentos ?? {};
+    const mano = pilas.mano ?? null;
+    const quemadas = pilas.quemadas ?? null;
+    if (!mano || !quemadas) {
+      ui.notifications.warn("Tus pilas de cartas no están inicializadas. Inicialízalas antes de usar habilidades.");
+      return null;
+    }
+
+    // Exigir al menos una Carta de Acción de Misticismo (Copas) en la mano.
+    const cartasMisticismo = mano.cards.contents.filter(
+      c => c.type === "accion" && c.system.palo === "copas"
+    );
+    if (cartasMisticismo.length === 0) {
+      ui.notifications.warn(
+        "Necesitas tener al menos una carta de Misticismo (Copas) en la mano para usar una habilidad."
+      );
+      return null;
+    }
+
+    const cartaElegida = await this._elegirCartaMisticismo(cartasMisticismo, item.name);
+    if (!cartaElegida) return null; // El jugador canceló la selección.
+
+    const numero = Number(cartaElegida.system.numero) || 1;
+    const tipoDado = cartaElegida.system.tipoDado || SISTEMA_CONFIG.dadoPorNumeroCarta[numero] || "d6";
+    // `Number(undefined)` es NaN (no null), por eso se usa `||` en lugar de `??`.
+    const cantidadDados =
+      Number(this.system.caracteristicasTotales?.misticismo) ||
+      Number(this.system.caracteristicas?.misticismo) ||
+      1;
+    const bonoTirada = Number(item.system.bonoTirada) || 0;
+    const esAtaque = Boolean(item.system.esAtaque);
+    const nombreCarta = nombreVisibleCarta(cartaElegida);
+
+    // Habilidad sin tirada: efecto directo, consumiendo la carta de Misticismo.
+    if (item.system.requiereTirada === false) {
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        content: `
+          <div class="cyd-carta-jugada">
+            <h3>⚡ ${item.name}</h3>
+            <p><strong>Carta de Misticismo usada:</strong> ${nombreCarta} <small>MIST | ${tipoDado} (Valor ${numero})</small></p>
+            <p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>
+            ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
+            <p><small>🔥 La carta <strong>${nombreCarta}</strong> fue <strong>quemada</strong> y enviada a Cartas Quemadas.</small></p>
+          </div>
+        `
+      });
+      // Automatización (curación, cambio de cansancio y robo de cartas) si está configurada.
+      await this._aplicarAutomatizacionHabilidad(item);
+
+      await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
+      this.prepareData();
+      if (this.sheet?.rendered) this.sheet.render();
+      return null;
+    }
+
+    // Habilidad con tirada: XdY de Misticismo.
+    const bono = bonoTirada;
+    const formula = bono !== 0 ? `${cantidadDados}${tipoDado} + ${bono}` : `${cantidadDados}${tipoDado}`;
+    const roll = new Roll(formula, this.getRollData());
+    await roll.evaluate();
+
+    let bloqueResolucionHtml = "";
+    const tokenObjetivo = game.user.targets.first() ?? null;
+    const actorObjetivo = tokenObjetivo?.actor ?? null;
+
+    if (esAtaque && actorObjetivo) {
+      actorObjetivo.prepareData();
+      const defensaObjetivo = actorObjetivo.system.defensaTotal ?? actorObjetivo.system.defensa ?? 0;
+      const danoCalculado = Math.max(0, roll.total - defensaObjetivo);
+
+      if (danoCalculado > 0) {
+        bloqueResolucionHtml = `
+          <div class="cyd-resolucion-caja cyd-exito">
+            <p>🎯 <strong>Objetivo:</strong> ${tokenObjetivo.name} (🛡️ Defensa: ${defensaObjetivo})</p>
+            <p>💥 <strong>¡IMPACTO! Daño: ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
+            <button type="button" class="cyd-btn-aplicar-dano"
+                    data-actor-uuid="${actorObjetivo.uuid}"
+                    data-dano="${danoCalculado}">
+              🩸 Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
+            </button>
+          </div>
+        `;
+      } else {
+        bloqueResolucionHtml = `
+          <div class="cyd-resolucion-caja cyd-fallo">
+            <p>🎯 <strong>Objetivo:</strong> ${tokenObjetivo.name} (🛡️ Defensa: ${defensaObjetivo})</p>
+            <p>🛡️ <strong>Ataque Bloqueado (0 Daño):</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
+          </div>
+        `;
+      }
+    } else if (!esAtaque) {
+      const dificultadMaster = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
+      if (dificultadMaster > 0) {
+        const exito = roll.total >= dificultadMaster;
+        bloqueResolucionHtml = `
+          <div class="cyd-resolucion-caja">
+            <p>🎲 <strong>Dificultad (${dificultadMaster}):</strong> ${exito ? "✅ ¡ÉXITO!" : "❌ FALLO"} (Total: ${roll.total})</p>
+          </div>
+        `;
+      }
+    }
+
+    const saborChat = `
+      <div class="cyd-carta-jugada">
+        <h3>⚡ ${item.name}</h3>
+        <p><strong>Carta de Misticismo usada:</strong> ${nombreCarta} <small>MIST | ${tipoDado} (Valor ${numero})</small></p>
+        <p><strong>Tirada:</strong> ${cantidadDados}${tipoDado}${bono > 0 ? ` + ${bono}` : ""} = <strong>${roll.total}</strong> (Misticismo × ${tipoDado})</p>
+        ${bloqueResolucionHtml}
+        ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
+        <p><small>🔥 La carta <strong>${nombreCarta}</strong> fue <strong>quemada</strong> y enviada a Cartas Quemadas.</small></p>
+      </div>
+    `;
+
+    await roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      flavor: saborChat
     });
+
+    // Quemar la carta usada: mano -> quemadas (motor propio de pilas, sin Cards#pass()).
+    await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
+
+    // Automatización (curación, cambio de cansancio y robo de cartas) si está configurada.
+    await this._aplicarAutomatizacionHabilidad(item);
+
+    this.prepareData();
+    if (this.sheet?.rendered) this.sheet.render();
+    return roll;
+  }
+
+  /**
+   * Aplica los efectos de automatización de una Habilidad (curación, cambio de cansancio
+   * y robo de cartas) cuando están configurados en `item.system.automatizacion`.
+   * @param {Item} item - Item de tipo "habilidad" activado.
+   * @returns {Promise<void>}
+   */
+  async _aplicarAutomatizacionHabilidad(item) {
+    const automatizacion = item.system.automatizacion ?? {};
+    const curacion = Number(automatizacion.curacion) || 0;
+    const cambioCansancio = Number(automatizacion.cambioCansancio) || 0;
+    const robarCartas = Number(automatizacion.robarCartas) || 0;
+
+    if (curacion !== 0) {
+      // Tope de curación = Salud Máxima Total (Base + Físico + Bonos), igual que en jugarCarta.
+      const saludActual = Number(this.system.salud?.value) || 0;
+      const saludMax = Number(this.system.salud?.maxTotal) || Number(this.system.salud?.max) || saludActual;
+      const nuevaSalud = Math.max(0, Math.min(saludMax, saludActual + curacion));
+      await this.update({ "system.salud.value": nuevaSalud });
+    }
+
+    if (cambioCansancio !== 0) {
+      const cansancioActual = Number(this.system.cansancio?.value) || 0;
+      await this.update({ "system.cansancio.value": Math.max(0, cansancioActual + cambioCansancio) });
+    }
+
+    if (robarCartas > 0) {
+      await this.robarCantidadCartas(robarCartas);
+    }
+  }
+
+  /**
+   * Muestra un DialogV2 para elegir qué Carta de Misticismo (Copas) de la mano
+   * se consumirá al activar una habilidad.
+   * @param {Card[]} cartas - Cartas de Misticismo disponibles en la mano del Actor.
+   * @param {string} nombreHabilidad - Nombre de la habilidad que se va a activar.
+   * @returns {Card|null} La carta elegida o null si el jugador canceló.
+   */
+  async _elegirCartaMisticismo(cartas, nombreHabilidad) {
+    const botones = cartas.map(c => {
+      const numero = Number(c.system.numero) || 1;
+      const tipoDado = SISTEMA_CONFIG.dadoPorNumeroCarta[numero] ?? c.system.tipoDado ?? "d6";
+      return {
+        action: c.id,
+        label: `${nombreVisibleCarta(c)} — MIST ${numero} (${tipoDado})`,
+        callback: () => c.id
+      };
+    });
+    botones.push({ action: "cancelar", label: "Cancelar", callback: () => null });
+
+    const seleccion = await foundry.applications.api.DialogV2.wait({
+      window: { title: `Usar habilidad: ${nombreHabilidad}` },
+      content: `<p>Selecciona la Carta de Misticismo (Copas) de tu mano que se consumirá al activar <strong>${nombreHabilidad}</strong>:</p>`,
+      buttons: botones,
+      rejectClose: false
+    });
+
+    if (!seleccion) return null;
+    const cartaElegida = this.system.pilasDocumentos?.mano?.cards.get(seleccion) ?? null;
+    return cartaElegida;
+  }
+
+  /**
+   * @deprecated Usar `usarHabilidad(itemId)`. Se mantiene para retrocompatibilidad
+   * con cualquier llamador externo que aún invoque el nombre anterior.
+   * @param {string} itemId - ID del Item dentro de `this.items`.
+   * @returns {Roll|null}
+   */
+  async usarHabilidadItem(itemId) {
+    return this.usarHabilidad(itemId);
   }
 }

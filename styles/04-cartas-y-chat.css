@@ -180,3 +180,9 @@
 .cyd-btn-quemar-especial {
   width: 34px;
 }
+
+/* Insignia de Nivel para Trinkets en la Mano (sin palo ni dado desde v0.8.4) */
+.cyd-carta-dado.cyd-tag-nivel {
+  background: var(--cyd-trinket, #9b59b6);
+  color: #fff;
+}

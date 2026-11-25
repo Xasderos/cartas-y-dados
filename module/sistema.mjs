@@ -30,6 +30,18 @@ Hooks.once("init", () => {
 
   CONFIG.CARTASYDADOS = SISTEMA_CONFIG;
 
+  // 1. PRIMERO: registrar los ajustes del mundo ANTES de asignar CONFIG.*.dataModels ni
+  //    registrar las fichas. Al reabrir el mundo, Foundry hidrata los Actores desde la base
+  //    de datos nada más arrancar; si los ajustes (y sus valores por defecto en los esquemas)
+  //    aún no se han registrado, la hidratación falla y la ficha queda colapsada (Bug 1).
+  registrarAjustesDelSistema(() => {
+    for (const actor of game.actors ?? []) {
+      actor.prepareData();
+      if (actor.sheet?.rendered) actor.sheet.render();
+    }
+    if (PanelMasterApp.instancia?.rendered) PanelMasterApp.instancia.render();
+  });
+
   CONFIG.Actor.documentClass = SistemaActor;
   CONFIG.Combat.documentClass = SistemaCombat;
 
@@ -43,15 +55,6 @@ Hooks.once("init", () => {
     accion: "TYPES.Card.accion",
     trinket: "TYPES.Card.trinket"
   };
-
-  // Registrar todas las opciones configurables del sistema (Salud, Defensa, Cansancio PJ/PNJ, Mano, etc.)
-  registrarAjustesDelSistema(() => {
-    for (const actor of game.actors ?? []) {
-      actor.prepareData();
-      if (actor.sheet?.rendered) actor.sheet.render();
-    }
-    if (PanelMasterApp.instancia?.rendered) PanelMasterApp.instancia.render();
-  });
 
   // Exponer API global para acceso rápido o macros
   game.cartasYDados = {
@@ -74,6 +77,34 @@ Hooks.once("init", () => {
   Object.assign(CONFIG.Card.dataModels, {
     accion: CartaAccionDataModel,
     trinket: CartaTrinketDataModel
+  });
+
+  // 2. Registro de fichas en `init` (nunca en `ready`): así las fichas existen antes de
+  //    que Foundry hidrate y renderice cualquier Actor/Item/Card al reabrir el mundo (Bug 1).
+  // Hoja predeterminada para Personajes Jugadores (y opcional para PNJs Jefes)
+  DocumentSheetConfig.registerSheet(Actor, "cartas-y-dados", HojaPersonajeActor, {
+    types: ["personaje"],
+    makeDefault: true,
+    label: "Hoja Completa con Mazo (PJ / Jefe)"
+  });
+
+  // Hoja táctica simplificada predeterminada para Criaturas / PNJs
+  DocumentSheetConfig.registerSheet(Actor, "cartas-y-dados", HojaPnjActor, {
+    types: ["pnj"],
+    makeDefault: true,
+    label: "Ficha Táctica de Criatura / PNJ"
+  });
+
+  DocumentSheetConfig.registerSheet(Item, "cartas-y-dados", HojaItemSistema, {
+    types: ["raza", "origen", "clase", "objeto", "habilidad"],
+    makeDefault: true,
+    label: "Hoja de Elemento (Cartas y Dados)"
+  });
+
+  DocumentSheetConfig.registerSheet(Card, "cartas-y-dados", HojaCartaSistema, {
+    types: ["accion", "trinket"],
+    makeDefault: true,
+    label: "Editor de Carta (Cartas y Dados)"
   });
 });
 
@@ -126,34 +157,26 @@ async function sanearNombresCartasExistentes() {
 }
 
 Hooks.once("ready", async () => {
-  await sanearNombresCartasExistentes();
+  try {
+    await sanearNombresCartasExistentes();
+  } catch (err) {
+    console.warn("Cartas y Dados | Error sanando nombres de cartas existentes:", err);
+  }
 
 
-  // Hoja predeterminada para Personajes Jugadores (y opcional para PNJs Jefes)
-  DocumentSheetConfig.registerSheet(Actor, "cartas-y-dados", HojaPersonajeActor, {
-    types: ["personaje", "pnj"],
-    makeDefault: true,
-    label: "Hoja Completa con Mazo (PJ / Jefe)"
-  });
-
-  // Hoja táctica simplificada predeterminada para Criaturas / PNJs
-  DocumentSheetConfig.registerSheet(Actor, "cartas-y-dados", HojaPnjActor, {
-    types: ["pnj"],
-    makeDefault: true,
-    label: "Ficha Táctica de Criatura / PNJ"
-  });
-
-  DocumentSheetConfig.registerSheet(Item, "cartas-y-dados", HojaItemSistema, {
-    types: ["raza", "origen", "clase", "objeto", "habilidad"],
-    makeDefault: true,
-    label: "Hoja de Elemento (Cartas y Dados)"
-  });
-
-  DocumentSheetConfig.registerSheet(Card, "cartas-y-dados", HojaCartaSistema, {
-    types: ["accion", "trinket"],
-    makeDefault: true,
-    label: "Editor de Carta (Cartas y Dados)"
-  });
+  // REFRESCO DE SEGURIDAD AL REABRIR EL MUNDO (Bug 1):
+  // game.cards y game.actors ya están hidratados. Recalcular los datos derivados
+  // de todos los actores y re-renderizar cualquier ficha abierta para que ninguna
+  // quede solo con el marco y el título tras recargar (F5) o volver a abrir Foundry.
+  for (const actor of game.actors ?? []) {
+    actor.prepareData();
+    if (actor.sheet?.rendered) {
+      actor.sheet.render();
+    }
+  }
+  if (PanelMasterApp.instancia?.rendered) {
+    PanelMasterApp.instancia.render();
+  }
 });
 
 /**

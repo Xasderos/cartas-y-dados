@@ -27,6 +27,7 @@
   flex-direction: column;
   gap: 10px;
   height: 100%;
+  min-height: 500px;
 }
 
 .cyd-cabecera {
@@ -143,14 +144,15 @@
   gap: 10px;
   overflow-y: auto;
   padding-right: 4px;
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 300px;
 }
 
 /* El <main> debe ser flex-container para que .cyd-cuerpo-hoja pueda hacer scroll */
 .cyd-hoja-contenedor > main {
   display: flex;
   flex-direction: column;
+  height: 100%;
   flex: 1;
   min-height: 0;
 }

@@ -4,14 +4,12 @@
  * Clase, Objetos equipables y creador visual de Cartas/Trinkets.
  */
 
-import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
 export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2) {
-
-  dificultadActual = 7;
 
   /** @override */
   static DEFAULT_OPTIONS = {
@@ -44,7 +42,6 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       crearItem: HojaPersonajeActor.#onCrearItem,
       editarItem: HojaPersonajeActor.#onEditarItem,
       eliminarItem: HojaPersonajeActor.#onEliminarItem,
-      generarMazoBase: HojaPersonajeActor.#onGenerarMazoBase,
       alternarEquipado: HojaPersonajeActor.#onAlternarEquipado,
       usarHabilidad: HojaPersonajeActor.#onUsarHabilidad
     }
@@ -73,27 +70,35 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
     // El nombre visible nunca muestra vacíos ni genéricos tipo "Unknown": usa un
     // identificador descriptivo (tipo + palo + dado) como respaldo (v0.8.2).
     const cartasEnMano = pilas.mano
-      ? pilas.mano.cards.contents.map(c => ({
-          id: c.id,
-          nombre: nombreVisibleCarta(c),
-          tipo: c.type,
-          esTrinket: c.type === "trinket",
-          palo: c.system.palo,
-          paloAbrev: abreviadoPalo(c.system.palo),
-          numero: c.system.numero,
-          tipoDado: c.system.tipoDado,
-          caracteristica: c.system.caracteristicaAsociada,
-          cantidadDados: system.caracteristicasTotales[c.system.caracteristicaAsociada] ?? 1,
-          seQuema: c.system.seQuema,
-          efecto: c.type === "trinket" ? c.system.efectoAlJugar : c.system.efecto
-        }))
+      ? (pilas.mano.cards?.contents ?? []).map(c => {
+          const esTrinket = c.type === "trinket";
+          // Los Trinkets (v0.8.4+) NO tienen palo, número ni tipoDado: solo Nivel.
+          // Nunca se accede a sistema.palo / sistema.tipoDado de un Trinket (protección de datos).
+          return {
+            id: c.id,
+            nombre: nombreVisibleCarta(c),
+            tipo: c.type,
+            esTrinket,
+            nivel: esTrinket ? Number(c.system?.nivel) || 1 : null,
+            palo: esTrinket ? null : c.system?.palo,
+            paloAbrev: esTrinket ? null : abreviadoPalo(c.system?.palo),
+            numero: esTrinket ? null : c.system?.numero,
+            tipoDado: esTrinket ? null : c.system?.tipoDado,
+            caracteristica: esTrinket ? null : c.system?.caracteristicaAsociada,
+            cantidadDados: esTrinket
+              ? null
+              : system.caracteristicasTotales?.[c.system?.caracteristicaAsociada] ?? 1,
+            seQuema: c.system?.seQuema,
+            efecto: esTrinket ? c.system?.efectoAlJugar : c.system?.efecto
+          };
+        })
       : [];
 
     const todosLosTrinkets = actor.obtenerResumenTrinkets().map(t => {
       const tooltipHtml = `
         <div style='text-align:left; max-width:260px;'>
           <strong>${t.nombre}</strong> <em>(${t.etiquetaEstado})</em><hr/>
-          <p><strong>Palo:</strong> ${abreviadoPalo(t.palo)} | <strong>Dado:</strong> ${t.tipoDado}</p>
+          <p><strong>Nivel:</strong> ${t.nivel}</p>
           ${t.efectoPermanente ? `<p><strong>Pasivo:</strong> ${t.efectoPermanente}</p>` : ""}
           ${t.efectoAlJugar ? `<p><strong>Al Jugar:</strong> ${t.efectoAlJugar}</p>` : ""}
         </div>
@@ -128,7 +133,6 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       actor,
       system,
       esPropietario: actor.isOwner,
-      dificultadActual: this.dificultadActual,
       pilasInicializadas,
       contadoresPilas,
       cartasEnMano,
@@ -143,22 +147,124 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
   }
 
   /** @override */
-  _onRender(context, options) {
-    super._onRender(context, options);
-    const inputDificultad = this.element.querySelector(".cyd-input-dificultad");
-    if (inputDificultad) {
-      inputDificultad.addEventListener("change", ev => {
-        this.dificultadActual = Number(ev.target.value) || 0;
-      });
+  _onFirstRender(context, options) {
+    super._onFirstRender(context, options);
+    const actor = this.document;
+    // Auto-asistente (v0.8.4): al abrir la ficha de un Personaje sin Clase, lanzar
+    // el Asistente de Creación de Personaje (Paso 1: Clase, Paso 2: Trinket).
+    if (actor.type === "personaje" && actor.isOwner && !actor.items.some(i => i.type === "clase")) {
+      this.abrirAsistenteClase().catch(err =>
+        console.error("Cartas y Dados | Error en el Asistente de Clase:", err)
+      );
     }
+  }
+
+  /**
+   * Asistente de Creación de Personaje (v0.8.4) construido con `foundry.applications.api.DialogV2`:
+   * - Paso 1: elección entre las 5 Clases de `SISTEMA_CONFIG.CLASES_BASE`.
+   * - Validación `tabulaRasa`: `DialogV2.confirm` con la advertencia exacta
+   *   "Clase avanzada, no es recomendable para jugadores nuevos"; si se cancela,
+   *   regresa a la selección de Clase.
+   * - Paso 2: elección del Trinket inicial entre los `trinkets` de la clase elegida
+   *   (en Tabula Rasa se ofrece "Vasija vacía").
+   * Al confirmar, llama a `SistemaActor#inicializarPersonajeConClase` para inicializar
+   * las 6 pilas y poblar `mazo` (12 cartas místicas) y `trinkets` (1 Trinket Nv. 1).
+   */
+  async abrirAsistenteClase() {
+    const actor = this.document;
+    const clases = SISTEMA_CONFIG.CLASES_BASE;
+    if (!clases) return;
+
+    /* ---------------- PASO 1: SELECCIÓN DE CLASE ---------------- */
+    let claveClase = null;
+    while (!claveClase) {
+      const botonesClases = Object.entries(clases).map(([clave, cfg]) => {
+        const etiquetaAtributo = cfg.atributo ? cfg.atributo.toUpperCase() : "AVANZADA";
+        const etiquetaPalo = cfg.paloPrincipal ? ` · ${abreviadoPalo(cfg.paloPrincipal)}` : "";
+        return {
+          action: clave,
+          // Texto plano sin etiquetas HTML: evita que se vean marcas crudas al elegir la clase en el diálogo.
+          label: `🧙 ${cfg.nombre} (${etiquetaAtributo}${etiquetaPalo})`,
+          callback: () => clave
+        };
+      });
+
+      const contenidoPaso1 = `
+        <p>Elige una de las siguientes clases iniciales:</p>
+
+      `;
+
+      const seleccion = await DialogV2.wait({
+        window: { title: `${actor.name} — Paso 1: Elige tu Clase` },
+        content: contenidoPaso1,
+        buttons: botonesClases,
+        rejectClose: false
+      });
+
+      if (!seleccion) return; // El jugador canceló el asistente
+
+      // Validación especial para la clase avanzada Tabula Rasa
+      if (seleccion === "tabulaRasa") {
+        const confirmarAvanzada = await DialogV2.confirm({
+          window: { title: "Advertencia de Clase Avanzada" },
+          content: "<p>Clase avanzada, no es recomendable para jugadores nuevos</p>",
+          yes: { label: "Continuar con Tabula Rasa" },
+          no: { label: "Volver a elegir Clase" },
+          defaultYes: false,
+          rejectClose: false
+        });
+        if (!confirmarAvanzada) continue; // Regresa a la selección de Clase
+      }
+
+      claveClase = seleccion;
+    }
+
+    const configClase = clases[claveClase];
+
+    /* ---------------- PASO 2: SELECCIÓN DE TRINKET ---------------- */
+    const opcionesTrinket = configClase.trinkets.map((nombre, indice) => `
+      <label style="display: block; margin: 4px 0;">
+        <input type="radio" name="cydTrinketElegido" value="${nombre}" ${indice === 0 ? "checked" : ""} />
+        🔮 ${nombre}
+      </label>`).join("");
+
+    const trinketElegido = await DialogV2.prompt({
+      window: { title: `${actor.name} — Paso 2: Elige tu Trinket Inicial` },
+      content: `
+        <p><strong>${configClase.nombre}</strong> — Trinkets iniciales disponibles (Nivel 1):</p>
+        ${opcionesTrinket}
+      `,
+      ok: {
+        label: "✨ Confirmar y Generar Mazo",
+        callback: (event, button) => button.form.elements.cydTrinketElegido.value
+      },
+      rejectClose: false
+    });
+
+    if (!trinketElegido) return; // El jugador canceló el Paso 2
+
+    await actor.inicializarPersonajeConClase(claveClase, trinketElegido);
+    this.render();
   }
 
   /* ======================================================================== */
   /*  ACCIONES DE CARTAS Y TURNO                                              */
   /* ======================================================================== */
 
+  /**
+   * Botón "inicializar pilas/clase" (v0.8.4):
+   * - Si el Actor aún NO tiene Clase, abre el Asistente de Creación de Personaje
+   *   (Diálogo DialogV2 de 2 pasos: Clase → Trinket) que además crea sus 6 pilas.
+   * - Si ya tiene Clase, solo crea/vincula las 6 pilas de cartas.
+   */
   static async #onInicializarPilas() {
-    await this.document.inicializarPilasDeJugador();
+    const actor = this.document;
+    const tieneClase = actor.items.some(i => i.type === "clase");
+    if (tieneClase) {
+      await actor.inicializarPilasDeJugador();
+    } else {
+      await this.abrirAsistenteClase();
+    }
     this.render();
   }
 
@@ -170,8 +276,8 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
   static async #onJugarCarta(event, target) {
     const cartaId = target.dataset.cartaId;
     const modo = target.dataset.modo || "usar";
-    const dificultad = this.dificultadActual > 0 ? this.dificultadActual : null;
-    await this.document.jugarCarta(cartaId, { dificultad, modo });
+    // La dificultad de las acciones no-ataque es siempre la global del Master (`dificultadMaster`).
+    await this.document.jugarCarta(cartaId, { modo });
     this.render();
   }
 
@@ -191,10 +297,15 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
 
     const preId = target.dataset.trinketId || "";
     const opcionesMano = mano.cards.contents
-      .map(c => `<option value="${c.id}">${c.name} (${abreviadoPalo(c.system.palo)} - ${c.system.tipoDado})</option>`)
+      .map(c => {
+        const etiqueta = c.type === "trinket"
+          ? `Trinket Nv. ${Number(c.system?.nivel) || 1}`
+          : `${abreviadoPalo(c.system.palo)} - ${c.system.tipoDado}`;
+        return `<option value="${c.id}">${nombreVisibleCarta(c)} (${etiqueta})</option>`;
+      })
       .join("");
     const opcionesTrinkets = trinketsDisponibles
-      .map(t => `<option value="${t.idOriginal}" ${t.idOriginal === preId ? "selected" : ""}>${t.nombre} (${abreviadoPalo(t.palo)} - ${t.tipoDado})</option>`)
+      .map(t => `<option value="${t.idOriginal}" ${t.idOriginal === preId ? "selected" : ""}>${t.nombre} (Nv. ${t.nivel})</option>`)
       .join("");
 
     const seleccion = await DialogV2.prompt({
@@ -258,10 +369,10 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
     const nombresEnPila = [...pilaDestino.cards].map(c => c.name);
     const nombreUnico = generarNombreUnico(nombresEnPila, base);
 
-    const [nuevaCarta] = await pilaDestino.createEmbeddedDocuments("Card", [{
-      name: nombreUnico,
-      type: tipoCarta
-    }]);
+    // Payload normalizado (name/face/faces/back sincronizados) para evitar "Unknown"
+    const [nuevaCarta] = await pilaDestino.createEmbeddedDocuments("Card", [
+      this.document._normalizarPayloadCarta({ name: nombreUnico, type: tipoCarta })
+    ]);
 
     if (nuevaCarta) {
       nuevaCarta.sheet.render(true);
@@ -321,14 +432,9 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
     }
   }
 
-  static async #onGenerarMazoBase() {
-    await this.document.generarMazoInicialDePrueba();
-    this.render();
-  }
-
   static async #onUsarHabilidad(event, target) {
     const itemId = target.dataset.itemId;
-    await this.document.usarHabilidadItem(itemId);
+    await this.document.usarHabilidad(itemId);
   }
 
   static async #onDescartarCarta(event, target) {

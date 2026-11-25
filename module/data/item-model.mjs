@@ -104,6 +104,9 @@ export class HabilidadDataModel extends TypeDataModel {
       }),
       // Si es true, muestra un botón para lanzar dados al usar la habilidad
       esActivable: new BooleanField({ required: true, initial: true }),
+      // Si es true, activar la habilidad requiere consumir una Carta de Misticismo (Copas)
+      // de la mano y lanzar dados. Si es false, el efecto se aplica directamente sin tirada.
+      requiereTirada: new BooleanField({ required: true, initial: true }),
       esAtaque: new BooleanField({ required: true, initial: true }),
       caracteristica: new StringField({
         required: true,
@@ -115,7 +118,14 @@ export class HabilidadDataModel extends TypeDataModel {
         initial: "d6",
         choices: ["d4", "d6", "d8", "d10", "d12"]
       }),
-      bonoTirada: new NumberField({ required: true, integer: true, initial: 0 })
+      bonoTirada: new NumberField({ required: true, integer: true, initial: 0 }),
+
+      // Automatización aplicada al activar la habilidad (solo los campos configurados tienen efecto)
+      automatizacion: new SchemaField({
+        curacion: new NumberField({ required: true, integer: true, initial: 0 }),
+        cambioCansancio: new NumberField({ required: true, integer: true, initial: 0 }),
+        robarCartas: new NumberField({ required: true, integer: true, initial: 0 })
+      })
     };
   }
 }

@@ -76,6 +76,15 @@ export class CartaAccionDataModel extends TypeDataModel {
 export class CartaTrinketDataModel extends TypeDataModel {
   static defineSchema() {
     return {
+      // Nivel del Trinket (v0.8.4): los Trinkets ya NO tienen palo ni número/dado;
+      // su escala de poder se representa exclusivamente mediante su Nivel.
+      nivel: new NumberField({
+        required: true,
+        integer: true,
+        min: 1,
+        initial: 1
+      }),
+
       efectoPermanente: new HTMLField({
         required: false,
         blank: true,
@@ -98,20 +107,6 @@ export class CartaTrinketDataModel extends TypeDataModel {
         initial: false
       }),
 
-      palo: new StringField({
-        required: true,
-        initial: "oros",
-        choices: () => Object.keys(CONFIG.CARTASYDADOS?.palosCartas ?? SISTEMA_CONFIG.palosCartas)
-      }),
-
-      numero: new NumberField({
-        required: true,
-        integer: true,
-        initial: 3,
-        min: 1,
-        max: 5
-      }),
-
       // Bonificador a la Defensa del jugador mientras este Trinket permanezca 'En Juego'
       bonoDefensaEnJuego: new NumberField({
         required: true,
@@ -124,10 +119,6 @@ export class CartaTrinketDataModel extends TypeDataModel {
     };
   }
 
-  prepareDerivedData() {
-    super.prepareDerivedData();
-    const config = CONFIG.CARTASYDADOS ?? SISTEMA_CONFIG;
-    this.tipoDado = config.dadoPorNumeroCarta[this.numero] ?? "d6";
-    this.caracteristicaAsociada = config.palosCartas[this.palo]?.caracteristicaAsociada ?? "social";
-  }
+  // NOTA (v0.8.4): No existe prepareDerivedData con tipoDado/caracteristicaAsociada.
+  // Los Trinkets entran en juego directamente sin lanzar dados (XdY).
 }

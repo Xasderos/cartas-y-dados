@@ -44,7 +44,6 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
       descansar: HojaPnjActor.#onDescansar,
       abrirPila: HojaPnjActor.#onAbrirPila,
       crearCartaEnMazo: HojaPnjActor.#onCrearCartaEnMazo,
-      generarMazoBase: HojaPnjActor.#onGenerarMazoBase,
       tiradaAtributoPnj: HojaPnjActor.#onTiradaAtributoPnj
     }
   };
@@ -85,19 +84,19 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
     // muestra vacíos ni genéricos tipo "Unknown": usa un identificador
     // descriptivo (tipo + palo + dado) como respaldo (v0.8.2).
     const cartasEnMano = tieneMazoJefe
-      ? pilas.mano.cards.contents
+      ? (pilas.mano?.cards?.contents ?? [])
           .filter(c => c.type === "accion")
           .map(c => ({
             id: c.id,
             nombre: nombreVisibleCarta(c),
-            palo: c.system.palo,
-            paloAbrev: abreviadoPalo(c.system.palo),
-            numero: c.system.numero,
-            tipoDado: c.system.tipoDado,
-            caracteristica: c.system.caracteristicaAsociada,
-            cantidadDados: system.caracteristicasTotales[c.system.caracteristicaAsociada] ?? 1,
-            seQuema: c.system.seQuema,
-            efecto: c.system.efecto
+            palo: c.system?.palo,
+            paloAbrev: abreviadoPalo(c.system?.palo),
+            numero: c.system?.numero,
+            tipoDado: c.system?.tipoDado,
+            caracteristica: c.system?.caracteristicaAsociada,
+            cantidadDados: system.caracteristicasTotales?.[c.system?.caracteristicaAsociada] ?? 1,
+            seQuema: c.system?.seQuema,
+            efecto: c.system?.efecto
           }))
       : [];
 
@@ -119,7 +118,7 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
   /* ======================================================================== */
 
   static async #onUsarHabilidad(event, target) {
-    await this.document.usarHabilidadItem(target.dataset.itemId);
+    await this.document.usarHabilidad(target.dataset.itemId);
   }
 
   static async #onCrearItemPnj(event, target) {
@@ -222,8 +221,8 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
   /* ======================================================================== */
 
   static async #onInicializarPilasJefe() {
+    // Solo crea/vincula las 6 pilas; el Master puebla el Mazo de Jefe manualmente
     await this.document.inicializarPilasDeJugador();
-    await this.document.generarMazoInicialDePrueba();
     this.render();
   }
 
@@ -262,16 +261,11 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
     const nombresEnMazo = [...mazo.cards].map(c => c.name);
     const nombreUnico = generarNombreUnico(nombresEnMazo, "Nueva Carta de Jefe");
 
-    const [nuevaCarta] = await mazo.createEmbeddedDocuments("Card", [{
-      name: nombreUnico,
-      type: "accion"
-    }]);
+    // Payload normalizado (name/face/faces/back sincronizados) para evitar "Unknown"
+    const [nuevaCarta] = await mazo.createEmbeddedDocuments("Card", [
+      this.document._normalizarPayloadCarta({ name: nombreUnico, type: "accion" })
+    ]);
     if (nuevaCarta) nuevaCarta.sheet.render(true);
-  }
-
-  static async #onGenerarMazoBase() {
-    await this.document.generarMazoInicialDePrueba();
-    this.render();
   }
 
   static async #onDescartarCarta(event, target) {

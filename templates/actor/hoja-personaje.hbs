@@ -158,7 +158,7 @@
         <p>Este personaje aún no tiene sus pilas de cartas vinculadas en el mundo.</p>
         {{#if esPropietario}}
           <button type="button" class="cyd-btn-primario" data-action="inicializarPilas">
-            ✨ Crear e Inicializar las Pilas de Cartas
+            ✨ Elegir Clase e Inicializar las Pilas de Cartas
           </button>
         {{/if}}
       </div>
@@ -194,10 +194,12 @@
           {{#if esPropietario}}
             <button type="button" class="cyd-btn-mini" data-action="crearCartaEnMazo" data-tipo-carta="trinket" data-tooltip="Crear un nuevo Trinket en tu Mazo de Trinkets">+ Trinket</button>
           {{/if}}
-          {{#if (and esPropietario (eq contadoresPilas.mazoTotal 0))}}
-            <button type="button" class="cyd-btn-mini" data-action="generarMazoBase" data-tooltip="Poblar con 6 Cartas y 2 Trinkets de ejemplo">
-              🎁 Generar Mazo Inicial
-            </button>
+          {{#if esPropietario}}
+            {{#unless itemClase}}
+              <button type="button" class="cyd-btn-mini" data-action="inicializarPilas" data-tooltip="Asistente de Clase: elige tu Clase y Trinket, y genera tu Mazo inicial (v0.8.4)">
+                🎁 Asistente de Clase
+              </button>
+            {{/unless}}
           {{/if}}
         </div>
       </section>
@@ -214,7 +216,7 @@
             <div class="cyd-lista-pildoras">
               {{#each trinketsEnJuego as |trinket|}}
                 <div class="cyd-pildora-trinket cyd-estado-enJuego" data-tooltip="{{trinket.tooltipHtml}}">
-                  <span>🟢 {{trinket.nombre}} ({{trinket.tipoDado}})</span>
+                  <span>🟢 {{trinket.nombre}} (Nv. {{trinket.nivel}})</span>
                   {{#if ../esPropietario}}
                     <button type="button" class="cyd-btn-mini" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="false" data-tooltip="Enviar al Descarte">📥</button>
                     <button type="button" class="cyd-btn-mini" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="true" data-tooltip="Quemar Trinket">🔥</button>
@@ -260,11 +262,19 @@
                 <article class="cyd-carta-item {{#if carta.esTrinket}}cyd-carta-trinket{{/if}}">
                   <header class="cyd-carta-cabecera">
                     <span class="cyd-carta-titulo">{{carta.nombre}}</span>
-                    <span class="cyd-carta-dado">{{carta.cantidadDados}}{{carta.tipoDado}}</span>
+                    {{#if carta.esTrinket}}
+                      <span class="cyd-carta-dado cyd-tag-nivel">Nv. {{carta.nivel}}</span>
+                    {{else}}
+                      <span class="cyd-carta-dado">{{carta.cantidadDados}}{{carta.tipoDado}}</span>
+                    {{/if}}
                   </header>
                   <div class="cyd-carta-subtitulo">
-                    <span>Palo: <strong>{{carta.paloAbrev}}</strong> ({{carta.caracteristica}})</span>
-                    {{#if carta.esTrinket}}<span>🔮 Trinket</span>{{else if carta.seQuema}}<span>🔥 Se Quema</span>{{/if}}
+                    {{#if carta.esTrinket}}
+                      <span>🔮 Trinket</span>
+                    {{else}}
+                      <span>Palo: <strong>{{carta.paloAbrev}}</strong> ({{carta.caracteristica}})</span>
+                      {{#if carta.seQuema}}<span>🔥 Se Quema</span>{{/if}}
+                    {{/if}}
                   </div>
                   <div class="cyd-carta-efecto">{{{carta.efecto}}}</div>
                   <footer class="cyd-carta-acciones">

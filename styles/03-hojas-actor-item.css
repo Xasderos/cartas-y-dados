@@ -293,3 +293,34 @@
   margin-bottom: 4px;
   padding-bottom: 2px;
 }
+
+/* ======================================================================== */
+/*  REFUERZO DE LAYOUT (Bug 1, v0.8.5): .cyd-cuerpo-hoja nunca colapsa      */
+/*  a 0px de altura al (re)abrir el mundo. Se carga después de 01-*.css     */
+/* ======================================================================== */
+.window-content .cyd-hoja-contenedor,
+.sheet.actor .cyd-hoja-contenedor,
+.sheet.pnj .cyd-hoja-contenedor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 500px;
+}
+
+.window-content .cyd-hoja-contenedor > main,
+.sheet.actor .cyd-hoja-contenedor > main,
+.sheet.pnj .cyd-hoja-contenedor > main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.cyd-cuerpo-hoja {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 300px;
+  overflow-y: auto;
+}

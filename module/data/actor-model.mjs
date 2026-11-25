@@ -166,20 +166,24 @@ export class BaseActorDataModel extends TypeDataModel {
     let bonoCansancioMax = 0;
 
     for (const item of items) {
-      if (item.type === "objeto" && !item.system.equipado) continue;
+      try {
+        if (item.type === "objeto" && !item.system.equipado) continue;
 
-      const b = item.system.bonificadores;
-      if (!b) continue;
+        const b = item.system.bonificadores;
+        if (!b) continue;
 
-      bonosCaract.fisico += b.fisico || 0;
-      bonosCaract.consciencia += b.consciencia || 0;
-      bonosCaract.social += b.social || 0;
-      bonosCaract.misticismo += b.misticismo || 0;
+        bonosCaract.fisico += b.fisico || 0;
+        bonosCaract.consciencia += b.consciencia || 0;
+        bonosCaract.social += b.social || 0;
+        bonosCaract.misticismo += b.misticismo || 0;
 
-      bonoDefensa += b.defensa || 0;
-      bonoManoItems += b.limiteMano || 0;
-      bonoSaludOtros += b.saludMax || 0;
-      bonoCansancioMax += b.cansancioMax || 0;
+        bonoDefensa += b.defensa || 0;
+        bonoManoItems += b.limiteMano || 0;
+        bonoSaludOtros += b.saludMax || 0;
+        bonoCansancioMax += b.cansancioMax || 0;
+      } catch (error) {
+        console.warn("[Cartas y Dados] Error calculando bonificadores derivados del ítem", item?.id, error);
+      }
     }
 
     if (game.cards) {
@@ -198,6 +202,11 @@ export class BaseActorDataModel extends TypeDataModel {
         }
       }
     }
+
+    // Garantizar siempre un objeto de pilas aunque `game.cards` aún no esté hidratado
+    // (al recargar el mundo, prepareDerivedData puede ejecutarse antes de que las
+    // colecciones de Foundry estén disponibles; nunca debe quedar undefined).
+    this.pilasDocumentos = this.pilasDocumentos ?? {};
 
     this.bonificadoresCaracteristicas = bonosCaract;
     this.caracteristicasTotales = {

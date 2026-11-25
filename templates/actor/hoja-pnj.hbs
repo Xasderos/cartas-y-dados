@@ -192,9 +192,6 @@
             📚 Mazo: <strong>{{contadoresPilas.mazoDisponibles}}/{{contadoresPilas.mazoTotal}}</strong>
           </span>
           <button type="button" class="cyd-btn-mini" data-action="crearCartaEnMazo">+ Carta</button>
-          {{#if (eq contadoresPilas.mazoTotal 0)}}
-            <button type="button" class="cyd-btn-mini" data-action="generarMazoBase">🎁 Mazo Base</button>
-          {{/if}}
           <span class="cyd-chip-pila" data-action="abrirPila" data-pila="mano" data-tooltip="Abrir Mano del Jefe">
             ✋ Mano: <strong>{{contadoresPilas.manoActual}}/{{system.limiteMano}}</strong>
           </span>
