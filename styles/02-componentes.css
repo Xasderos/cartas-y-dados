@@ -1,102 +1,296 @@
 /**
  * @file 02-componentes.css
- * @description Componentes reutilizables: paneles, botones, cajas de recursos, píldoras e inputs.
+ * @description Componentes reutilizables integrados con el estilo nativo de Foundry v14:
+ * paneles, cabeceras de sección, cajas de recursos, botones compactos, listas de Items
+ * y avisos. Los colores salen de los tokens `--cyd-*` (derivados del tema de Foundry).
  */
+
+/* ======================================================================== */
+/*  PANELES                                                                 */
+/* ======================================================================== */
 
 .cyd-panel,
 .cyd-panel-controles,
-.cyd-panel-mano {
-  background: var(--cyd-bg-panel);
-  border: 1px solid var(--cyd-borde);
-  border-radius: 6px;
-  padding: 8px 10px;
+.cyd-panel-mano,
+.cyd-panel-trinkets {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 6px 8px 8px;
+  background: var(--cyd-tinte);
+  border: 1px solid var(--cyd-borde-suave);
+  border-radius: var(--cyd-radio);
 }
 
 .cyd-panel-flex {
   flex: 1;
 }
 
+/* Cabecera de sección: como las de Foundry, con un filete dorado tenue */
 .cyd-cabecera-seccion {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--cyd-borde);
+  gap: 8px;
   padding-bottom: 4px;
+  border-bottom: 1px solid var(--cyd-oro-linea);
 }
 
 .cyd-cabecera-seccion h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
+  padding: 0;
+  border: none;
+  font-family: var(--cyd-fuente-texto);
   font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--cyd-texto);
 }
 
-/* Cajas de recursos (Salud, Defensa, Cansancio, Mano) */
+.cyd-cabecera-seccion h3 i {
+  font-size: 0.8rem;
+  color: var(--cyd-azul);
+}
+
+.cyd-cabecera-seccion h3 .cyd-contador {
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: var(--cyd-texto-tenue);
+}
+
+.cyd-cabecera-seccion small,
+.cyd-ayuda {
+  font-size: 0.75rem;
+  color: var(--cyd-texto-tenue);
+}
+
+/* Subtítulo interno de un panel (p. ej. "En Juego", "Colección") */
+.cyd-subtitulo-panel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cyd-texto-suave);
+}
+
+.cyd-subtitulo-panel::before {
+  content: "◆";
+  font-size: 0.5rem;
+  color: var(--cyd-oro);
+  opacity: 0.8;
+}
+
+/* ======================================================================== */
+/*  CAJAS DE RECURSOS (Salud, Defensa, Cansancio, Mano, Movimiento...)      */
+/* ======================================================================== */
+
 .cyd-recursos-barra {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 6px;
+}
+
+.cyd-recursos-barra.cyd-cols-2 {
+  grid-template-columns: repeat(2, 1fr) !important;
+}
+
+.cyd-recursos-barra.cyd-cols-3 {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+
+.cyd-recursos-barra.cyd-cols-5 {
+  grid-template-columns: repeat(5, 1fr) !important;
 }
 
 .cyd-recurso-caja {
-  background: var(--cyd-bg-caja);
-  padding: 5px 8px;
-  border-radius: 4px;
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
-  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 5px 7px;
+  background: var(--cyd-fondo-hundido);
+  border: 1px solid var(--cyd-borde-suave);
+  border-radius: var(--cyd-radio);
   font-size: 0.85rem;
+}
+
+/* Barra de recursos principal: sin caja exterior, fila limpia */
+.cyd-recursos-vitales .cyd-recurso-caja {
+  background: var(--cyd-tinte);
+}
+
+.cyd-recurso-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-tenue);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cyd-recurso-titulo i {
+  color: var(--cyd-azul);
+  font-size: 0.75rem;
 }
 
 .cyd-recurso-inputs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  color: var(--cyd-texto-suave);
 }
 
-.cyd-recurso-inputs input {
-  width: 42px;
-  text-align: center;
+.cartas-y-dados .window-content .cyd-recurso-inputs input[type="number"],
+.cartas-y-dados .window-content .cyd-recurso-caja > input[type="number"] {
+  width: 48px;
+  height: 26px;
 }
 
-/* Botones y enlaces */
-.cyd-btn-mini {
-  padding: 2px 6px;
+.cartas-y-dados .window-content .cyd-recurso-caja > select,
+.cartas-y-dados .window-content .cyd-recurso-inputs select {
+  width: 100%;
+  height: 26px;
+}
+
+/* Valor calculado (Total) */
+.cyd-valor-grande {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--cyd-texto);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cyd-valor-sep {
+  color: var(--cyd-texto-tenue);
+}
+
+.cyd-unidad {
   font-size: 0.75rem;
-  line-height: 1.2;
+  color: var(--cyd-texto-tenue);
 }
 
-.cyd-btn-micro {
+label.cyd-recurso-caja {
+  cursor: pointer;
+}
+
+.cyd-recurso-caja.cyd-check {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ======================================================================== */
+/*  BOTONES COMPACTOS (el aspecto base lo pone Foundry)                     */
+/* ======================================================================== */
+
+.cartas-y-dados .window-content button.cyd-btn-mini {
+  width: auto;
+  height: 24px;
+  min-height: 0;
+  padding: 0 8px;
+  font-size: 0.78rem;
+  line-height: 22px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Botón solo-icono: sin caja hasta el hover, como los controles nativos */
+.cartas-y-dados .window-content button.cyd-btn-icono {
+  width: 24px;
+  padding: 0;
+  color: var(--cyd-texto-tenue);
+  background: transparent;
+  border-color: transparent;
+}
+
+.cartas-y-dados .window-content button.cyd-btn-icono:hover {
+  color: var(--cyd-texto);
+  background: var(--cyd-tinte-hover);
+}
+
+.cartas-y-dados .window-content button.cyd-btn-icono.cyd-peligro:hover {
+  color: var(--cyd-peligro);
+}
+
+.cartas-y-dados .window-content button.cyd-btn-micro {
+  width: auto;
   padding: 0 5px;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   line-height: 1.1;
 }
 
+.cartas-y-dados .window-content button.cyd-btn-primario {
+  width: auto;
+  padding: 0 16px;
+}
+
+/* ======================================================================== */
+/*  ENLACES, TEXTO VACÍO Y TEXTAREAS                                        */
+/* ======================================================================== */
+
 .cyd-link-item {
   cursor: pointer;
-  color: var(--cyd-acento);
+  color: var(--cyd-texto);
+  font-weight: 600;
 }
 
 .cyd-link-item:hover {
-  text-decoration: underline;
+  color: var(--cyd-oro);
 }
 
 .cyd-texto-vacio {
-  font-size: 0.8rem;
-  color: var(--cyd-texto-suave);
-  font-style: italic;
   margin: 2px 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--cyd-texto-tenue);
 }
 
-.cyd-textarea {
+.cartas-y-dados .window-content textarea.cyd-textarea {
   width: 100%;
   flex: 1;
-  background: #14181d;
-  color: var(--cyd-texto);
-  border: 1px solid var(--cyd-borde);
-  padding: 6px;
-  border-radius: 4px;
+  min-height: 70px;
+  resize: vertical;
+}
+
+/* Grupo de campo con etiqueta encima (editores de Item y Carta) */
+.cyd-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+}
+
+.cyd-campo > label,
+.cyd-campo-linea label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--color-form-label, var(--cyd-texto-suave));
+}
+
+.cyd-campo > label i {
+  color: var(--cyd-azul);
+}
+
+.cyd-campo-linea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cartas-y-dados .window-content .cyd-campo-linea input {
+  flex: 1;
 }
 
 .cyd-inline-control {
@@ -110,14 +304,112 @@
   width: 64px;
 }
 
-/* Aviso de nombre duplicado en la ficha de carta (v0.8.2): invita a usar
-   un nombre único y personalizado para diferenciar la carta en su pila */
+/* ======================================================================== */
+/*  AVISOS                                                                  */
+/* ======================================================================== */
+
+.cyd-aviso-inicializar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 12px;
+  text-align: center;
+  background: var(--cyd-tinte);
+  border: 1px dashed var(--cyd-oro-linea);
+  border-radius: var(--cyd-radio);
+  color: var(--cyd-texto-suave);
+}
+
+.cyd-aviso-inicializar p {
+  margin: 0;
+}
+
 .cyd-aviso-duplicado {
   margin: 2px 0 0 0;
   padding: 3px 8px;
-  font-size: 0.72rem;
-  color: #f5c542;
-  background: rgba(212, 175, 55, 0.12);
-  border: 1px solid rgba(212, 175, 55, 0.5);
-  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-suave);
+  background: var(--cyd-oro-velo);
+  border: 1px solid var(--cyd-oro-linea);
+  border-radius: var(--cyd-radio);
+}
+
+/* ======================================================================== */
+/*  LISTAS DE ITEMS (Equipo y Habilidades)                                  */
+/* ======================================================================== */
+
+.cyd-lista-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.cyd-fila-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--cyd-borde-suave);
+  border-left: 2px solid transparent;
+  transition: background 0.15s ease;
+}
+
+.cyd-fila-item:last-child {
+  border-bottom: none;
+}
+
+.cyd-fila-item:hover {
+  background: var(--cyd-tinte-hover);
+}
+
+.cyd-item-equipado {
+  border-left-color: var(--cyd-oro-linea);
+}
+
+.cyd-fila-item-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.cyd-fila-item-info .cyd-link-item {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cyd-fila-item-info small,
+.cyd-detalle-item {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-tenue);
+  white-space: nowrap;
+}
+
+.cyd-detalle-item i {
+  color: var(--cyd-azul);
+}
+
+.cyd-fila-item-acciones {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.cyd-tag-cantidad {
+  padding: 0 6px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-tenue);
+}
+
+/* Interruptor de equipado */
+.cartas-y-dados .window-content button.cyd-btn-equipar.cyd-activo {
+  color: var(--cyd-oro);
 }

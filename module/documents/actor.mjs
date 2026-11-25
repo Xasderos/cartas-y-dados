@@ -334,7 +334,7 @@ export class SistemaActor extends Actor {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<p>🎴 <strong>${this.name}</strong> roba cartas hasta completar su mano (${mano.cards.size}/${limite}).</p>`
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-clone"></i><p><strong>${this.name}</strong> roba cartas hasta completar su mano (${mano.cards.size}/${limite}).</p></div>`
     });
   }
 
@@ -378,7 +378,7 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: `
         <div class="cyd-alerta-cansancio">
-          <h4>⚠️ ¡Mazo Agotado!</h4>
+          <h4><i class="fa-solid fa-triangle-exclamation"></i> Mazo Agotado</h4>
           <p><strong>${this.name}</strong> baraja su Descarte para formar un nuevo Mazo y recibe <strong>+1 de Cansancio</strong> (Total: ${nuevoCansancio}/${this.system.cansancio.maxTotal}).</p>
         </div>
       `
@@ -399,9 +399,9 @@ export class SistemaActor extends Actor {
   _infoCartaHtml(carta) {
     if (carta.type === "trinket") {
       const nivel = Number(carta.system?.nivel) || 1;
-      return `<p><strong>🔮 Trinket:</strong> Nv. ${nivel}</p>`;
+      return `<p><i class="fa-solid fa-gem"></i> <strong>Trinket</strong> · Nv. ${nivel}</p>`;
     }
-    return `<p><strong>Palo:</strong> ${abreviadoPalo(carta.system.palo)} | <strong>Dado:</strong> ${carta.system.tipoDado}</p>`;
+    return `<p><i class="fa-solid fa-diamond"></i> <strong>${abreviadoPalo(carta.system.palo)}</strong> · Dado <strong>${carta.system.tipoDado}</strong></p>`;
   }
 
   async jugarCarta(cartaId, { quemar = false, modo = "usar" } = {}) {
@@ -452,38 +452,38 @@ export class SistemaActor extends Actor {
         if (danoCalculado > 0) {
           bloqueResolucionHtml = `
             <div class="cyd-resolucion-caja cyd-exito">
-              <p>🎯 <strong>Objetivo:</strong> ${tokenObjetivo.name} (🛡️ Defensa: ${defensaObjetivo})</p>
-              <p>💥 <strong>¡IMPACTO! Daño: ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
+              <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
+              <p><i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span> · <strong>Daño ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
               <button type="button" class="cyd-btn-aplicar-dano"
                       data-actor-uuid="${actorObjetivo.uuid}"
                       data-dano="${danoCalculado}">
-                🩸 Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
+                <i class="fa-solid fa-droplet"></i> Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
               </button>
             </div>
           `;
         } else {
           bloqueResolucionHtml = `
             <div class="cyd-resolucion-caja cyd-fallo">
-              <p>🎯 <strong>Objetivo:</strong> ${tokenObjetivo.name} (🛡️ Defensa: ${defensaObjetivo})</p>
-              <p>🛡️ <strong>Ataque Bloqueado (0 Daño):</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
+              <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
+              <p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
             </div>
           `;
         }
       } else if (carta.system.esAtaque && !actorObjetivo) {
         bloqueResolucionHtml = `
           <div class="cyd-resolucion-caja">
-            <p>⚔️ <strong>Resultado de Ataque: ${roll.total}</strong></p>
-            <p><small>💡 Pulsa <strong>T</strong> sobre un enemigo antes de jugar la carta para restar su Defensa.</small></p>
+            <p><i class="fa-solid fa-crosshairs"></i> <strong>Resultado de Ataque: ${roll.total}</strong></p>
+            <p><small><i class="fa-solid fa-circle-info"></i> Pulsa <strong>T</strong> sobre un enemigo antes de jugar la carta para restar su Defensa.</small></p>
           </div>
         `;
       } else {
         const dificultadMaster = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
         if (dificultadMaster > 0) {
           const exito = roll.total >= dificultadMaster;
-          const textoExito = exito ? "✅ ¡ÉXITO!" : "❌ FALLO";
+          const textoExito = exito ? '<span class="cyd-resultado-exito">ÉXITO</span>' : '<span class="cyd-resultado-fallo">FALLO</span>';
           bloqueResolucionHtml = `
             <div class="cyd-resolucion-caja">
-              <p>🎲 <strong>Dificultad del Master (${dificultadMaster}):</strong> ${textoExito} (Total: ${roll.total})</p>
+              <p><i class="fa-solid fa-bullseye"></i> <strong>Dificultad del Master (${dificultadMaster}):</strong> ${textoExito} (Total: ${roll.total})</p>
             </div>
           `;
         }
@@ -493,14 +493,14 @@ export class SistemaActor extends Actor {
     // Determinar pila destino: Quemadas, En Juego (si es Trinket) o Descarte
     const seQuema = quemar || Boolean(carta.system.seQuema);
     let pilaDestino = descarte;
-    let etiquetaDestino = "📥 Descarte";
+    let etiquetaDestino = "Descarte";
 
     if (seQuema) {
       pilaDestino = quemadas;
-      etiquetaDestino = "🔥 Carta Quemada";
+      etiquetaDestino = "Carta Quemada";
     } else if (carta.type === "trinket") {
       pilaDestino = enJuego;
-      etiquetaDestino = "🟢 Trinket En Juego";
+      etiquetaDestino = "Trinket En Juego";
     }
 
     // Mover carta preservando flags y recalcular datos derivados del Actor (incluyendo Defensa)
@@ -512,14 +512,14 @@ export class SistemaActor extends Actor {
     if (auto.curacion > 0) {
       const nuevaSalud = Math.min(this.system.salud.maxTotal, this.system.salud.value + auto.curacion);
       updatesActor["system.salud.value"] = nuevaSalud;
-      resumenEfectosAuto.push(`❤️ +${auto.curacion} Salud`);
+      resumenEfectosAuto.push(`<i class="fa-solid fa-heart-pulse"></i> +${auto.curacion} Salud`);
     }
 
     if (auto.cambioCansancio !== 0) {
       const nuevoCansancio = Math.max(0, this.system.cansancio.value + auto.cambioCansancio);
       updatesActor["system.cansancio.value"] = nuevoCansancio;
       const signo = auto.cambioCansancio > 0 ? `+${auto.cambioCansancio}` : auto.cambioCansancio;
-      resumenEfectosAuto.push(`⚡ ${signo} Cansancio`);
+      resumenEfectosAuto.push(`<i class="fa-solid fa-hourglass-half"></i> ${signo} Cansancio`);
     }
 
     if (Object.keys(updatesActor).length > 0) {
@@ -528,20 +528,20 @@ export class SistemaActor extends Actor {
 
     if (auto.robarCartas > 0) {
       await this.robarCantidadCartas(auto.robarCartas);
-      resumenEfectosAuto.push(`✋ Roba +${auto.robarCartas} carta(s)`);
+      resumenEfectosAuto.push(`<i class="fa-solid fa-clone"></i> Roba +${auto.robarCartas} carta(s)`);
     }
 
     const bonoDefTrinket = Number(carta.system.bonoDefensaEnJuego) || 0;
     if (carta.type === "trinket" && bonoDefTrinket !== 0 && !seQuema) {
       const signoDef = bonoDefTrinket > 0 ? `+${bonoDefTrinket}` : bonoDefTrinket;
-      resumenEfectosAuto.push(`🛡️ ${signoDef} Defensa (Activo en Juego)`);
+      resumenEfectosAuto.push(`<i class="fa-solid fa-shield-halved"></i> ${signoDef} Defensa (Activo en Juego)`);
     }
 
     // Garantizar que `defensaTotal` quede recalculada en el Actor
     this.prepareData();
 
     const htmlEfectosAuto = resumenEfectosAuto.length > 0
-      ? `<p class="cyd-tags-auto"><strong>Efectos aplicados:</strong> ${resumenEfectosAuto.join(" | ")}</p>`
+      ? `<p class="cyd-tags-auto"><strong>Efectos aplicados:</strong> ${resumenEfectosAuto.join(" · ")}</p>`
       : "";
 
     const efectoHtml = carta.type === "trinket"
@@ -549,7 +549,7 @@ export class SistemaActor extends Actor {
       : carta.system.efecto;
 
     // Icono de cabecera: los Trinkets anuncian su entrada en juego con su Nivel (v0.8.4)
-    const iconoChat = carta.type === "trinket" ? "🔮" : carta.system.esAtaque ? "⚔️" : "🃏";
+    const iconoChat = carta.type === "trinket" ? '<i class="fa-solid fa-gem"></i>' : carta.system.esAtaque ? '<i class="fa-solid fa-crosshairs"></i>' : '<i class="fa-solid fa-diamond"></i>';
     const saborChat = `
       <div class="cyd-carta-jugada">
         <h3>${iconoChat} ${nombreVisibleCarta(carta)} <small>(${etiquetaDestino})</small></h3>
@@ -601,8 +601,8 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: `
         <div class="cyd-carta-jugada">
-          <h3>📥 ${nombreVisibleCarta(carta)}</h3>
-          <p><strong>${carta.type === "trinket" ? "🔮 Trinket" : "🃏 Acción"}:</strong> ${carta.type === "trinket" ? "Nv. " + (Number(carta.system.nivel) || 1) + " —" : ""} Descartad${carta.type === "trinket" ? "o" : "a"} sin tirar</p>
+          <h3><i class="fa-solid fa-box-archive"></i> ${nombreVisibleCarta(carta)} <small>Descarte</small></h3>
+          <p><strong>${carta.type === "trinket" ? "Trinket" : "Acción"}:</strong> ${carta.type === "trinket" ? "Nv. " + (Number(carta.system.nivel) || 1) + " —" : ""} Descartad${carta.type === "trinket" ? "o" : "a"} sin tirar</p>
           ${this._infoCartaHtml(carta)}
           <p><small>La carta ha sido enviada al Descarte sin realizar ninguna tirada.</small></p>
         </div>
@@ -634,8 +634,8 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: `
         <div class="cyd-carta-jugada">
-          <h3>🔥 ${nombreVisibleCarta(carta)}</h3>
-          <p><strong>${carta.type === "trinket" ? "🔮 Trinket" : "🃏 Acción"}:</strong> ${carta.type === "trinket" ? "Nv. " + (Number(carta.system.nivel) || 1) + " —" : ""} Quemad${carta.type === "trinket" ? "o" : "a"} sin tirar</p>
+          <h3><i class="fa-solid fa-fire"></i> ${nombreVisibleCarta(carta)} <small>Carta Quemada</small></h3>
+          <p><strong>${carta.type === "trinket" ? "Trinket" : "Acción"}:</strong> ${carta.type === "trinket" ? "Nv. " + (Number(carta.system.nivel) || 1) + " —" : ""} Quemad${carta.type === "trinket" ? "o" : "a"} sin tirar</p>
           ${this._infoCartaHtml(carta)}
           <p><small>La carta ha sido quemada (enviada a Cartas Quemadas) sin realizar ninguna tirada.</small></p>
         </div>
@@ -674,7 +674,7 @@ export class SistemaActor extends Actor {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<p>✨ <strong>${this.name}</strong> descarta <em>${nombreVisibleCarta(cartaCoste)}</em> y añade el Trinket <strong>${nombreVisibleCarta(cartaTrinket)}</strong> a su mano.</p>`
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-gem"></i><p><strong>${this.name}</strong> descarta <em>${nombreVisibleCarta(cartaCoste)}</em> y añade el Trinket <strong>${nombreVisibleCarta(cartaTrinket)}</strong> a su mano.</p></div>`
     });
   }
 
@@ -690,13 +690,14 @@ export class SistemaActor extends Actor {
     if (!trinket) return;
 
     const destino = quemar ? quemadas : descarte;
-    const textoAccion = quemar ? "quema 🔥" : "descarta 📥";
+    const textoAccion = quemar ? "quema" : "descarta";
+    const iconoAccion = quemar ? '<i class="fa-solid fa-fire"></i>' : '<i class="fa-solid fa-box-archive"></i>';
 
     await this._moverCartaEntrePilas(enJuego, destino, trinket.id);
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<p><strong>${this.name}</strong> ${textoAccion} su Trinket activo <strong>${nombreVisibleCarta(trinket)}</strong>.</p>`
+      content: `<div class="cyd-chat-aviso">${iconoAccion}<p><strong>${this.name}</strong> ${textoAccion} su Trinket activo <strong>${nombreVisibleCarta(trinket)}</strong>.</p></div>`
     });
   }
 
@@ -723,7 +724,7 @@ export class SistemaActor extends Actor {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<p>🔄 <strong>Fin de Escena / Combate (${this.name}):</strong> Su Mano, su Descarte y sus Trinkets en juego regresan a sus respectivos mazos y se barajan.</p>`
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-rotate"></i><p><strong>Fin de Escena / Combate (${this.name}):</strong> Su Mano, su Descarte y sus Trinkets en juego regresan a sus respectivos mazos y se barajan.</p></div>`
     });
   }
 
@@ -750,7 +751,7 @@ export class SistemaActor extends Actor {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<p>🏕️ <strong>${this.name}</strong> descansa: recupera su Mano, su Descarte y sus <strong>Cartas Quemadas</strong>, baraja sus mazos y elimina su Cansancio.</p>`
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-campground"></i><p><strong>${this.name}</strong> descansa: recupera su Mano, su Descarte y sus <strong>Cartas Quemadas</strong>, baraja sus mazos y elimina su Cansancio.</p></div>`
     });
   }
 
@@ -790,7 +791,7 @@ export class SistemaActor extends Actor {
 
     return trinkets.cards.map(trinketOriginal => {
       let estado = "disponible";
-      let etiquetaEstado = "⚪ En Reserva";
+      let etiquetaEstado = "En Reserva";
       let idEnPilaActual = trinketOriginal.id;
 
       if (trinketOriginal.drawn) {
@@ -801,19 +802,19 @@ export class SistemaActor extends Actor {
 
         if (enMesa) {
           estado = "enJuego";
-          etiquetaEstado = "🟢 Activo en Juego";
+          etiquetaEstado = "Activo en Juego";
           idEnPilaActual = enMesa.id;
         } else if (enLaMano) {
           estado = "enMano";
-          etiquetaEstado = "✋ En Mano";
+          etiquetaEstado = "En Mano";
           idEnPilaActual = enLaMano.id;
         } else if (enElDescarte) {
           estado = "descartado";
-          etiquetaEstado = "📥 Descartado";
+          etiquetaEstado = "Descartado";
           idEnPilaActual = enElDescarte.id;
         } else if (enQuemadas) {
           estado = "quemado";
-          etiquetaEstado = "🔥 Quemado";
+          etiquetaEstado = "Quemado";
           idEnPilaActual = enQuemadas.id;
         }
       }
@@ -884,20 +885,20 @@ export class SistemaActor extends Actor {
       if (danoCalculado > 0) {
         bloqueResolucionHtml = `
           <div class="cyd-resolucion-caja cyd-exito">
-            <p>🎯 <strong>Objetivo:</strong> ${tokenObjetivo.name} (🛡️ Defensa: ${defensaObjetivo})</p>
-            <p>💥 <strong>¡IMPACTO! Daño: ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
+            <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
+            <p><i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span> · <strong>Daño ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
             <button type="button" class="cyd-btn-aplicar-dano"
                     data-actor-uuid="${actorObjetivo.uuid}"
                     data-dano="${danoCalculado}">
-              🩸 Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
+              <i class="fa-solid fa-droplet"></i> Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
             </button>
           </div>
         `;
       } else {
         bloqueResolucionHtml = `
           <div class="cyd-resolucion-caja cyd-fallo">
-            <p>🎯 <strong>Objetivo:</strong> ${tokenObjetivo.name} (🛡️ Defensa: ${defensaObjetivo})</p>
-            <p>🛡️ <strong>Ataque Bloqueado (0 Daño):</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
+            <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
+            <p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
           </div>
         `;
       }
@@ -907,7 +908,7 @@ export class SistemaActor extends Actor {
         const exito = roll.total >= dificultadMaster;
         bloqueResolucionHtml = `
           <div class="cyd-resolucion-caja">
-            <p>🎲 <strong>Dificultad (${dificultadMaster}):</strong> ${exito ? "✅ ¡ÉXITO!" : "❌ FALLO"} (Total: ${roll.total})</p>
+            <p><i class="fa-solid fa-bullseye"></i> <strong>Dificultad (${dificultadMaster}):</strong> ${exito ? '<span class="cyd-resultado-exito">ÉXITO</span>' : '<span class="cyd-resultado-fallo">FALLO</span>'} (Total: ${roll.total})</p>
           </div>
         `;
       }
@@ -915,7 +916,7 @@ export class SistemaActor extends Actor {
 
     const saborChat = `
       <div class="cyd-carta-jugada">
-        <h3>${esAtaque ? "🐾" : "⚡"} ${titulo}</h3>
+        <h3>${esAtaque ? '<i class="fa-solid fa-crosshairs"></i>' : '<i class="fa-solid fa-bolt"></i>'} ${titulo}</h3>
         <p><strong>Atributo:</strong> ${caracteristica.toUpperCase()} (${cantidadDados}${tipoDado})</p>
         ${bloqueResolucionHtml}
         ${descripcion ? `<div class="cyd-efecto">${descripcion}</div>` : ""}
@@ -950,7 +951,7 @@ export class SistemaActor extends Actor {
     if (!item.system.esActivable) {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this }),
-        content: `<div class="cyd-carta-jugada"><h3>⚡ ${item.name}</h3><div>${item.system.descripcion || ""}</div></div>`
+        content: `<div class="cyd-carta-jugada"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3><div>${item.system.descripcion || ""}</div></div>`
       });
       return null;
     }
@@ -1007,10 +1008,10 @@ export class SistemaActor extends Actor {
 
     // Líneas de chat que solo aparecen si se consumió una carta de Misticismo.
     const lineaCartaUsada = cartaElegida
-      ? `<p><strong>Carta de Misticismo usada:</strong> ${nombreCarta} <small>MIST | ${tipoDado} (Valor ${numero})</small></p>`
+      ? `<p><i class="fa-solid fa-moon"></i> <strong>Carta de Misticismo:</strong> ${nombreCarta} <small>MIST · ${tipoDado} (Valor ${numero})</small></p>`
       : `<p><small>Sin Mazo de Jefe: habilidad usada sin consumir carta de Misticismo.</small></p>`;
     const lineaQuemada = cartaElegida
-      ? `<p><small>🔥 La carta <strong>${nombreCarta}</strong> fue <strong>quemada</strong> y enviada a Cartas Quemadas.</small></p>`
+      ? `<p class="cyd-nota-quemada"><small><i class="fa-solid fa-fire"></i> La carta <strong>${nombreCarta}</strong> fue <strong>quemada</strong> y enviada a Cartas Quemadas.</small></p>`
       : "";
 
     // Habilidad sin tirada: efecto directo, consumiendo la carta de Misticismo.
@@ -1019,7 +1020,7 @@ export class SistemaActor extends Actor {
         speaker: ChatMessage.getSpeaker({ actor: this }),
         content: `
           <div class="cyd-carta-jugada">
-            <h3>⚡ ${item.name}</h3>
+            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3>
             ${lineaCartaUsada}
             <p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>
             ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
@@ -1054,20 +1055,20 @@ export class SistemaActor extends Actor {
       if (danoCalculado > 0) {
         bloqueResolucionHtml = `
           <div class="cyd-resolucion-caja cyd-exito">
-            <p>🎯 <strong>Objetivo:</strong> ${tokenObjetivo.name} (🛡️ Defensa: ${defensaObjetivo})</p>
-            <p>💥 <strong>¡IMPACTO! Daño: ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
+            <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
+            <p><i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span> · <strong>Daño ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
             <button type="button" class="cyd-btn-aplicar-dano"
                     data-actor-uuid="${actorObjetivo.uuid}"
                     data-dano="${danoCalculado}">
-              🩸 Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
+              <i class="fa-solid fa-droplet"></i> Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
             </button>
           </div>
         `;
       } else {
         bloqueResolucionHtml = `
           <div class="cyd-resolucion-caja cyd-fallo">
-            <p>🎯 <strong>Objetivo:</strong> ${tokenObjetivo.name} (🛡️ Defensa: ${defensaObjetivo})</p>
-            <p>🛡️ <strong>Ataque Bloqueado (0 Daño):</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
+            <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
+            <p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
           </div>
         `;
       }
@@ -1077,7 +1078,7 @@ export class SistemaActor extends Actor {
         const exito = roll.total >= dificultadMaster;
         bloqueResolucionHtml = `
           <div class="cyd-resolucion-caja">
-            <p>🎲 <strong>Dificultad (${dificultadMaster}):</strong> ${exito ? "✅ ¡ÉXITO!" : "❌ FALLO"} (Total: ${roll.total})</p>
+            <p><i class="fa-solid fa-bullseye"></i> <strong>Dificultad (${dificultadMaster}):</strong> ${exito ? '<span class="cyd-resultado-exito">ÉXITO</span>' : '<span class="cyd-resultado-fallo">FALLO</span>'} (Total: ${roll.total})</p>
           </div>
         `;
       }
@@ -1085,7 +1086,7 @@ export class SistemaActor extends Actor {
 
     const saborChat = `
       <div class="cyd-carta-jugada">
-        <h3>⚡ ${item.name}</h3>
+        <h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3>
         ${lineaCartaUsada}
         <p><strong>Tirada:</strong> ${cantidadDados}${tipoDado}${bono > 0 ? ` + ${bono}` : ""} = <strong>${roll.total}</strong> (Misticismo × ${tipoDado})</p>
         ${bloqueResolucionHtml}

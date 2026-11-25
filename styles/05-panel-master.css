@@ -1,17 +1,252 @@
 /**
  * @file 05-panel-master.css
- * @description Estilos adicionales para el Panel del Master (clases no usadas por la plantilla actual, mantenidas para compatibilidad futura).
- * Los estilos activos del panel están en 03-hojas-actor-item.css.
+ * @description Panel del Master: barra de dificultad, acciones de grupo y cuadrícula
+ * compacta de estado de los Personajes Jugadores, integrada con el estilo de Foundry.
  */
 
-/* Placeholder: clases definidas pero no usadas por la plantilla actual de panel-master.hbs */
-.cyd-gm-card-pj,
-.cyd-gm-card-header,
-.cyd-gm-cansancio-ctrl,
-.cyd-gm-badges-vitales,
-.cyd-gm-badge,
-.cyd-gm-pilas-mini,
-.cyd-gm-trinkets-mini,
-.cyd-gm-chip-trinket {
-  /* Estilos de reserva - no aplicados actualmente */
+.cyd-gm-panel .cyd-hoja-contenedor {
+  min-height: 0;
+}
+
+/* ======================================================================== */
+/*  BARRA SUPERIOR: DIFICULTAD Y ACCIONES                                   */
+/* ======================================================================== */
+
+.cyd-gm-barra-dificultad {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.cyd-gm-bloque {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cyd-gm-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--cyd-texto-tenue);
+}
+
+.cyd-gm-etiqueta i {
+  color: var(--cyd-azul);
+}
+
+.cyd-gm-control-numero {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cartas-y-dados .window-content input.cyd-gm-input-dificultad {
+  width: 50px !important;
+  height: 28px !important;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.cyd-gm-presets {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.cartas-y-dados .window-content button.cyd-gm-btn-icono,
+.cartas-y-dados .window-content button.cyd-gm-btn-tag {
+  width: auto !important;
+  height: 26px !important;
+  min-height: 0 !important;
+  padding: 0 8px !important;
+  margin: 0 !important;
+  font-size: 0.78rem !important;
+  line-height: 24px !important;
+}
+
+.cartas-y-dados .window-content button.cyd-gm-btn-icono {
+  width: 26px !important;
+  padding: 0 !important;
+}
+
+.cartas-y-dados .window-content button.cyd-gm-btn-tag.cyd-gm-preset {
+  min-width: 30px;
+  font-weight: 600;
+}
+
+.cartas-y-dados .window-content button.cyd-gm-btn-tag i {
+  color: var(--cyd-azul);
+}
+
+.cyd-gm-separador-vertical {
+  width: 1px;
+  align-self: stretch;
+  background: var(--cyd-borde-suave);
+}
+
+/* ======================================================================== */
+/*  LISTA Y CUADRÍCULA DE PERSONAJES                                        */
+/* ======================================================================== */
+
+.cyd-gm-lista-personajes {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.cyd-gm-grid-compacto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 6px;
+  align-items: start;
+}
+
+.cyd-gm-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 7px;
+  background: var(--cyd-fondo-hundido);
+  border: 1px solid var(--cyd-borde-suave);
+  border-top: 2px solid var(--cyd-oro-linea);
+  border-radius: var(--cyd-radio);
+}
+
+.cyd-gm-tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--cyd-borde-suave);
+}
+
+.cyd-gm-actor-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.cyd-gm-actor-link:hover .cyd-gm-nombre {
+  color: var(--cyd-oro);
+}
+
+.cyd-gm-avatar-mini {
+  width: 26px;
+  height: 26px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--cyd-borde);
+  border-radius: 3px;
+}
+
+.cyd-gm-nombre {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cyd-texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cyd-gm-cansancio-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-suave);
+}
+
+.cyd-gm-cansancio-box i {
+  color: var(--cyd-azul);
+  font-size: 0.65rem;
+}
+
+.cyd-gm-mini-click {
+  padding: 0 3px;
+  font-weight: bold;
+  color: var(--cyd-texto-tenue);
+  cursor: pointer;
+  user-select: none;
+}
+
+.cyd-gm-mini-click:hover {
+  color: var(--cyd-oro);
+}
+
+.cyd-gm-fila-iconos {
+  display: grid;
+  gap: 3px;
+}
+
+.cyd-gm-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.cyd-gm-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.cyd-gm-stat-pill,
+.cyd-gm-zona-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 2px 4px;
+  font-size: 0.76rem;
+  color: var(--cyd-texto);
+  background: var(--cyd-tinte);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cyd-gm-stat-pill i,
+.cyd-gm-zona-link i {
+  font-size: 0.65rem;
+  color: var(--cyd-azul);
+}
+
+.cyd-gm-zona-link {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cyd-gm-zona-link:hover {
+  background: var(--cyd-tinte-hover);
+  border-color: var(--cyd-oro-linea);
+}
+
+.cyd-gm-zona-activa {
+  border-color: color-mix(in srgb, var(--cyd-exito) 45%, transparent);
+}
+
+.cyd-gm-zona-activa i {
+  color: var(--cyd-exito);
+}
+
+.cyd-gm-sin-pilas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-suave);
+  border: 1px dashed var(--cyd-oro-linea);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.cyd-gm-sin-pilas i {
+  color: var(--color-level-warning, #ee9b3a);
 }

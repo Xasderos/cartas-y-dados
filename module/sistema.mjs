@@ -264,7 +264,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
     await actorObjetivo.update({ "system.salud.value": nuevaSalud });
 
     btnDano.disabled = true;
-    btnDano.textContent = `✅ ${dano} de Daño Aplicado (Salud: ${nuevaSalud})`;
+    btnDano.innerHTML = `<i class="fa-solid fa-check"></i> ${dano} de Daño Aplicado (Salud: ${nuevaSalud})`;
   });
 });
 

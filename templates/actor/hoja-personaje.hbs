@@ -1,53 +1,54 @@
 {{!--
   Plantilla de la Hoja de Personaje ApplicationV2 con Raza, Origen, Clase, Equipo y Cartas.
+  Iconografía (v0.9.0): solo iconos Font Awesome y símbolos tipográficos, sin emojis.
+  Características: FISC fa-hand-fist · CONS fa-eye · SOC fa-masks-theater · MIST fa-moon.
 --}}
 <div class="cyd-hoja-contenedor">
 
   {{!-- ================= 1. CABECERA Y TRASFONDO (RAZA, ORIGEN, CLASE) ================= --}}
   <header class="cyd-cabecera">
     <img class="cyd-avatar" src="{{actor.img}}" data-edit="img" title="{{actor.name}}" />
-    
+
     <div class="cyd-cabecera-principal">
       <div class="cyd-fila-titulo">
         <input type="text" name="name" value="{{actor.name}}" class="cyd-nombre-actor" placeholder="Nombre del Personaje" />
       </div>
 
-      {{!-- Píldoras interactivas de Trasfondo: Raza, Origen y Clase --}}
+      {{!-- Ranuras de Trasfondo: Raza, Origen y Clase --}}
       <div class="cyd-trasfondo-barra">
-        <div class="cyd-slot-trasfondo" data-tooltip="{{#if itemRaza}}Rasgo: {{itemRaza.system.rasgoRacial}}<br>{{itemRaza.system.descripcion}}{{else}}Haz clic para definir la Raza{{/if}}">
-          <span class="cyd-slot-etiqueta">🧬 Raza:</span>
+        <div class="cyd-slot-trasfondo" data-tooltip="{{#if itemRaza}}Rasgo: {{itemRaza.system.rasgoRacial}}<br>{{itemRaza.system.descripcion}}{{else}}Define la Raza del personaje{{/if}}">
+          <span class="cyd-slot-etiqueta"><i class="fa-solid fa-dna"></i> Raza</span>
           {{#if itemRaza}}
             <strong data-action="editarItem" data-item-id="{{itemRaza.id}}" class="cyd-link-item">{{itemRaza.name}}</strong>
-            <button type="button" class="cyd-btn-mini" data-action="eliminarItem" data-item-id="{{itemRaza.id}}">✕</button>
+            <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{itemRaza.id}}" data-tooltip="Quitar Raza"><i class="fa-solid fa-xmark"></i></button>
           {{else}}
-            <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="raza">+ Elegir Raza</button>
+            <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="raza"><i class="fa-solid fa-plus"></i> Elegir</button>
           {{/if}}
         </div>
 
-        <div class="cyd-slot-trasfondo" data-tooltip="{{#if itemOrigen}}Beneficio: {{itemOrigen.system.beneficioTrasfondo}}<br>{{itemOrigen.system.descripcion}}{{else}}Haz clic para definir el Origen{{/if}}">
-          <span class="cyd-slot-etiqueta">🌍 Origen:</span>
+        <div class="cyd-slot-trasfondo" data-tooltip="{{#if itemOrigen}}Beneficio: {{itemOrigen.system.beneficioTrasfondo}}<br>{{itemOrigen.system.descripcion}}{{else}}Define el Origen del personaje{{/if}}">
+          <span class="cyd-slot-etiqueta"><i class="fa-solid fa-compass"></i> Origen</span>
           {{#if itemOrigen}}
             <strong data-action="editarItem" data-item-id="{{itemOrigen.id}}" class="cyd-link-item">{{itemOrigen.name}}</strong>
-            <button type="button" class="cyd-btn-mini" data-action="eliminarItem" data-item-id="{{itemOrigen.id}}">✕</button>
+            <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{itemOrigen.id}}" data-tooltip="Quitar Origen"><i class="fa-solid fa-xmark"></i></button>
           {{else}}
-            <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="origen">+ Elegir Origen</button>
+            <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="origen"><i class="fa-solid fa-plus"></i> Elegir</button>
           {{/if}}
         </div>
 
-        <div class="cyd-slot-trasfondo" data-tooltip="{{#if itemClase}}Palo Afín: {{itemClase.system.paloAfin}}<br>{{itemClase.system.descripcion}}{{else}}Haz clic para definir la Clase{{/if}}">
-          <span class="cyd-slot-etiqueta">🛡️ Clase:</span>
+        <div class="cyd-slot-trasfondo" data-tooltip="{{#if itemClase}}Palo Afín: {{itemClase.system.paloAfin}}<br>{{itemClase.system.descripcion}}{{else}}Define la Clase del personaje{{/if}}">
+          <span class="cyd-slot-etiqueta"><i class="fa-solid fa-scroll"></i> Clase</span>
           {{#if itemClase}}
             <strong data-action="editarItem" data-item-id="{{itemClase.id}}" class="cyd-link-item">
-              {{itemClase.name}} (Nv. {{itemClase.system.nivel}})
+              {{itemClase.name}} · Nv. {{itemClase.system.nivel}}
             </strong>
-            <button type="button" class="cyd-btn-mini" data-action="eliminarItem" data-item-id="{{itemClase.id}}">✕</button>
+            <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{itemClase.id}}" data-tooltip="Quitar Clase"><i class="fa-solid fa-xmark"></i></button>
           {{else}}
-            <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="clase">+ Elegir Clase</button>
+            <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="clase"><i class="fa-solid fa-plus"></i> Elegir</button>
           {{/if}}
         </div>
       </div>
-
-          </div>
+    </div>
   </header>
 
   <main class="cyd-cuerpo-hoja">
@@ -55,37 +56,61 @@
   {{!-- ================= 2. LAYOUT DOS COLUMNAS: ATRIBUTOS IZQUIERDA | CONTENIDO DERECHA ================= --}}
   <div class="cyd-layout-dos-columnas">
 
-    {{!-- COLUMNA IZQUIERDA: ATRIBUTOS (debajo del avatar) ================= --}}
+    {{!-- COLUMNA IZQUIERDA: CARACTERÍSTICAS ================= --}}
     <aside class="cyd-sidebar-atributos">
       <div class="cyd-cabecera-seccion">
-        <h3>📊 Características</h3>
+        <h3><i class="fa-solid fa-star-of-life"></i> Características</h3>
       </div>
+
       <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.fisico}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.fisico}}">
-        <span class="cyd-atributo-icono">⚔️ FISC — Físico</span>
+        <div class="cyd-atributo-cabecera">
+          <span class="cyd-atributo-sello"><i class="fa-solid fa-hand-fist"></i></span>
+          <span class="cyd-atributo-nombre">Físico</span>
+          <span class="cyd-atributo-abrev">FISC</span>
+        </div>
         <div class="cyd-atributo-fila-valores">
+          <span class="cyd-mini-etiqueta">Base</span>
           <input type="number" name="system.caracteristicas.fisico" value="{{system.caracteristicas.fisico}}" min="1" max="10" title="Valor Base" />
-          <span class="cyd-atributo-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.fisico}}</span>
+          <span class="cyd-atributo-total" title="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.fisico}}</span>
         </div>
       </div>
+
       <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.consciencia}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.consciencia}}">
-        <span class="cyd-atributo-icono">🦯 CONS — Consciencia</span>
+        <div class="cyd-atributo-cabecera">
+          <span class="cyd-atributo-sello"><i class="fa-solid fa-eye"></i></span>
+          <span class="cyd-atributo-nombre">Consciencia</span>
+          <span class="cyd-atributo-abrev">CONS</span>
+        </div>
         <div class="cyd-atributo-fila-valores">
+          <span class="cyd-mini-etiqueta">Base</span>
           <input type="number" name="system.caracteristicas.consciencia" value="{{system.caracteristicas.consciencia}}" min="1" max="10" title="Valor Base" />
-          <span class="cyd-atributo-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.consciencia}}</span>
+          <span class="cyd-atributo-total" title="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.consciencia}}</span>
         </div>
       </div>
+
       <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.social}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.social}}">
-        <span class="cyd-atributo-icono">🪙 SOC — Social</span>
+        <div class="cyd-atributo-cabecera">
+          <span class="cyd-atributo-sello"><i class="fa-solid fa-masks-theater"></i></span>
+          <span class="cyd-atributo-nombre">Social</span>
+          <span class="cyd-atributo-abrev">SOC</span>
+        </div>
         <div class="cyd-atributo-fila-valores">
+          <span class="cyd-mini-etiqueta">Base</span>
           <input type="number" name="system.caracteristicas.social" value="{{system.caracteristicas.social}}" min="1" max="10" title="Valor Base" />
-          <span class="cyd-atributo-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.social}}</span>
+          <span class="cyd-atributo-total" title="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.social}}</span>
         </div>
       </div>
+
       <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.misticismo}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.misticismo}}">
-        <span class="cyd-atributo-icono">🏆 MIST — Misticismo</span>
+        <div class="cyd-atributo-cabecera">
+          <span class="cyd-atributo-sello"><i class="fa-solid fa-moon"></i></span>
+          <span class="cyd-atributo-nombre">Misticismo</span>
+          <span class="cyd-atributo-abrev">MIST</span>
+        </div>
         <div class="cyd-atributo-fila-valores">
+          <span class="cyd-mini-etiqueta">Base</span>
           <input type="number" name="system.caracteristicas.misticismo" value="{{system.caracteristicas.misticismo}}" min="1" max="10" title="Valor Base" />
-          <span class="cyd-atributo-total" title="Dados totales a lanzar">🎲 {{system.caracteristicasTotales.misticismo}}</span>
+          <span class="cyd-atributo-total" title="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.misticismo}}</span>
         </div>
       </div>
     </aside>
@@ -94,132 +119,145 @@
     <section class="cyd-contenido-derecha">
 
       {{!-- Recursos vitales ================= --}}
-      <div class="cyd-recursos-barra" style="grid-template-columns: repeat(4, 1fr); gap: 6px;">
+      <div class="cyd-recursos-barra cyd-recursos-vitales">
         <div class="cyd-recurso-caja" data-tooltip="Base: {{system.salud.max}} | Físico: +{{system.salud.bonoFisico}} | Otros: +{{system.salud.bonoOtros}} | Total: {{system.salud.maxTotal}}">
-          <span class="cyd-recurso-titulo">❤️ Salud</span>
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart-pulse"></i> Salud</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.salud.value" value="{{system.salud.value}}" />
-            <span>/ {{system.salud.maxTotal}}</span>
+            <span class="cyd-valor-sep">/</span>
+            <span class="cyd-valor-grande">{{system.salud.maxTotal}}</span>
           </div>
         </div>
 
-        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo/Raza: +{{system.bonificadorDefensa}}">
-          <span class="cyd-recurso-titulo">🛡️ Defensa</span>
+        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo/Raza: +{{system.bonificadorDefensa}} | Total: {{system.defensaTotal}}">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Defensa</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" />
-            <span>({{system.defensaTotal}})</span>
+            <span class="cyd-valor-sep">→</span>
+            <span class="cyd-valor-grande">{{system.defensaTotal}}</span>
           </div>
         </div>
 
         <div class="cyd-recurso-caja" data-tooltip="Cansancio Máximo Base: {{system.cansancio.max}} | Total: {{system.cansancio.maxTotal}}">
-          <span class="cyd-recurso-titulo">⚡ Cansancio</span>
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-hourglass-half"></i> Cansancio</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.cansancio.value" value="{{system.cansancio.value}}" />
-            <span>/ {{system.cansancio.maxTotal}}</span>
+            <span class="cyd-valor-sep">/</span>
+            <span class="cyd-valor-grande">{{system.cansancio.maxTotal}}</span>
           </div>
         </div>
 
         <div class="cyd-recurso-caja" data-tooltip="Base: {{system.manoConfig.base}} | Nivel Clase: +{{system.manoConfig.bonificadorClase}} | Raza/Origen/Equipo: +{{system.manoConfig.bonificadorObjetos}}">
-          <span class="cyd-recurso-titulo">✋ Mano Máx.</span>
-          <div class="cyd-recurso-valor-fijo">
-            {{#if contadoresPilas}}{{contadoresPilas.manoActual}}{{else}}0{{/if}} / <strong>{{system.limiteMano}}</strong>
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-hand"></i> Mano Máx.</span>
+          <div class="cyd-recurso-inputs">
+            <span class="cyd-valor-grande">{{#if contadoresPilas}}{{contadoresPilas.manoActual}}{{else}}0{{/if}}</span>
+            <span class="cyd-valor-sep">/</span>
+            <span class="cyd-valor-grande">{{system.limiteMano}}</span>
           </div>
         </div>
       </div>
 
       {{!-- ================= 3. MOVIMIENTO Y TAMAÑO ================= --}}
       <section class="cyd-panel cyd-panel-movimiento-tamano">
-    <div class="cyd-cabecera-seccion">
-      <h3>🏃 Movimiento y Tamaño</h3>
-    </div>
-    <div class="cyd-recursos-barra" style="grid-template-columns: repeat(2, 1fr); gap: 8px;">
-      <div class="cyd-recurso-caja" data-tooltip="Base de Movimiento editable en esta ficha. El Total se calcula automáticamente: Base + (Físico Total × 5) metros">
-        <span class="cyd-recurso-titulo">🏃 Movimiento</span>
-        <div class="cyd-recurso-inputs">
-          <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" style="width: 60px;" />
-          <span>/ {{system.movimiento.max}} m</span>
+        <div class="cyd-cabecera-seccion">
+          <h3><i class="fa-solid fa-shoe-prints"></i> Movimiento y Tamaño</h3>
         </div>
-      </div>
-      <div class="cyd-recurso-caja" data-tooltip="Categoría de tamaño de la criatura">
-        <span class="cyd-recurso-titulo">📏 Tamaño</span>
-        <select name="system.categoriaTamano" style="width: 100%;">
-          <option value="Diminuto" {{#if (eq system.categoriaTamano "Diminuto")}}selected{{/if}}>Diminuto</option>
-          <option value="Pequeño" {{#if (eq system.categoriaTamano "Pequeño")}}selected{{/if}}>Pequeño</option>
-          <option value="Mediano" {{#if (eq system.categoriaTamano "Mediano")}}selected{{/if}}>Mediano</option>
-          <option value="Grande" {{#if (eq system.categoriaTamano "Grande")}}selected{{/if}}>Grande</option>
-          <option value="Enorme" {{#if (eq system.categoriaTamano "Enorme")}}selected{{/if}}>Enorme</option>
-        </select>
-      </div>
-    </div>
-  </section>
+        <div class="cyd-recursos-barra cyd-cols-2">
+          <div class="cyd-recurso-caja" data-tooltip="Base de Movimiento editable en esta ficha. El Total se calcula automáticamente: Base + (Físico Total × 5) metros">
+            <span class="cyd-recurso-titulo"><i class="fa-solid fa-person-running"></i> Movimiento · Base / Total</span>
+            <div class="cyd-recurso-inputs">
+              <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" />
+              <span class="cyd-valor-sep">/</span>
+              <span class="cyd-valor-grande">{{system.movimiento.max}}</span>
+              <span class="cyd-unidad">m</span>
+            </div>
+          </div>
+          <div class="cyd-recurso-caja" data-tooltip="Categoría de tamaño de la criatura">
+            <span class="cyd-recurso-titulo"><i class="fa-solid fa-ruler-vertical"></i> Tamaño</span>
+            <select name="system.categoriaTamano">
+              <option value="Diminuto" {{#if (eq system.categoriaTamano "Diminuto")}}selected{{/if}}>Diminuto</option>
+              <option value="Pequeño" {{#if (eq system.categoriaTamano "Pequeño")}}selected{{/if}}>Pequeño</option>
+              <option value="Mediano" {{#if (eq system.categoriaTamano "Mediano")}}selected{{/if}}>Mediano</option>
+              <option value="Grande" {{#if (eq system.categoriaTamano "Grande")}}selected{{/if}}>Grande</option>
+              <option value="Enorme" {{#if (eq system.categoriaTamano "Enorme")}}selected{{/if}}>Enorme</option>
+            </select>
+          </div>
+        </div>
+      </section>
 
     {{#unless pilasInicializadas}}
       <div class="cyd-aviso-inicializar">
         <p>Este personaje aún no tiene sus pilas de cartas vinculadas en el mundo.</p>
         {{#if esPropietario}}
           <button type="button" class="cyd-btn-primario" data-action="inicializarPilas">
-            ✨ Elegir Clase e Inicializar las Pilas de Cartas
+            <i class="fa-solid fa-wand-sparkles"></i> Elegir Clase e Inicializar las Pilas de Cartas
           </button>
         {{/if}}
       </div>
     {{else}}
 
-      {{!-- ================= 3. CONTROLES DE TURNO Y PILAS ================= --}}
+      {{!-- ================= 4. CONTROLES DE TURNO Y PILAS ================= --}}
       <section class="cyd-panel-controles">
-        <div class="cyd-acciones-turno">
-          {{#if esPropietario}}
-            <button type="button" data-action="robarTurno">🎴 Inicio Turno (Robar)</button>
-            <button type="button" data-action="robarTrinket">✨ Robar Trinket</button>
-            <button type="button" data-action="finCombate">🔄 Fin Combate</button>
-            <button type="button" data-action="descansar">🏕️ Descansar</button>
-          {{/if}}
-        </div>
-
-        <div class="cyd-resumen-pilas">
-          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="mazo">
-            📚 Mazo: <strong>{{contadoresPilas.mazoDisponibles}}/{{contadoresPilas.mazoTotal}}</strong>
-          </span>
-          {{#if esPropietario}}
-            <button type="button" class="cyd-btn-mini" data-action="crearCartaEnMazo" data-tipo-carta="accion" data-tooltip="Crear una nueva Carta de Acción en tu Mazo">+ Carta</button>
-          {{/if}}
-          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="descarte">
-            📥 Descarte: <strong>{{contadoresPilas.descarteActual}}</strong>
-          </span>
-          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="quemadas">
-            🔥 Quemadas: <strong>{{contadoresPilas.quemadasActual}}</strong>
-          </span>
-          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="trinkets">
-            🔮 Trinkets: <strong>{{contadoresPilas.trinketsDisponibles}}/{{contadoresPilas.trinketsTotal}}</strong>
-          </span>
-          {{#if esPropietario}}
-            <button type="button" class="cyd-btn-mini" data-action="crearCartaEnMazo" data-tipo-carta="trinket" data-tooltip="Crear un nuevo Trinket en tu Mazo de Trinkets">+ Trinket</button>
-          {{/if}}
+        <div class="cyd-cabecera-seccion">
+          <h3><i class="fa-solid fa-layer-group"></i> Mazo y Pilas</h3>
           {{#if esPropietario}}
             {{#unless itemClase}}
-              <button type="button" class="cyd-btn-mini" data-action="inicializarPilas" data-tooltip="Asistente de Clase: elige tu Clase y Trinket, y genera tu Mazo inicial (v0.8.4)">
-                🎁 Asistente de Clase
+              <button type="button" class="cyd-btn-mini" data-action="inicializarPilas" data-tooltip="Asistente de Clase: elige tu Clase y Trinket, y genera tu Mazo inicial">
+                <i class="fa-solid fa-wand-sparkles"></i> Asistente de Clase
               </button>
             {{/unless}}
           {{/if}}
         </div>
+
+        {{#if esPropietario}}
+          <div class="cyd-acciones-turno">
+            <button type="button" data-action="robarTurno"><i class="fa-solid fa-clone"></i> Inicio de Turno</button>
+            <button type="button" data-action="robarTrinket"><i class="fa-solid fa-gem"></i> Robar Trinket</button>
+            <button type="button" data-action="finCombate"><i class="fa-solid fa-rotate"></i> Fin de Combate</button>
+            <button type="button" data-action="descansar"><i class="fa-solid fa-campground"></i> Descansar</button>
+          </div>
+        {{/if}}
+
+        <div class="cyd-resumen-pilas">
+          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="mazo" data-tooltip="Abrir Mazo de Juego">
+            <i class="fa-solid fa-layer-group"></i> Mazo <strong>{{contadoresPilas.mazoDisponibles}}/{{contadoresPilas.mazoTotal}}</strong>
+          </span>
+          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="descarte" data-tooltip="Abrir Descarte">
+            <i class="fa-solid fa-box-archive"></i> Descarte <strong>{{contadoresPilas.descarteActual}}</strong>
+          </span>
+          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="quemadas" data-tooltip="Abrir Cartas Quemadas">
+            <i class="fa-solid fa-fire"></i> Quemadas <strong>{{contadoresPilas.quemadasActual}}</strong>
+          </span>
+          <span class="cyd-chip-pila" data-action="abrirPila" data-pila="trinkets" data-tooltip="Abrir Mazo de Trinkets">
+            <i class="fa-solid fa-gem"></i> Trinkets <strong>{{contadoresPilas.trinketsDisponibles}}/{{contadoresPilas.trinketsTotal}}</strong>
+          </span>
+          {{#if esPropietario}}
+            <span class="cyd-separador"></span>
+            <button type="button" class="cyd-btn-mini" data-action="crearCartaEnMazo" data-tipo-carta="accion" data-tooltip="Crear una nueva Carta de Acción en tu Mazo"><i class="fa-solid fa-plus"></i> Carta</button>
+            <button type="button" class="cyd-btn-mini" data-action="crearCartaEnMazo" data-tipo-carta="trinket" data-tooltip="Crear un nuevo Trinket en tu Mazo de Trinkets"><i class="fa-solid fa-plus"></i> Trinket</button>
+          {{/if}}
+        </div>
       </section>
 
-      {{!-- ================= 4. VISOR PÚBLICO DE TRINKETS ================= --}}
+      {{!-- ================= 5. VISOR PÚBLICO DE TRINKETS ================= --}}
       <section class="cyd-panel-trinkets">
         <div class="cyd-cabecera-seccion">
-          <h3>🔮 Trinkets del Personaje <small>(Pasa el ratón para ver efectos)</small></h3>
+          <h3><i class="fa-solid fa-gem"></i> Trinkets</h3>
+          <small>Pasa el cursor para ver sus efectos</small>
         </div>
 
         <div class="cyd-trinkets-activos-contenedor">
-          <strong>🟢 En Juego:</strong>
+          <div class="cyd-subtitulo-panel">En Juego</div>
           {{#if trinketsEnJuego.length}}
             <div class="cyd-lista-pildoras">
               {{#each trinketsEnJuego as |trinket|}}
                 <div class="cyd-pildora-trinket cyd-estado-enJuego" data-tooltip="{{trinket.tooltipHtml}}">
-                  <span>🟢 {{trinket.nombre}} (Nv. {{trinket.nivel}})</span>
+                  <i class="fa-solid fa-circle cyd-estado-icono"></i>
+                  <span>{{trinket.nombre}}</span>
+                  <span class="cyd-nivel">Nv. {{trinket.nivel}}</span>
                   {{#if ../esPropietario}}
-                    <button type="button" class="cyd-btn-mini" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="false" data-tooltip="Enviar al Descarte">📥</button>
-                    <button type="button" class="cyd-btn-mini" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="true" data-tooltip="Quemar Trinket">🔥</button>
+                    <button type="button" class="cyd-btn-mini cyd-btn-icono" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="false" data-tooltip="Enviar al Descarte"><i class="fa-solid fa-box-archive"></i></button>
+                    <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="true" data-tooltip="Quemar Trinket"><i class="fa-solid fa-fire"></i></button>
                   {{/if}}
                 </div>
               {{/each}}
@@ -230,36 +268,38 @@
         </div>
 
         <div class="cyd-trinkets-coleccion">
-          <strong>📋 Colección:</strong>
+          <div class="cyd-subtitulo-panel">Colección</div>
           {{#if todosLosTrinkets.length}}
             <div class="cyd-lista-pildoras">
               {{#each todosLosTrinkets as |trinket|}}
                 <div class="cyd-pildora-trinket cyd-estado-{{trinket.estado}}" data-tooltip="{{trinket.tooltipHtml}}">
-                  <span>{{trinket.etiquetaEstado}} — <strong>{{trinket.nombre}}</strong></span>
+                  <i class="fa-solid {{#if (eq trinket.estado "quemado")}}fa-fire{{else if (eq trinket.estado "descartado")}}fa-box-archive{{else if (eq trinket.estado "enMano")}}fa-hand{{else if (eq trinket.estado "enJuego")}}fa-circle{{else}}fa-circle-notch{{/if}} cyd-estado-icono"></i>
+                  <strong>{{trinket.nombre}}</strong>
+                  <span class="cyd-nivel">Nv. {{trinket.nivel}}</span>
                   {{#if (and ../esPropietario trinket.estaDisponible)}}
-                    <button type="button" class="cyd-btn-mini" data-action="robarTrinket" data-trinket-id="{{trinket.idOriginal}}">+Mano</button>
+                    <button type="button" class="cyd-btn-mini" data-action="robarTrinket" data-trinket-id="{{trinket.idOriginal}}" data-tooltip="Llevar a la Mano (descartando una carta)"><i class="fa-solid fa-hand"></i></button>
                   {{/if}}
                 </div>
               {{/each}}
             </div>
           {{else}}
-            <span class="cyd-texto-vacio">Pulsa "+ Trinket" arriba para añadir tu primer Trinket.</span>
+            <span class="cyd-texto-vacio">Pulsa "Trinket" en Mazo y Pilas para añadir tu primer Trinket.</span>
           {{/if}}
         </div>
       </section>
 
-      {{!-- ================= 5. MANO ACTUAL DEL JUGADOR ================= --}}
+      {{!-- ================= 6. MANO ACTUAL DEL JUGADOR ================= --}}
       <section class="cyd-panel-mano">
         <div class="cyd-cabecera-seccion">
-          <h3>✋ Cartas en Mano ({{contadoresPilas.manoActual}} / {{system.limiteMano}})</h3>
-          <small style="opacity: 0.8;">🎯 Para atacar: sitúa el cursor sobre un enemigo y pulsa <strong>T</strong> antes de jugar la carta</small>
+          <h3><i class="fa-solid fa-hand"></i> Mano <span class="cyd-contador">{{contadoresPilas.manoActual}} / {{system.limiteMano}}</span></h3>
+          <small class="cyd-ayuda"><i class="fa-solid fa-crosshairs"></i> Para atacar, marca un objetivo con <kbd>T</kbd> antes de jugar</small>
         </div>
 
         {{#if esPropietario}}
           {{#if cartasEnMano.length}}
             <div class="cyd-grid-cartas">
               {{#each cartasEnMano as |carta|}}
-                <article class="cyd-carta-item {{#if carta.esTrinket}}cyd-carta-trinket{{/if}}">
+                <article class="cyd-carta-item {{#if carta.esTrinket}}cyd-carta-trinket{{else}}cyd-palo-{{carta.palo}}{{/if}}">
                   <header class="cyd-carta-cabecera">
                     <span class="cyd-carta-titulo">{{carta.nombre}}</span>
                     {{#if carta.esTrinket}}
@@ -270,45 +310,44 @@
                   </header>
                   <div class="cyd-carta-subtitulo">
                     {{#if carta.esTrinket}}
-                      <span>🔮 Trinket</span>
+                      <span><i class="fa-solid fa-gem"></i> Trinket</span>
                     {{else}}
-                      <span>Palo: <strong>{{carta.paloAbrev}}</strong> ({{carta.caracteristica}})</span>
-                      {{#if carta.seQuema}}<span>🔥 Se Quema</span>{{/if}}
+                      <span><strong>{{carta.paloAbrev}}</strong> · {{carta.caracteristica}}</span>
+                      {{#if carta.seQuema}}<span class="cyd-se-quema"><i class="fa-solid fa-fire"></i> Se quema</span>{{/if}}
                     {{/if}}
                   </div>
                   <div class="cyd-carta-efecto">{{{carta.efecto}}}</div>
                   <footer class="cyd-carta-acciones">
                     <button type="button" class="cyd-btn-jugar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-modo="usar">
-                      🎲 Usar
+                      <i class="fa-solid fa-dice-d20"></i> Usar
                     </button>
                     <button type="button" class="cyd-btn-descartar" data-action="descartarCarta" data-carta-id="{{carta.id}}" data-tooltip="Descartar sin tirar (se anuncia en el chat)">
-                      📥 Descartar
+                      <i class="fa-solid fa-box-archive"></i> Descartar
                     </button>
                     <button type="button" class="cyd-btn-quemar" data-action="quemarCarta" data-carta-id="{{carta.id}}" data-tooltip="Quemar sin tirar (se anuncia en el chat)">
-                      🔥 Quemar
+                      <i class="fa-solid fa-fire"></i> Quemar
                     </button>
-                    <button type="button" class="cyd-btn-jugar-quemar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-modo="usar-y-quemar">
-                      🎲🔥 Usar y Quemar
+                    <button type="button" class="cyd-btn-jugar-quemar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-modo="usar-y-quemar" data-tooltip="Usar la carta y quemarla después">
+                      <i class="fa-solid fa-fire-flame-curved"></i> Usar y Quemar
                     </button>
                   </footer>
                 </article>
               {{/each}}
             </div>
           {{else}}
-            <p class="cyd-texto-vacio">Mano vacía. Crea cartas con "+ Carta" y pulsa "🎴 Inicio Turno (Robar)".</p>
+            <p class="cyd-texto-vacio">Mano vacía. Crea cartas con "Carta" y pulsa "Inicio de Turno" para robar.</p>
           {{/if}}
         {{/if}}
       </section>
 
-      {{!-- ================= 6. EQUIPO Y HABILIDADES EN APARTADOS SEPARADOS ================= --}}
+      {{!-- ================= 7. EQUIPO Y HABILIDADES ================= --}}
       <div class="cyd-dos-columnas">
 
-        {{!-- 6.A: APARTADO EXCLUSIVO DE EQUIPO Y OBJETOS --}}
         <section class="cyd-panel">
           <div class="cyd-cabecera-seccion">
-            <h3>🎒 Equipo y Objetos</h3>
+            <h3><i class="fa-solid fa-box-open"></i> Equipo</h3>
             {{#if esPropietario}}
-              <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="objeto">+ Objeto</button>
+              <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="objeto"><i class="fa-solid fa-plus"></i> Objeto</button>
             {{/if}}
           </div>
 
@@ -317,19 +356,19 @@
               {{#each objetos as |obj|}}
                 <div class="cyd-fila-item {{#if obj.system.equipado}}cyd-item-equipado{{/if}}" data-tooltip="{{obj.system.descripcion}}">
                   <div class="cyd-fila-item-info">
-                    <button type="button" class="cyd-btn-mini" data-action="alternarEquipado" data-item-id="{{obj.id}}" data-tooltip="Equipar / Desequipar">
-                      {{#if obj.system.equipado}}🛡️{{else}}⚪{{/if}}
+                    <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-btn-equipar {{#if obj.system.equipado}}cyd-activo{{/if}}" data-action="alternarEquipado" data-item-id="{{obj.id}}" data-tooltip="{{#if obj.system.equipado}}Desequipar{{else}}Equipar{{/if}}">
+                      <i class="{{#if obj.system.equipado}}fa-solid fa-shield-halved{{else}}fa-regular fa-circle{{/if}}"></i>
                     </button>
                     <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{obj.id}}">{{obj.name}}</strong>
-                    <small>
-                      {{#if obj.system.bonificadores.defensa}}🛡️+{{obj.system.bonificadores.defensa}}{{/if}}
-                      {{#if obj.system.bonificadores.limiteMano}}✋+{{obj.system.bonificadores.limiteMano}}{{/if}}
+                    <small class="cyd-detalle-item">
+                      {{#if obj.system.bonificadores.defensa}}<span><i class="fa-solid fa-shield-halved"></i> +{{obj.system.bonificadores.defensa}}</span>{{/if}}
+                      {{#if obj.system.bonificadores.limiteMano}}<span><i class="fa-solid fa-hand"></i> +{{obj.system.bonificadores.limiteMano}}</span>{{/if}}
                     </small>
                   </div>
                   <div class="cyd-fila-item-acciones">
-                    <span class="cyd-tag-cantidad">x{{obj.system.cantidad}}</span>
+                    <span class="cyd-tag-cantidad">×{{obj.system.cantidad}}</span>
                     {{#if ../esPropietario}}
-                      <button type="button" class="cyd-btn-mini" data-action="eliminarItem" data-item-id="{{obj.id}}">✕</button>
+                      <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{obj.id}}" data-tooltip="Eliminar"><i class="fa-solid fa-xmark"></i></button>
                     {{/if}}
                   </div>
                 </div>
@@ -340,12 +379,11 @@
           {{/if}}
         </section>
 
-        {{!-- 6.B: APARTADO EXCLUSIVO DE HABILIDADES Y RASGOS --}}
         <section class="cyd-panel">
           <div class="cyd-cabecera-seccion">
-            <h3>⚡ Habilidades y Rasgos</h3>
+            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidades</h3>
             {{#if esPropietario}}
-              <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="habilidad">+ Habilidad</button>
+              <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="habilidad"><i class="fa-solid fa-plus"></i> Habilidad</button>
             {{/if}}
           </div>
 
@@ -355,14 +393,14 @@
                 <div class="cyd-fila-item" data-tooltip="{{hab.system.descripcion}}">
                   <div class="cyd-fila-item-info">
                     <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{hab.id}}">{{hab.name}}</strong>
-                    <small>({{hab.system.origenHabilidad}})</small>
+                    {{#if hab.system.origenHabilidad}}<small>{{hab.system.origenHabilidad}}</small>{{/if}}
                   </div>
                   <div class="cyd-fila-item-acciones">
                     {{#if ../esPropietario}}
-                      <button type="button" class="cyd-btn-mini" data-action="usarHabilidad" data-item-id="{{hab.id}}">
-                        {{#if hab.system.esActivable}}🎲 Usar{{else}}💬 Chat{{/if}}
+                      <button type="button" class="cyd-btn-mini" data-action="usarHabilidad" data-item-id="{{hab.id}}" data-tooltip="{{#if hab.system.esActivable}}Activar (consume una carta MIST){{else}}Mostrar en el chat{{/if}}">
+                        {{#if hab.system.esActivable}}<i class="fa-solid fa-dice-d20"></i> Usar{{else}}<i class="fa-solid fa-comment"></i> Chat{{/if}}
                       </button>
-                      <button type="button" class="cyd-btn-mini" data-action="eliminarItem" data-item-id="{{hab.id}}">✕</button>
+                      <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{hab.id}}" data-tooltip="Eliminar"><i class="fa-solid fa-xmark"></i></button>
                     {{/if}}
                   </div>
                 </div>

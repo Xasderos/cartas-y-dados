@@ -1,297 +1,99 @@
 /**
- * @file 05-panel-master.css
- * @description Cuadrícula visual de iconos y números para el Panel del Master en Foundry VTT v14.
+ * @file 03-hojas-actor-item.css
+ * @description Ajustes específicos de las fichas de Actor (PJ/PNJ), del editor de Items
+ * y del editor de Cartas/Trinkets, más el refuerzo de layout del Bug 1 (v0.8.5).
  */
 
-.cyd-gm-barra-dificultad {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
+/* ======================================================================== */
+/*  FICHAS DE ACTOR                                                         */
+/* ======================================================================== */
 
-.cyd-gm-control-numero {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.82rem;
-}
-
-.cyd-gm-input-dificultad {
-  width: 44px !important;
-  height: 24px !important;
-  text-align: center;
-  font-size: 0.95rem;
-  font-weight: bold;
-  color: var(--cyd-acento);
-}
-
-.cyd-gm-presets {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  flex-wrap: wrap;
-}
-
-.cyd-gm-btn-icono,
-.cyd-gm-btn-tag {
-  width: auto !important;
-  height: 24px !important;
-  min-height: 0 !important;
-  padding: 0 6px !important;
-  margin: 0 !important;
-  font-size: 0.72rem !important;
-  line-height: 22px !important;
-}
-
-.cyd-gm-lista-personajes {
-  flex: 1;
-  overflow-y: auto;
-}
-
-/* Cuadrícula de tarjetas resumen de jugadores (más compacta) */
-.cyd-gm-grid-compacto {
+/* Barra de acciones de turno (Robar, Trinket, Fin Combate, Descansar) */
+.cyd-acciones-turno {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
-  align-items: start;
 }
 
-.cyd-gm-tile {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--cyd-borde);
-  border-radius: 5px;
-  padding: 5px 7px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.cyd-gm-tile-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding-bottom: 3px;
-}
-
-.cyd-gm-actor-link {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  overflow: hidden;
-  flex: 1;
-}
-
-.cyd-gm-actor-link:hover .cyd-gm-nombre {
-  color: var(--cyd-acento);
-  text-decoration: underline;
-}
-
-.cyd-gm-avatar-mini {
-  width: 22px;
-  height: 22px;
-  border-radius: 3px;
-  object-fit: cover;
-  border: 1px solid var(--cyd-acento);
-  flex-shrink: 0;
-}
-
-.cyd-gm-nombre {
-  font-weight: bold;
-  font-size: 0.8rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cyd-gm-cansancio-box {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-size: 0.72rem;
-}
-
-.cyd-gm-mini-click {
-  cursor: pointer;
-  padding: 0 2px;
-  font-weight: bold;
-  color: var(--cyd-acento);
-  user-select: none;
-}
-
-.cyd-gm-mini-click:hover {
-  color: #fff;
-}
-
-/* Filas de iconos y números */
-.cyd-gm-fila-iconos {
-  display: grid;
-  gap: 3px;
-}
-
-.cyd-gm-cols-2 {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.cyd-gm-cols-3 {
+.cyd-acciones-turno.cyd-cols-3 {
   grid-template-columns: repeat(3, 1fr);
 }
 
-.cyd-gm-stat-pill {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 3px;
-  padding: 1px 3px;
-  text-align: center;
-  font-size: 0.72rem;
+.cartas-y-dados .window-content .cyd-acciones-turno button {
+  width: 100%;
+  font-size: 0.82rem;
 }
 
-.cyd-gm-zona-link {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--cyd-borde);
-  border-radius: 3px;
-  padding: 2px 3px;
-  text-align: center;
-  font-size: 0.72rem;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.cyd-gm-zona-link:hover {
-  background: rgba(212, 175, 55, 0.15);
-  border-color: var(--cyd-acento);
-}
-
-.cyd-gm-zona-activa {
-  border-color: var(--cyd-exito);
-  background: rgba(46, 204, 113, 0.12);
-}
-
-.cyd-gm-sin-pilas {
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--cyd-acento);
-  cursor: pointer;
-  padding: 3px;
-}
-
-/* Paneles más compactos */
-.cyd-hoja-contenedor > section.cyd-panel {
-  padding: 6px 8px;
-  gap: 6px;
-}
-
-.cyd-cabecera-seccion {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--cyd-borde);
-  padding-bottom: 3px;
-  margin-bottom: 6px;
-}
-
-.cyd-cabecera-seccion h3 {
-  margin: 0;
-  font-size: 0.85rem;
+.cartas-y-dados .window-content .cyd-acciones-turno button i {
+  color: var(--cyd-azul);
 }
 
 /* ======================================================================== */
-/*  HOJAS DE ITEM Y CARTA COMPACTAS (v0.8.1)                                */
+/*  EDITORES DE ITEM Y CARTA                                                */
 /* ======================================================================== */
 
 .sheet.item .cyd-hoja-contenedor,
 .sheet.card .cyd-hoja-contenedor {
-  gap: 6px;
-}
-
-.sheet.item .cyd-cabecera,
-.sheet.card .cyd-cabecera {
-  padding: 4px 6px;
   gap: 8px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .sheet.item .cyd-avatar,
 .sheet.card .cyd-avatar {
-  width: 44px !important;
-  height: 44px !important;
+  width: 52px !important;
+  height: 52px !important;
 }
 
-.sheet.item .cyd-panel-controles,
-.sheet.item .cyd-panel-mano,
-.sheet.card .cyd-panel-controles,
-.sheet.card .cyd-panel-mano {
-  padding: 5px 7px;
-  gap: 4px;
+.cartas-y-dados.sheet.item .window-content input.cyd-nombre-actor,
+.cartas-y-dados.sheet.card .window-content input.cyd-nombre-actor {
+  font-size: 1.35rem;
 }
 
-.sheet.item .cyd-recursos-barra,
-.sheet.card .cyd-recursos-barra {
-  gap: 5px;
+/* Rejilla de bonificadores de características en el editor de Items */
+.cyd-caracteristicas-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 }
 
-.sheet.item .cyd-recurso-caja,
-.sheet.card .cyd-recurso-caja {
-  padding: 2px 5px;
-  gap: 1px;
+.cyd-caract-tarjeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 7px;
+  background: var(--cyd-fondo-hundido);
+  border: 1px solid var(--cyd-borde-suave);
+  border-radius: var(--cyd-radio);
 }
 
-.sheet.item .cyd-recurso-caja input[type="number"],
-.sheet.card .cyd-recurso-caja input[type="number"] {
-  width: 38px !important;
-  height: 22px !important;
-  padding: 0 2px !important;
-  font-size: 0.78rem;
+.cyd-palo-icono {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--cyd-texto);
+  white-space: nowrap;
 }
 
-.sheet.item .cyd-recurso-caja input[type="text"],
-.sheet.card .cyd-recurso-caja input[type="text"],
-.sheet.item .cyd-campo-linea input,
-.sheet.card .cyd-campo-linea input {
-  height: 22px !important;
-  padding: 1px 4px !important;
-  font-size: 0.78rem;
+.cyd-palo-icono i {
+  color: var(--cyd-azul);
 }
 
-.sheet.item select,
-.sheet.card select {
-  height: 22px !important;
-  padding: 0 2px !important;
-  font-size: 0.76rem;
+.cartas-y-dados .window-content .cyd-caract-tarjeta input[type="number"] {
+  width: 44px;
+  height: 26px;
 }
 
-.sheet.item textarea,
-.sheet.card textarea {
-  font-size: 0.78rem;
-  line-height: 1.3;
-  padding: 4px 6px !important;
+/* Área de texto que ocupa el espacio restante del editor */
+.cyd-panel-texto {
+  flex: 1;
+  min-height: 140px;
 }
 
-.sheet.item .cyd-caract-tarjeta,
-.sheet.card .cyd-caract-tarjeta {
-  padding: 3px 6px;
-  gap: 4px;
-}
-
-.sheet.item .cyd-caract-tarjeta input,
-.sheet.card .cyd-caract-tarjeta input {
-  width: 40px !important;
-  height: 22px !important;
-  padding: 0 2px !important;
-  font-size: 0.78rem;
-}
-
-.sheet.item .cyd-cabecera-seccion,
-.sheet.card .cyd-cabecera-seccion {
-  margin-bottom: 4px;
-  padding-bottom: 2px;
+.cyd-panel-texto textarea {
+  flex: 1;
 }
 
 /* ======================================================================== */

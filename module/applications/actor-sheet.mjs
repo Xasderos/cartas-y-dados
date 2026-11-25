@@ -184,7 +184,8 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
         return {
           action: clave,
           // Texto plano sin etiquetas HTML: evita que se vean marcas crudas al elegir la clase en el diálogo.
-          label: `🧙 ${cfg.nombre} (${etiquetaAtributo}${etiquetaPalo})`,
+          label: `${cfg.nombre} (${etiquetaAtributo}${etiquetaPalo})`,
+          icon: cfg.paloPrincipal ? "fa-solid fa-scroll" : "fa-solid fa-circle-half-stroke",
           callback: () => clave
         };
       });
@@ -225,7 +226,7 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
     const opcionesTrinket = configClase.trinkets.map((nombre, indice) => `
       <label style="display: block; margin: 4px 0;">
         <input type="radio" name="cydTrinketElegido" value="${nombre}" ${indice === 0 ? "checked" : ""} />
-        🔮 ${nombre}
+        ${nombre}
       </label>`).join("");
 
     const trinketElegido = await DialogV2.prompt({
@@ -235,7 +236,8 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
         ${opcionesTrinket}
       `,
       ok: {
-        label: "✨ Confirmar y Generar Mazo",
+        label: "Confirmar y Generar Mazo",
+        icon: "fa-solid fa-wand-sparkles",
         callback: (event, button) => button.form.elements.cydTrinketElegido.value
       },
       rejectClose: false

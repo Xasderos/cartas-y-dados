@@ -1,54 +1,121 @@
 /**
  * @file 01-variables-y-base.css
- * @description Variables globales (paleta de colores) y estructura general de ventanas ApplicationV2.
+ * @description Tokens visuales del sistema y estructura general de las fichas.
+ *
+ * Integración con Foundry VTT v14 (v0.9.0):
+ * - Los tokens `--cyd-*` se DERIVAN de las variables del tema activo de Foundry
+ *   (`--color-text-primary`, `--color-border`, `--color-light-3`, ...), así el sistema
+ *   sigue automáticamente el tema claro/oscuro y la paleta elegida por el usuario.
+ * - El marco de ventana, botones, inputs y selects los estiliza Foundry; aquí solo se
+ *   ajustan tamaños. Nunca se redefine `.window-header` ni el fondo de `.window-content`.
+ * - Sobre esa base se añade un tinte azul muy suave en paneles y acentos dorados tomados
+ *   del propio dorado de Foundry (`--color-light-3`, el mismo del `<hr>` nativo).
+ * - Los tokens se declaran en cada raíz donde se usan (ventanas del sistema y tarjetas de
+ *   chat) para que las variables de Foundry se resuelvan con el tema de ese elemento.
+ *
+ * Iconografía: solo iconos Font Awesome y símbolos tipográficos (◆ · → ×). Sin emojis.
  */
 
-:root {
-  --cyd-bg-oscuro: #1b2026;
-  --cyd-bg-panel: #262e38;
-  --cyd-bg-caja: rgba(0, 0, 0, 0.28);
-  --cyd-borde: #3e4a59;
-  --cyd-acento: #d4af37;
-  --cyd-trinket: #9b59b6;
-  --cyd-exito: #2ecc71;
-  --cyd-peligro: #e74c3c;
-  --cyd-texto: #f0f3f5;
-  --cyd-texto-suave: #aeb8c4;
+.cartas-y-dados,
+.cyd-carta-jugada,
+.cyd-chat-tirada-pnj,
+.cyd-alerta-cansancio,
+.cyd-chat-aviso {
+  /* --- Texto (del tema de Foundry) --- */
+  --cyd-texto: var(--color-text-primary, #dee9ed);
+  --cyd-texto-suave: var(--color-text-secondary, #c2daea);
+  --cyd-texto-tenue: var(--color-text-subtle, #899fad);
+
+  /* --- Bordes y fondos (del tema de Foundry + tinte azul suave) --- */
+  --cyd-borde: var(--color-border, #302831);
+  --cyd-borde-suave: color-mix(in srgb, var(--cyd-texto) 10%, transparent);
+  --cyd-fondo-hundido: var(--color-cool-5-50, rgba(11, 10, 19, 0.5));
+  --cyd-tinte: rgba(96, 128, 190, 0.07);
+  --cyd-tinte-hover: rgba(96, 128, 190, 0.13);
+
+  /* --- Acentos --- */
+  --cyd-oro: var(--color-light-3, #e7d1b1);
+  --cyd-oro-linea: color-mix(in srgb, var(--cyd-oro) 28%, transparent);
+  --cyd-oro-velo: color-mix(in srgb, var(--cyd-oro) 8%, transparent);
+  --cyd-azul: #8ea7d4;
+  --cyd-arcano: #a3a6e0;
+  --cyd-exito: var(--color-level-success, #26b231);
+  --cyd-peligro: var(--color-level-error, #ce0707);
+
+  /* --- Tipografía (fuentes nativas de Foundry) --- */
+  --cyd-fuente-titulo: var(--font-serif, "Amiri", serif);
+  --cyd-fuente-texto: var(--font-primary, "Signika", sans-serif);
+
+  --cyd-radio: 4px;
+
+  /* --- Alias de compatibilidad (nombres anteriores a v0.9.0) --- */
+  --cyd-acento: var(--cyd-oro);
+  --cyd-trinket: var(--cyd-arcano);
+  --cyd-bg-caja: var(--cyd-tinte);
+  --cyd-bg-panel: var(--cyd-tinte);
 }
 
-.cartas-y-dados .window-content {
-  background: var(--cyd-bg-oscuro);
-  color: var(--cyd-texto);
-  padding: 10px;
+/* Tema claro de Foundry: acentos más oscuros para mantener el contraste */
+.theme-light .cartas-y-dados,
+.cartas-y-dados.theme-light,
+.theme-light .cyd-carta-jugada,
+.theme-light .cyd-chat-tirada-pnj,
+.theme-light .cyd-alerta-cansancio,
+.theme-light .cyd-chat-aviso {
+  --cyd-oro: #8a6a2f;
+  --cyd-azul: #3f5f99;
+  --cyd-arcano: #5a5db0;
+  --cyd-tinte: rgba(60, 90, 150, 0.06);
+  --cyd-tinte-hover: rgba(60, 90, 150, 0.12);
+  --cyd-fondo-hundido: rgba(0, 0, 0, 0.04);
 }
+
+/* ======================================================================== */
+/*  CONTROLES: solo tamaños; el aspecto lo define Foundry                   */
+/* ======================================================================== */
+
+.cartas-y-dados .window-content input[type="number"] {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.cartas-y-dados .window-content button i {
+  margin-right: 4px;
+}
+
+.cartas-y-dados .window-content button i:only-child {
+  margin-right: 0;
+}
+
+/* ======================================================================== */
+/*  CONTENEDOR Y CABECERA DE FICHA                                          */
+/* ======================================================================== */
 
 .cyd-hoja-contenedor {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   height: 100%;
   min-height: 500px;
 }
 
 .cyd-cabecera {
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 6px 8px;
-  background: var(--cyd-bg-panel);
-  border: 1px solid var(--cyd-borde);
-  border-radius: 6px;
-  margin-bottom: 6px;
+  gap: 12px;
+  align-items: center;
+  padding: 4px 2px 10px;
+  border-bottom: 1px solid var(--cyd-oro-linea);
   flex-shrink: 0;
 }
 
 .cyd-avatar {
-  width: 56px !important;
-  height: 56px !important;
+  width: 64px !important;
+  height: 64px !important;
   object-fit: cover;
-  border-radius: 6px;
-  border: 2px solid var(--cyd-acento);
+  border-radius: var(--cyd-radio);
+  border: 1px solid var(--cyd-borde);
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .cyd-cabecera-principal {
@@ -62,86 +129,124 @@
 .cyd-fila-titulo {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.cyd-nombre-actor {
+.cartas-y-dados .window-content input.cyd-nombre-actor {
+  flex: 1;
   width: 100%;
-  font-size: 1.1rem;
-  font-weight: bold;
-  background: transparent;
-  border: none;
+  min-width: 0;
+  height: auto;
+  padding: 0 4px;
+  font-family: var(--cyd-fuente-titulo);
+  font-size: 1.6rem;
+  line-height: 1.3;
   color: var(--cyd-texto);
-  padding: 2px 4px;
-  border-radius: 3px;
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
 }
 
-.cyd-trasfondo-barra {
+.cartas-y-dados .window-content input.cyd-nombre-actor:hover,
+.cartas-y-dados .window-content input.cyd-nombre-actor:focus {
+  border-color: var(--cyd-borde);
+}
+
+/* Subtítulo bajo el nombre (tipo de ficha / descripción breve) */
+.cyd-subtitulo-cabecera {
+  margin: 0;
+  padding: 0 5px;
+  font-size: 0.8rem;
+  color: var(--cyd-texto-tenue);
+}
+
+p.cyd-subtitulo-cabecera {
   display: flex;
-  gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cyd-subtitulo-cabecera strong {
+  color: var(--cyd-texto-suave);
+  font-weight: 600;
+}
+
+/* Insignia de cabecera (Amenaza, tipo de Carta, tipo de Item) */
+.cyd-badge-nivel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-suave);
+  border: 1px solid var(--cyd-oro-linea);
+  border-radius: var(--cyd-radio);
+  white-space: nowrap;
+}
+
+.cyd-badge-nivel i {
+  color: var(--cyd-oro);
+}
+
+.cartas-y-dados .window-content .cyd-badge-nivel input[type="number"] {
+  width: 42px;
+  height: 24px;
+}
+
+/* Ranuras de trasfondo: Raza, Origen y Clase */
+.cyd-trasfondo-barra {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
 
 .cyd-slot-trasfondo {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: var(--cyd-bg-caja);
-  border: 1px solid var(--cyd-borde);
-  border-radius: 4px;
+  gap: 6px;
+  min-width: 0;
   padding: 3px 6px;
-  font-size: 0.78rem;
-  flex: 1;
-  min-width: 120px;
+  background: var(--cyd-tinte);
+  border: 1px solid var(--cyd-borde-suave);
+  border-radius: var(--cyd-radio);
+  font-size: 0.82rem;
 }
 
 .cyd-slot-etiqueta {
-  font-size: 0.72rem;
-  opacity: 0.8;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-tenue);
+  flex-shrink: 0;
 }
 
-.cyd-link-item {
+.cyd-slot-etiqueta i {
+  color: var(--cyd-azul);
+}
+
+.cyd-slot-trasfondo .cyd-link-item {
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.cyd-recursos-barra {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-top: 4px;
+.cyd-slot-trasfondo .cyd-btn-mini:not(.cyd-btn-icono) {
+  flex: 1;
 }
 
-.cyd-recurso-caja {
-  background: var(--cyd-bg-caja);
-  padding: 4px 6px;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.78rem;
-}
-
-.cyd-recurso-titulo {
-  font-size: 0.72rem;
-  opacity: 0.8;
-}
-
-.cyd-recurso-inputs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.cyd-recurso-inputs input {
-  width: 42px;
-  text-align: center;
-}
+/* ======================================================================== */
+/*  CUERPO SCROLLABLE Y LAYOUT DE DOS COLUMNAS                              */
+/* ======================================================================== */
 
 .cyd-cuerpo-hoja {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   overflow-y: auto;
   padding-right: 4px;
   flex: 1 1 auto;
@@ -157,18 +262,12 @@
   min-height: 0;
 }
 
-/* Utilidades de rejilla */
 .cyd-dos-columnas {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
-.cyd-cols-3 {
-  grid-template-columns: repeat(3, 1fr) !important;
-}
-
-/* Layout de dos columnas: atributos izquierda | contenido derecha */
 .cyd-layout-dos-columnas {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -176,84 +275,6 @@
   align-items: start;
 }
 
-/* Sidebar de atributos (izquierda, debajo del avatar) */
-.cyd-sidebar-atributos {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.cyd-sidebar-atributos .cyd-cabecera-seccion {
-  padding: 0 0 4px 0;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--cyd-borde);
-}
-
-.cyd-sidebar-atributos .cyd-cabecera-seccion h3 {
-  font-size: 0.85rem;
-  margin: 0;
-}
-
-.cyd-atributo-tarjeta {
-  background: var(--cyd-bg-caja);
-  border: 1px solid var(--cyd-borde);
-  border-radius: 4px;
-  padding: 5px 7px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 6px;
-}
-
-.cyd-atributo-icono {
-  font-size: 0.85rem;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.cyd-atributo-fila-valores {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.cyd-atributo-fila-valores input {
-  width: 36px;
-  text-align: center;
-  font-size: 0.8rem;
-}
-
-.cyd-atributo-total {
-  font-size: 0.8rem;
-  font-weight: bold;
-  color: var(--cyd-acento);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* Botón de tirada directa de atributo PNJ */
-.cyd-btn-atributo-pnj {
-  background: var(--cyd-bg-boton, #4a5568);
-  border: 1px solid var(--cyd-borde);
-  border-radius: 3px;
-  color: var(--cyd-color-texto, #e2e8f0);
-  padding: 1px 5px;
-  font-size: 0.72rem;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: background 0.15s ease;
-}
-
-.cyd-btn-atributo-pnj:hover {
-  background: var(--cyd-acento, #d4a843);
-  color: #000;
-}
-
-/* Contenido derecho */
 .cyd-contenido-derecha {
   display: flex;
   flex-direction: column;
@@ -261,39 +282,122 @@
   min-width: 0;
 }
 
-/* Select compacto de dado individual (sidebar de PNJ, v0.8.1) */
-.cyd-select-dado-individual {
-  height: 22px;
-  padding: 0 2px;
-  font-size: 0.72rem;
-  width: auto;
+/* ======================================================================== */
+/*  SIDEBAR DE CARACTERÍSTICAS                                              */
+/* ======================================================================== */
+
+.cyd-sidebar-atributos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
-/* Sidebar PNJ: la etiqueta del atributo ocupa su propia línea para que
-   quepan el valor, el select del dado y el botón de tirada */
-.sheet.pnj .cyd-atributo-tarjeta {
-  flex-wrap: wrap;
+.cyd-atributo-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 8px;
+  background: var(--cyd-tinte);
+  border: 1px solid var(--cyd-borde-suave);
+  border-radius: var(--cyd-radio);
+  transition: background 0.15s ease;
 }
 
-.sheet.pnj .cyd-atributo-icono {
-  width: 100%;
+.cyd-atributo-tarjeta:hover {
+  background: var(--cyd-tinte-hover);
 }
 
-/* Panel Movimiento y Tamaño */
-.cyd-panel-movimiento-tamano {
-  margin-top: 6px;
+.cyd-atributo-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
-.cyd-recurso-total {
-  font-size: 0.72rem;
-  opacity: 0.8;
-  margin-left: 4px;
+.cyd-atributo-sello {
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--cyd-azul);
 }
 
-/* Movimiento total calculado (solo lectura, v0.8.2): Base + (Físico × 5) */
-.cyd-recurso-total-grande {
-  font-size: 0.95rem;
-  font-weight: bold;
-  color: var(--cyd-acento);
+.cyd-atributo-nombre {
+  flex: 1;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--cyd-texto);
+}
+
+.cyd-atributo-abrev {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--cyd-oro);
+  opacity: 0.85;
+}
+
+.cyd-atributo-fila-valores {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cartas-y-dados .window-content .cyd-atributo-fila-valores input[type="number"] {
+  width: 40px;
+  height: 26px;
+}
+
+.cyd-atributo-total {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--cyd-texto);
   white-space: nowrap;
+}
+
+.cyd-atributo-total i {
+  font-size: 0.75rem;
+  color: var(--cyd-oro);
+}
+
+/* Etiqueta mínima (Base, Dado, etc.) */
+.cyd-mini-etiqueta {
+  font-size: 0.72rem;
+  color: var(--cyd-texto-tenue);
+}
+
+/* Select compacto de dado individual (sidebar de PNJ) */
+.cartas-y-dados .window-content select.cyd-select-dado-individual {
+  width: auto;
+  height: 26px;
+  padding: 0 2px;
+}
+
+/* Botón de tirada directa de atributo PNJ */
+.cartas-y-dados .window-content button.cyd-btn-atributo-pnj {
+  margin-left: auto;
+  width: auto;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cyd-nota-sidebar {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-tenue);
+}
+
+.cyd-nota-sidebar i {
+  margin-top: 2px;
+  color: var(--cyd-azul);
 }

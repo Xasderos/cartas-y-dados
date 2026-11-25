@@ -1,5 +1,6 @@
 {{!--
   Plantilla del Editor Visual de Cartas (Acción y Trinket) en Foundry VTT v14.
+  Iconografía (v0.9.0): solo iconos Font Awesome y símbolos tipográficos, sin emojis.
 --}}
 <div class="cyd-hoja-contenedor">
   <header class="cyd-cabecera">
@@ -7,106 +8,114 @@
     <div class="cyd-cabecera-principal">
       <div class="cyd-fila-titulo">
         <input type="text" name="name" value="{{name}}" class="cyd-nombre-actor" placeholder="Nombre de la Carta" />
-        <span class="cyd-badge-nivel">{{#if esTrinket}}🔮 Trinket{{else}}🃏 Acción{{/if}}</span>
+        <span class="cyd-badge-nivel">
+          {{#if esTrinket}}<i class="fa-solid fa-gem"></i> Trinket{{else}}<i class="fa-solid fa-diamond"></i> Acción{{/if}}
+        </span>
       </div>
-      <p style="margin: 0; font-size: 0.85rem; opacity: 0.85;">
+      <p class="cyd-subtitulo-cabecera">
         {{#if esTrinket}}
-          Trinket de <strong>Nivel {{system.nivel}}</strong> — entra en juego directamente, sin lanzar dados.
+          Nivel <strong>{{system.nivel}}</strong> · entra en juego directamente, sin lanzar dados
         {{else}}
-          Otorga dado <strong>{{system.tipoDado}}</strong> escalado con <strong>{{system.caracteristicaAsociada}}</strong>.
+          Dado <strong>{{system.tipoDado}}</strong> · escalado con <strong>{{system.caracteristicaAsociada}}</strong>
         {{/if}}
       </p>
     </div>
   </header>
 
   <section class="cyd-panel-controles">
-    <div class="cyd-recursos-barra">
+    <div class="cyd-cabecera-seccion">
+      <h3><i class="fa-solid fa-sliders"></i> Propiedades</h3>
+    </div>
+    <div class="cyd-recursos-barra cyd-cols-3">
       {{#if esTrinket}}
         {{!-- Trinkets: sin Palo ni Número/Dado; su escala es su Nivel (v0.8.4) --}}
         <div class="cyd-recurso-caja" data-tooltip="Nivel del Trinket (los Trinkets no usan palo ni dado)">
-          <span>Nivel</span>
-          <input type="number" name="system.nivel" min="1" value="{{system.nivel}}" style="width: 60px;" />
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-signal"></i> Nivel</span>
+          <input type="number" name="system.nivel" min="1" value="{{system.nivel}}" />
         </div>
       {{else}}
         <div class="cyd-recurso-caja">
-          <span>Palo</span>
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-diamond"></i> Palo</span>
           <select name="system.palo">
-            <option value="espadas" {{#if (eq system.palo "espadas")}}selected{{/if}}>⚔️ FISC (Físico)</option>
-            <option value="bastos" {{#if (eq system.palo "bastos")}}selected{{/if}}>🦯 CONS (Consciencia)</option>
-            <option value="oros" {{#if (eq system.palo "oros")}}selected{{/if}}>🪙 SOC (Social)</option>
-            <option value="copas" {{#if (eq system.palo "copas")}}selected{{/if}}>🏆 MIST (Misticismo)</option>
+            <option value="espadas" {{#if (eq system.palo "espadas")}}selected{{/if}}>FISC · Físico</option>
+            <option value="bastos" {{#if (eq system.palo "bastos")}}selected{{/if}}>CONS · Consciencia</option>
+            <option value="oros" {{#if (eq system.palo "oros")}}selected{{/if}}>SOC · Social</option>
+            <option value="copas" {{#if (eq system.palo "copas")}}selected{{/if}}>MIST · Misticismo</option>
           </select>
         </div>
 
         <div class="cyd-recurso-caja">
-          <span>Valor (Dado)</span>
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-dice-d20"></i> Valor · Dado</span>
           <select name="system.numero" data-dtype="Number">
-            <option value="1" {{#if (eq system.numero 1)}}selected{{/if}}>1 (d4)</option>
-            <option value="2" {{#if (eq system.numero 2)}}selected{{/if}}>2 (d6)</option>
-            <option value="3" {{#if (eq system.numero 3)}}selected{{/if}}>3 (d8)</option>
-            <option value="4" {{#if (eq system.numero 4)}}selected{{/if}}>4 (d10)</option>
-            <option value="5" {{#if (eq system.numero 5)}}selected{{/if}}>5 (d12)</option>
+            <option value="1" {{#if (eq system.numero 1)}}selected{{/if}}>1 · d4</option>
+            <option value="2" {{#if (eq system.numero 2)}}selected{{/if}}>2 · d6</option>
+            <option value="3" {{#if (eq system.numero 3)}}selected{{/if}}>3 · d8</option>
+            <option value="4" {{#if (eq system.numero 4)}}selected{{/if}}>4 · d10</option>
+            <option value="5" {{#if (eq system.numero 5)}}selected{{/if}}>5 · d12</option>
           </select>
         </div>
       {{/if}}
 
       {{#if esAccion}}
-        <label class="cyd-recurso-caja">
-          <span>🎲 ¿Lanza Dados?</span>
+        <label class="cyd-recurso-caja cyd-check">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-dice"></i> Lanza dados</span>
           <input type="checkbox" name="system.realizaTirada" {{checked system.realizaTirada}} />
         </label>
       {{/if}}
     </div>
   </section>
-  
-  {{!-- Bloque de Automatización Mecánica (Paso 6) --}}
+
+  {{!-- Bloque de Automatización Mecánica --}}
   <section class="cyd-panel-controles">
     <div class="cyd-cabecera-seccion">
-      <h3>⚙️ Efectos Automáticos al Jugar</h3>
+      <h3><i class="fa-solid fa-gears"></i> Efectos Automáticos al Jugar</h3>
     </div>
-    <div class="cyd-recursos-barra" style="grid-template-columns: repeat(4, 1fr);">
+    <div class="cyd-recursos-barra">
       <div class="cyd-recurso-caja" data-tooltip="Se suma al resultado de los dados y al daño">
-        <span>🎯 Bono Dado</span>
-        <input type="number" name="system.automatizacion.bonoTirada" value="{{system.automatizacion.bonoTirada}}" style="width: 44px;" />
+        <span class="cyd-recurso-titulo"><i class="fa-solid fa-plus-minus"></i> Bono Dado</span>
+        <input type="number" name="system.automatizacion.bonoTirada" value="{{system.automatizacion.bonoTirada}}" />
       </div>
       <div class="cyd-recurso-caja" data-tooltip="Salud que recupera el jugador al usar la carta">
-        <span>❤️ Curación</span>
-        <input type="number" name="system.automatizacion.curacion" value="{{system.automatizacion.curacion}}" min="0" style="width: 44px;" />
+        <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart-pulse"></i> Curación</span>
+        <input type="number" name="system.automatizacion.curacion" value="{{system.automatizacion.curacion}}" min="0" />
       </div>
       <div class="cyd-recurso-caja" data-tooltip="Cartas adicionales que roba inmediatamente">
-        <span>✋ Robar</span>
-        <input type="number" name="system.automatizacion.robarCartas" value="{{system.automatizacion.robarCartas}}" min="0" style="width: 44px;" />
+        <span class="cyd-recurso-titulo"><i class="fa-solid fa-clone"></i> Robar</span>
+        <input type="number" name="system.automatizacion.robarCartas" value="{{system.automatizacion.robarCartas}}" min="0" />
       </div>
       <div class="cyd-recurso-caja" data-tooltip="Usa valores negativos (ej. -1) para aliviar Cansancio">
-        <span>⚡ Cansancio</span>
-        <input type="number" name="system.automatizacion.cambioCansancio" value="{{system.automatizacion.cambioCansancio}}" style="width: 44px;" />
+        <span class="cyd-recurso-titulo"><i class="fa-solid fa-hourglass-half"></i> Cansancio</span>
+        <input type="number" name="system.automatizacion.cambioCansancio" value="{{system.automatizacion.cambioCansancio}}" />
       </div>
     </div>
 
     {{#if esTrinket}}
-      <div class="cyd-recurso-caja" style="margin-top: 6px;">
-        <span>🛡️ <strong>Bono a la Defensa mientras este Trinket esté "En Juego":</strong></span>
-        <input type="number" name="system.bonoDefensaEnJuego" value="{{system.bonoDefensaEnJuego}}" style="width: 52px;" />
+      <div class="cyd-recurso-caja cyd-check" data-tooltip="Se suma a la Defensa Total mientras el Trinket permanezca En Juego">
+        <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Bono a la Defensa mientras está En Juego</span>
+        <input type="number" name="system.bonoDefensaEnJuego" value="{{system.bonoDefensaEnJuego}}" />
       </div>
     {{/if}}
   </section>
 
   {{#if esAccion}}
-    <section class="cyd-panel-mano" style="flex: 1; display: flex; flex-direction: column;">
+    <section class="cyd-panel-mano cyd-panel-texto">
       <div class="cyd-cabecera-seccion">
-        <h3>⚡ Efecto de la Acción</h3>
+        <h3><i class="fa-solid fa-feather-pointed"></i> Efecto de la Acción</h3>
       </div>
-      <textarea name="system.efecto" rows="4" style="width: 100%; flex: 1; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 6px;">{{system.efecto}}</textarea>
+      <textarea name="system.efecto" rows="4" class="cyd-textarea">{{system.efecto}}</textarea>
     </section>
   {{else}}
-    <section class="cyd-panel-mano" style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
-      <div>
-        <strong>✨ Efecto Permanente (Pasivo):</strong>
-        <textarea name="system.efectoPermanente" rows="2" style="width: 100%; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 5px;">{{system.efectoPermanente}}</textarea>
+    <section class="cyd-panel-mano cyd-panel-texto">
+      <div class="cyd-cabecera-seccion">
+        <h3><i class="fa-solid fa-feather-pointed"></i> Efectos del Trinket</h3>
       </div>
-      <div>
-        <strong>🟢 Efecto al Jugar (Mientras está En Juego):</strong>
-        <textarea name="system.efectoAlJugar" rows="2" style="width: 100%; background: #14181d; color: #fff; border: 1px solid #414d5c; padding: 5px;">{{system.efectoAlJugar}}</textarea>
+      <div class="cyd-campo">
+        <label><i class="fa-solid fa-infinity"></i> Efecto Permanente (Pasivo)</label>
+        <textarea name="system.efectoPermanente" rows="2" class="cyd-textarea">{{system.efectoPermanente}}</textarea>
+      </div>
+      <div class="cyd-campo">
+        <label><i class="fa-solid fa-circle-dot"></i> Efecto al Jugar (mientras está En Juego)</label>
+        <textarea name="system.efectoAlJugar" rows="2" class="cyd-textarea">{{system.efectoAlJugar}}</textarea>
       </div>
     </section>
   {{/if}}

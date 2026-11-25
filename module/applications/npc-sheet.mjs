@@ -169,10 +169,10 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
     const caracteristicaTotal = sistema.caracteristicasTotales?.[caracteristica] ?? valorBase;
 
     const nombresCaracteristicas = {
-      fisico: "⚔️ Físico (FISC)",
-      consciencia: "🦯 Consciencia (CONS)",
-      social: "🪙 Social (SOC)",
-      misticismo: "🏆 Misticismo (MIST)"
+      fisico: "Físico (FISC)",
+      consciencia: "Consciencia (CONS)",
+      social: "Social (SOC)",
+      misticismo: "Misticismo (MIST)"
     };
     const nombreCaract = nombresCaracteristicas[caracteristica] || caracteristica;
 
@@ -185,16 +185,16 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
 
     if (dificultadMaster > 0) {
       const exito = roll.total >= dificultadMaster;
-      const textoExito = exito ? "✅ ¡ÉXITO!" : "❌ FALLO";
+      const textoExito = exito ? '<span class="cyd-resultado-exito">ÉXITO</span>' : '<span class="cyd-resultado-fallo">FALLO</span>';
       contenidoHtml = `
         <div class="cyd-resolucion-caja">
-          <p>🎲 <strong>Dificultad del Master (${dificultadMaster}):</strong> ${textoExito} (Total: ${roll.total})</p>
+          <p><i class="fa-solid fa-bullseye"></i> <strong>Dificultad del Master (${dificultadMaster}):</strong> ${textoExito} (Total: ${roll.total})</p>
         </div>
       `;
     } else {
       contenidoHtml = `
         <div class="cyd-resolucion-caja">
-          <p>🎲 <strong>Resultado:</strong> ${roll.total}</p>
+          <p><i class="fa-solid fa-dice-d20"></i> <strong>Resultado:</strong> ${roll.total}</p>
         </div>
       `;
     }
@@ -205,7 +205,7 @@ export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
       flavor: `${actor.name} lanza ${nombreCaract} — ${valorBase}${tipoDado} (${caracteristicaTotal} dados totales)`,
       content: `
         <div class="cyd-chat-tirada-pnj">
-          <h4>🎲 Tirada de Atributo: ${nombreCaract}</h4>
+          <h4><i class="fa-solid fa-dice-d20"></i> Tirada de Atributo: ${nombreCaract}</h4>
           <p><strong>Fórmula:</strong> ${formula} = <strong>${roll.total}</strong></p>
           ${contenidoHtml}
         </div>

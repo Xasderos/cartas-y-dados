@@ -1,188 +1,376 @@
 /**
  * @file 04-cartas-y-chat.css
- * @description Estilos para la barra de Trinkets, Mano de Cartas y Mensajes en el Chat.
+ * @description Resumen de pilas, Trinkets, Mano de Cartas y tarjetas de Chat.
+ * Las tarjetas de chat no imponen fondo propio: se integran en el mensaje nativo de
+ * Foundry y solo añaden jerarquía (título, filetes y bloques de resolución).
  */
 
-.cyd-acciones-turno {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
+/* ======================================================================== */
+/*  RESUMEN DE PILAS                                                        */
+/* ======================================================================== */
 
 .cyd-resumen-pilas {
   display: flex;
-  justify-content: space-around;
+  flex-wrap: wrap;
   align-items: center;
-  background: var(--cyd-bg-caja);
-  padding: 5px;
-  border-radius: 4px;
-  font-size: 0.82rem;
+  gap: 6px;
 }
 
 .cyd-chip-pila {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  color: var(--cyd-texto-suave);
+  background: var(--cyd-fondo-hundido);
+  border: 1px solid var(--cyd-borde-suave);
+  border-radius: var(--cyd-radio);
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cyd-chip-pila i {
+  color: var(--cyd-azul);
+}
+
+.cyd-chip-pila strong {
+  color: var(--cyd-texto);
+  font-variant-numeric: tabular-nums;
 }
 
 .cyd-chip-pila:hover {
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--cyd-texto);
+  background: var(--cyd-tinte-hover);
 }
 
-/* Barra de Trinkets */
-.cyd-panel-trinkets {
-  background: var(--cyd-bg-panel);
-  border: 1px solid var(--cyd-trinket);
-  border-radius: 6px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.cyd-resumen-pilas .cyd-separador {
+  flex: 1;
+}
+
+/* ======================================================================== */
+/*  TRINKETS                                                                */
+/* ======================================================================== */
+
+.cyd-panel-trinkets .cyd-cabecera-seccion h3 i {
+  color: var(--cyd-arcano);
 }
 
 .cyd-lista-pildoras {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 3px;
+  gap: 5px;
 }
 
 .cyd-pildora-trinket {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--cyd-bg-caja);
-  border: 1px solid var(--cyd-borde);
-  padding: 3px 9px;
-  border-radius: 14px;
+  min-height: 26px;
+  padding: 1px 3px 1px 9px;
   font-size: 0.82rem;
+  color: var(--cyd-texto);
+  background: var(--cyd-fondo-hundido);
+  border: 1px solid var(--cyd-borde-suave);
+  border-radius: 13px;
   cursor: help;
 }
 
+.cyd-pildora-trinket .cyd-estado-icono {
+  font-size: 0.6rem;
+  color: var(--cyd-texto-tenue);
+}
+
+.cyd-pildora-trinket .cyd-nivel {
+  font-size: 0.72rem;
+  color: var(--cyd-texto-tenue);
+}
+
 .cyd-estado-enJuego {
-  border-color: var(--cyd-exito);
-  background: rgba(46, 204, 113, 0.15);
+  border-color: color-mix(in srgb, var(--cyd-exito) 45%, transparent);
 }
 
+.cyd-estado-enJuego .cyd-estado-icono {
+  color: var(--cyd-exito);
+}
+
+.cyd-estado-enMano .cyd-estado-icono {
+  color: var(--cyd-azul);
+}
+
+.cyd-estado-descartado,
 .cyd-estado-quemado {
-  border-color: var(--cyd-peligro);
-  opacity: 0.7;
+  opacity: 0.65;
 }
 
-/* Rejilla de Cartas en Mano */
+.cyd-estado-quemado .cyd-estado-icono {
+  color: var(--cyd-peligro);
+}
+
+/* ======================================================================== */
+/*  MANO DE CARTAS                                                          */
+/* ======================================================================== */
+
 .cyd-grid-cartas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 8px;
 }
 
 .cyd-carta-item {
-  background: #161b20;
-  border: 2px solid var(--cyd-acento);
-  border-radius: 8px;
-  padding: 8px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 6px;
   min-height: 150px;
+  padding: 8px;
+  background: var(--cyd-fondo-hundido);
+  border: 1px solid var(--cyd-borde-suave);
+  border-top: 2px solid var(--cyd-oro-linea);
+  border-radius: var(--cyd-radio);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cyd-carta-item:hover {
+  background: var(--cyd-tinte-hover);
+  border-top-color: var(--cyd-oro);
 }
 
 .cyd-carta-trinket {
-  border-color: var(--cyd-trinket);
+  border-top-color: color-mix(in srgb, var(--cyd-arcano) 45%, transparent);
+}
+
+.cyd-carta-trinket:hover {
+  border-top-color: var(--cyd-arcano);
 }
 
 .cyd-carta-cabecera {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-weight: bold;
-  border-bottom: 1px solid var(--cyd-borde);
-  padding-bottom: 4px;
   gap: 6px;
 }
 
 .cyd-carta-titulo {
   flex: 1;
-  font-size: 0.85rem;
+  font-family: var(--cyd-fuente-titulo);
+  font-size: 1.05rem;
+  color: var(--cyd-texto);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .cyd-carta-dado {
-  background: var(--cyd-acento);
-  color: #111;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  padding: 0 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cyd-oro);
+  border: 1px solid var(--cyd-oro-linea);
+  border-radius: var(--cyd-radio);
   white-space: nowrap;
+}
+
+/* Insignia de Nivel para Trinkets (sin palo ni dado) */
+.cyd-carta-dado.cyd-tag-nivel {
+  color: var(--cyd-arcano);
+  border-color: color-mix(in srgb, var(--cyd-arcano) 40%, transparent);
 }
 
 .cyd-carta-subtitulo {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  font-size: 0.7rem;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--cyd-texto-tenue);
+}
+
+.cyd-carta-subtitulo i {
+  color: var(--cyd-azul);
+}
+
+.cyd-carta-subtitulo strong {
   color: var(--cyd-texto-suave);
+  letter-spacing: 0.06em;
+}
+
+.cyd-carta-subtitulo .cyd-se-quema,
+.cyd-carta-subtitulo .cyd-se-quema i {
+  color: var(--cyd-peligro);
 }
 
 .cyd-carta-efecto {
-  font-size: 0.78rem;
-  min-height: 40px;
   flex: 1;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 5px;
-  border-radius: 4px;
+  min-height: 40px;
+  padding: 4px 0;
   overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--cyd-texto-suave);
+  border-top: 1px solid var(--cyd-borde-suave);
+}
+
+.cyd-carta-efecto p {
+  margin: 0 0 4px;
 }
 
 .cyd-carta-acciones {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 4px;
-  margin-top: 4px;
 }
 
-.cyd-btn-jugar,
-.cyd-btn-jugar-quemar,
-.cyd-btn-descartar,
-.cyd-btn-quemar {
-  padding: 4px 6px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.1;
+.cartas-y-dados .window-content .cyd-carta-acciones button {
+  width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 0.76rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.cyd-btn-jugar,
-.cyd-btn-jugar-quemar {
-  flex: 1;
+.cartas-y-dados .window-content .cyd-carta-acciones button i {
+  color: var(--cyd-azul);
 }
 
-.cyd-btn-descartar,
-.cyd-btn-quemar {
+.cartas-y-dados .window-content .cyd-carta-acciones button.cyd-btn-quemar i,
+.cartas-y-dados .window-content .cyd-carta-acciones button.cyd-btn-jugar-quemar i {
+  color: color-mix(in srgb, var(--cyd-peligro) 70%, var(--cyd-texto));
+}
+
+/* ======================================================================== */
+/*  TARJETAS DE CHAT                                                        */
+/* ======================================================================== */
+
+.cyd-carta-jugada,
+.cyd-chat-tirada-pnj,
+.cyd-alerta-cansancio,
+.cyd-chat-aviso {
+  margin: 2px 0;
+  font-size: var(--font-size-13, 0.85rem);
+  line-height: 1.4;
+}
+
+.cyd-carta-jugada p,
+.cyd-chat-tirada-pnj p,
+.cyd-alerta-cansancio p,
+.cyd-chat-aviso p {
+  margin: 3px 0;
+}
+
+.cyd-carta-jugada h3,
+.cyd-chat-tirada-pnj h4,
+.cyd-alerta-cansancio h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 5px;
+  padding: 0 0 4px;
+  border: none;
+  border-bottom: 1px solid var(--cyd-oro-linea);
+  font-family: var(--cyd-fuente-titulo);
+  font-size: 1.15rem;
+  font-weight: normal;
+  color: inherit;
+}
+
+.cyd-carta-jugada h3 i,
+.cyd-chat-tirada-pnj h4 i,
+.cyd-alerta-cansancio h4 i {
+  font-size: 0.85rem;
+  color: var(--cyd-azul);
+}
+
+.cyd-carta-jugada h3 small {
+  margin-left: auto;
+  font-family: var(--cyd-fuente-texto);
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.cyd-carta-jugada p > i,
+.cyd-chat-tirada-pnj p > i,
+.cyd-tags-auto i {
+  width: 14px;
+  text-align: center;
+  color: var(--cyd-azul);
+}
+
+/* Aviso simple: icono + texto en una línea */
+.cyd-chat-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cyd-chat-aviso > i {
+  margin-top: 5px;
+  color: var(--cyd-azul);
+}
+
+.cyd-alerta-cansancio h4,
+.cyd-alerta-cansancio h4 i {
+  color: var(--color-level-warning, #ee9b3a);
+}
+
+/* Bloque de resolución (ataque vs defensa, dificultad) */
+.cyd-resolucion-caja {
+  margin: 6px 0;
+  padding: 4px 8px;
+  background: var(--cyd-tinte);
+  border-left: 2px solid var(--cyd-borde-suave);
+  border-radius: 0 var(--cyd-radio) var(--cyd-radio) 0;
+}
+
+.cyd-resolucion-caja.cyd-exito {
+  border-left-color: var(--cyd-exito);
+}
+
+.cyd-resolucion-caja.cyd-fallo {
+  border-left-color: var(--cyd-peligro);
+}
+
+.cyd-resultado-exito {
+  color: var(--cyd-exito);
+  font-weight: 700;
+}
+
+.cyd-resultado-fallo {
+  color: var(--cyd-peligro);
+  font-weight: 700;
+}
+
+.cyd-tags-auto {
+  font-size: 0.8rem;
   opacity: 0.9;
 }
 
-.cyd-btn-descartar:hover {
-  opacity: 1;
-  background: rgba(52, 152, 219, 0.15);
+.cyd-efecto {
+  margin-top: 6px;
+  padding: 2px 0 2px 8px;
+  font-style: italic;
+  opacity: 0.85;
+  border-left: 2px solid var(--cyd-oro-linea);
 }
 
-.cyd-btn-quemar:hover {
-  opacity: 1;
-  background: rgba(231, 76, 60, 0.15);
+.cyd-nota-quemada i {
+  color: var(--cyd-peligro) !important;
 }
 
-.cyd-btn-quemar-especial {
-  width: 34px;
+/* Botón de aplicar daño: botón nativo de Foundry con un icono de color */
+button.cyd-btn-aplicar-dano {
+  width: 100%;
+  margin-top: 6px;
 }
 
-/* Insignia de Nivel para Trinkets en la Mano (sin palo ni dado desde v0.8.4) */
-.cyd-carta-dado.cyd-tag-nivel {
-  background: var(--cyd-trinket, #9b59b6);
-  color: #fff;
+button.cyd-btn-aplicar-dano i {
+  margin-right: 4px;
+  color: var(--cyd-peligro);
+}
+
+button.cyd-btn-aplicar-dano:disabled i {
+  color: var(--cyd-exito);
 }

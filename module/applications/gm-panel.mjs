@@ -33,7 +33,8 @@ export class PanelMasterApp extends HandlebarsApplicationMixin(ApplicationV2) {
     },
     window: {
       resizable: true,
-      title: "👑 Panel del Master — Cartas y Dados"
+      title: "Panel del Master — Cartas y Dados",
+      icon: "fa-solid fa-crown"
     },
     actions: {
       ajustarDificultad: PanelMasterApp.#onAjustarDificultad,
