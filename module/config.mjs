@@ -113,6 +113,8 @@ export const SISTEMA_CONFIG = {
    * - `bonificadores` (opcional): bonos fijos que `prepareDerivedData` suma por la clave de raza
    *   (no se guardan en el Item, así también afectan a personajes creados antes).
    * - `visionOscuridad` (opcional): metros de visión en la oscuridad que se aplican al Token.
+   * - `aMano` (opcional, en un rasgo, v0.13.1): el rasgo tiene control o estado en juego y
+   *   se muestra también en la pestaña Principal de la ficha (el resto solo en la pestaña Raza).
    * Las claves de rasgo con mecánica propia: `esperaUnMomento` (repetir tirada, 1/descanso),
    * `queMeDaAlgo` (indicador con Salud ≤ mitad), `tradicionAlquimica` (curación = nivel, 1/día),
    * `sangreFria` (Mano Máx. a la mitad mientras `system.rasgosRaza.expuestoElementos`).
@@ -126,7 +128,7 @@ export const SISTEMA_CONFIG = {
           texto: "Los humanos tienen, la buena o mala suerte, de cumplir profecías y epopeyas: cuando estés entre la vida y la muerte y hayas quemado todas las cartas, aguantas 2 turnos más tras quemar la última carta. Si no eres ayudado en ese tiempo, el personaje muere."
         },
         {
-          clave: "esperaUnMomento", nombre: "Espera un momento", icono: "fa-rotate-left",
+          clave: "esperaUnMomento", aMano: true, nombre: "Espera un momento", icono: "fa-rotate-left",
           texto: "Tras realizar una tirada y ver el resultado, puedes elegir repetirla y usar el nuevo resultado. Puedes usar esto una vez por descanso.",
           auto: "Botón «Espera un momento» en tus tiradas del chat; se recarga al descansar."
         }
@@ -182,7 +184,7 @@ export const SISTEMA_CONFIG = {
           texto: "Tienes facilidad para obtener información en espacios naturales, como los recursos de la zona, los peligros que pueden habitar o si ha ocurrido algo inusual."
         },
         {
-          clave: "queMeDaAlgo", nombre: "Que me da algo", icono: "fa-person-running",
+          clave: "queMeDaAlgo", aMano: true, nombre: "Que me da algo", icono: "fa-person-running",
           texto: "En el momento en que te quedes a la mitad de tus puntos de vida o menos, puedes moverte hasta la mitad de tu movimiento sin generar reacciones.",
           auto: "La ficha indica cuándo está activo (Salud actual ≤ mitad de la Salud Máx.)."
         }
@@ -199,7 +201,7 @@ export const SISTEMA_CONFIG = {
       bonificadores: { defensa: 1 },
       beneficios: [
         {
-          clave: "tradicionAlquimica", nombre: "Tradición alquímica", icono: "fa-flask",
+          clave: "tradicionAlquimica", aMano: true, nombre: "Tradición alquímica", icono: "fa-flask",
           texto: "Una vez al día las sierpes son capaces de confeccionar un ungüento o poción con los materiales que encuentren cerca, que deberán usar inmediatamente en sí mismas o en una criatura voluntaria. Este curará tantos puntos de vida como el nivel de la sierpe.",
           auto: "Botón en la ficha: cura tantos puntos como tu nivel a ti o al objetivo marcado; se recarga con un descanso cómodo."
         },
@@ -211,7 +213,7 @@ export const SISTEMA_CONFIG = {
       ],
       desventajas: [
         {
-          clave: "sangreFria", nombre: "Sangre fría", icono: "fa-temperature-half",
+          clave: "sangreFria", aMano: true, nombre: "Sangre fría", icono: "fa-temperature-half",
           texto: "El cuerpo de las sierpes es especialmente sensible a los cambios de temperatura. En entornos muy fríos o muy cálidos tienen problemas si no se protegen adecuadamente. Siempre que la sierpe esté sufriendo por la exposición a los elementos, verá su mano máxima reducida a la mitad.",
           auto: "Interruptor «Expuesta a los elementos» en la ficha: Mano Máx. a la mitad mientras esté activo."
         }
@@ -391,6 +393,26 @@ export function tablaAgotamiento(valor) {
 }
 
 /**
+ * Contexto de la barra de Salud de las fichas de PJ y PNJ (v0.13.1).
+ * Se pinta con un `<meter>` (sin estilos en línea); el color lo da la clase `estado`:
+ * - `cyd-salud-alta`: más del 50 % de la Salud Máx.
+ * - `cyd-salud-media` (naranja): 50 % o menos.
+ * - `cyd-salud-baja` (rojo): menos del 25 %.
+ * @param {number} valor - Salud actual (`system.salud.value`).
+ * @param {number} maximo - Salud Máx. total (`system.salud.maxTotal`).
+ * @returns {{valor: number, maximo: number, porcentaje: number, estado: string}}
+ */
+export function contextoBarraSalud(valor, maximo) {
+  const max = Math.max(1, Number(maximo) || 1);
+  const actual = Math.clamp(Number(valor) || 0, 0, max);
+  const porcentaje = Math.round((actual / max) * 100);
+  let estado = "cyd-salud-alta";
+  if (porcentaje < 25) estado = "cyd-salud-baja";
+  else if (porcentaje <= 50) estado = "cyd-salud-media";
+  return { valor: actual, maximo: max, porcentaje, estado };
+}
+
+/**
  * Datos de Agotamiento para las fichas de Actor (v0.12.0).
  * @param {number} valor - Puntos de Agotamiento actuales (`system.cansancio.value`).
  * @returns {{nivel: number, maximo: number, muerto: boolean, activos: Object[], segmentos: Object[], tooltipHtml: string}}
@@ -451,7 +473,7 @@ export function tieneRasgoRacial(actor, claveRasgo) {
  * Contexto de plantilla de los rasgos raciales de un Actor (v0.13.0), para el panel
  * «Rasgos Raciales» de la ficha y la ficha del Item de Raza.
  * @param {string|null} claveRaza - Clave de `SISTEMA_CONFIG.RAZAS_BASE`.
- * @returns {{clave: string, nombre: string, beneficios: object[], desventajas: object[], sinDesventajas: string}|null}
+ * @returns {{clave: string, nombre: string, beneficios: object[], desventajas: object[], sinDesventajas: string, aMano: object[]}|null}
  */
 export function contextoRasgosRaza(claveRaza) {
   const config = claveRaza ? SISTEMA_CONFIG.RAZAS_BASE[claveRaza] : null;
@@ -461,7 +483,12 @@ export function contextoRasgosRaza(claveRaza) {
     nombre: config.nombre,
     beneficios: config.beneficios ?? [],
     desventajas: config.desventajas ?? [],
-    sinDesventajas: config.sinDesventajas ?? ""
+    sinDesventajas: config.sinDesventajas ?? "",
+    // (v0.13.1) Rasgos con control o estado en juego, para la pestaña Principal de la ficha.
+    aMano: [
+      ...(config.beneficios ?? []).filter(r => r.aMano).map(r => ({ ...r, esDesventaja: false })),
+      ...(config.desventajas ?? []).filter(r => r.aMano).map(r => ({ ...r, esDesventaja: true }))
+    ]
   };
 }
 

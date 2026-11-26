@@ -20,24 +20,28 @@ export const TAMANO_MINIMO_VENTANA = Object.freeze({ width: 340, height: 300 });
  * Recorta un objeto de posición de ApplicationV2 para que quepa en el viewport.
  * Solo toca `width`/`height` numéricos y `left`/`top` si la ventana se saldría.
  * @param {object} position - `options.position` o el resultado de `app.position`.
+ * @param {object} [config]
+ * @param {number} [config.margen=MARGEN_VIEWPORT] - Margen libre (px) respecto a los bordes.
+ *   Al abrir se deja `MARGEN_VIEWPORT`; al redimensionar el navegador se usa 0 para no
+ *   encoger una ventana que el usuario ha llevado a toda la altura (v0.13.1).
  * @returns {object} El mismo objeto `position`, modificado in situ.
  */
-export function ajustarPosicionAPantalla(position) {
+export function ajustarPosicionAPantalla(position, { margen = MARGEN_VIEWPORT } = {}) {
   if (!position) return position;
-  const anchoDisponible = Math.max(TAMANO_MINIMO_VENTANA.width, window.innerWidth - MARGEN_VIEWPORT * 2);
-  const altoDisponible = Math.max(TAMANO_MINIMO_VENTANA.height, window.innerHeight - MARGEN_VIEWPORT * 2);
+  const anchoDisponible = Math.max(TAMANO_MINIMO_VENTANA.width, window.innerWidth - margen * 2);
+  const altoDisponible = Math.max(TAMANO_MINIMO_VENTANA.height, window.innerHeight - margen * 2);
 
   if (Number.isFinite(position.width)) position.width = Math.min(position.width, anchoDisponible);
   if (Number.isFinite(position.height)) position.height = Math.min(position.height, altoDisponible);
 
   // Si la ventana ya tiene coordenadas, se reubica para que no quede fuera de pantalla.
   if (Number.isFinite(position.left) && Number.isFinite(position.width)) {
-    const maxLeft = window.innerWidth - position.width - MARGEN_VIEWPORT;
-    position.left = Math.max(MARGEN_VIEWPORT, Math.min(position.left, maxLeft));
+    const maxLeft = window.innerWidth - position.width - margen;
+    position.left = Math.max(margen, Math.min(position.left, maxLeft));
   }
   if (Number.isFinite(position.top) && Number.isFinite(position.height)) {
-    const maxTop = window.innerHeight - position.height - MARGEN_VIEWPORT;
-    position.top = Math.max(MARGEN_VIEWPORT, Math.min(position.top, maxTop));
+    const maxTop = window.innerHeight - position.height - margen;
+    position.top = Math.max(margen, Math.min(position.top, maxTop));
   }
   return position;
 }
@@ -51,14 +55,66 @@ export function ajustarPosicionAPantalla(position) {
  */
 export function VentanaDinamicaMixin(Base) {
   return class extends Base {
+    /**
+     * (v0.13.1) Acción del menú de la ventana para ocupar toda la altura de la pantalla.
+     * Se fusiona con las `actions` de cada subclase (ApplicationV2 combina los
+     * `DEFAULT_OPTIONS` de toda la cadena de herencia).
+     */
+    static DEFAULT_OPTIONS = {
+      actions: {
+        cydAlturaPantalla: VentanaDinamicaMixinAcciones.alternarAlturaPantalla
+      }
+    };
+
     /** @override */
     _initializeApplicationOptions(options) {
       const opciones = super._initializeApplicationOptions(options);
       ajustarPosicionAPantalla(opciones.position);
       return opciones;
     }
+
+    /**
+     * Añade «Ajustar a la altura de la pantalla» al menú de controles (⋮) de las
+     * ventanas redimensionables del sistema (v0.13.1).
+     * @override
+     */
+    _getHeaderControls() {
+      const controles = super._getHeaderControls();
+      if (this.options.window?.resizable) {
+        controles.push({
+          icon: "fa-solid fa-up-down",
+          label: "Ajustar a la altura de la pantalla",
+          action: "cydAlturaPantalla"
+        });
+      }
+      return controles;
+    }
   };
 }
+
+/**
+ * Manejadores de acciones compartidos por `VentanaDinamicaMixin` (`this` = la aplicación).
+ */
+const VentanaDinamicaMixinAcciones = {
+  /**
+   * Alterna entre la altura completa del área visible del navegador (top 0) y la
+   * posición/altura que tenía la ventana antes de maximizarla. Foundry nunca deja
+   * que una ventana sea más alta que el área visible, así que este es el máximo real.
+   * @this {foundry.applications.api.ApplicationV2}
+   */
+  alternarAlturaPantalla() {
+    const altoPantalla = document.documentElement.clientHeight;
+    const { top, height } = this.position;
+    const yaMaximizada = this._cydAlturaPrevia && (top === 0) && (Math.abs(height - altoPantalla) < 2);
+    if (yaMaximizada) {
+      this.setPosition(this._cydAlturaPrevia);
+      this._cydAlturaPrevia = null;
+      return;
+    }
+    this._cydAlturaPrevia = { top, height };
+    this.setPosition({ top: 0, height: altoPantalla });
+  }
+};
 
 /**
  * Reajusta todas las ventanas abiertas del sistema (`.cartas-y-dados`) al viewport.
@@ -70,7 +126,7 @@ export function registrarReajusteEnResize() {
       if (!app.rendered || !app.options?.classes?.includes("cartas-y-dados")) continue;
       if (app.minimized) continue;
       const { width, height, left, top } = app.position;
-      const nueva = ajustarPosicionAPantalla({ width, height, left, top });
+      const nueva = ajustarPosicionAPantalla({ width, height, left, top }, { margen: 0 });
       if (nueva.width !== width || nueva.height !== height || nueva.left !== left || nueva.top !== top) {
         app.setPosition(nueva);
       }

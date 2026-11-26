@@ -633,3 +633,273 @@ label.cyd-recurso-caja {
 .cyd-rasgo-auto i {
   color: var(--cyd-azul);
 }
+
+/* ======================================================================== */
+/*  PESTAÑAS DE LA FICHA DE PERSONAJE (v0.13.1)                              */
+/* ======================================================================== */
+
+/* La navegación usa el estilo nativo `nav.tabs` de Foundry; solo se ajusta el espaciado */
+.cartas-y-dados nav.cyd-pestanas {
+  flex: 0 0 auto;
+  margin: 2px 0 6px;
+}
+
+.cartas-y-dados nav.cyd-pestanas [data-tab] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Foundry oculta `.tab:not(.active)` en una capa CSS: el display propio solo
+   se aplica a la pestaña activa para no anular ese ocultado. */
+.cyd-pestana-raza.active {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* En la pestaña Raza los textos se leen enteros con el scroll de la ficha */
+.cyd-lista-rasgos.cyd-lista-rasgos-completa {
+  max-height: none;
+  overflow: visible;
+}
+
+.cyd-texto-multilinea {
+  white-space: pre-line;
+}
+
+/* ======================================================================== */
+/*  RASGOS RACIALES A MANO (pestaña Principal, v0.13.1)                      */
+/* ======================================================================== */
+
+.cyd-rasgos-a-mano .cyd-lista-rasgos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 4px 12px;
+}
+
+.cyd-rasgos-a-mano .cyd-rasgo {
+  margin: 0;
+}
+
+.cyd-rasgos-a-mano .cyd-rasgo-cabecera strong {
+  cursor: help;
+}
+
+.cyd-rasgo-tipo {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cyd-texto-tenue);
+}
+
+.cyd-enlace-pestana {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--cyd-texto-tenue);
+  cursor: pointer;
+}
+
+.cyd-enlace-pestana:hover {
+  color: var(--cyd-oro);
+}
+
+/* ======================================================================== */
+/*  BARRA LATERAL: RECURSOS Y MOVIMIENTO (v0.13.1)                           */
+/* ======================================================================== */
+
+/* Recursos (Salud, Defensa, Mano Máx.) y Movimiento/Tamaño apilados sobre y bajo
+   las Características; la rejilla adaptable los pone en una columna con el ancho
+   del sidebar y los reparte en fila cuando la ficha es estrecha (< 640px). */
+.cyd-sidebar-atributos .cyd-recursos-vitales {
+  margin-bottom: 4px;
+}
+
+.cyd-sidebar-atributos .cyd-panel-movimiento-tamano {
+  margin-top: 4px;
+}
+
+.cyd-sidebar-atributos .cyd-panel-movimiento-tamano select {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ======================================================================== */
+/*  BARRA LATERAL COMPACTA DE LA FICHA DE PJ (v0.13.1)                       */
+/*  Recursos, Características y Movimiento/Tamaño en rejillas de 2 columnas. */
+/* ======================================================================== */
+
+.cyd-layout-dos-columnas.cyd-layout-sidebar-compacta {
+  grid-template-columns: minmax(176px, 196px) minmax(0, 1fr);
+}
+
+.cyd-sidebar-compacta {
+  gap: 5px;
+}
+
+.cyd-rejilla-sidebar {
+  --cyd-sb-cols: 2;
+  display: grid;
+  grid-template-columns: repeat(var(--cyd-sb-cols), minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cyd-rejilla-sidebar > .cyd-ocupa-fila {
+  grid-column: 1 / -1;
+}
+
+.cyd-sidebar-compacta .cyd-cabecera-seccion {
+  padding-bottom: 2px;
+}
+
+.cyd-sidebar-compacta .cyd-cabecera-seccion h3 {
+  font-size: 0.85rem;
+}
+
+/* Cajas de recurso compactas */
+.cyd-sidebar-compacta .cyd-recurso-caja {
+  gap: 2px;
+  padding: 3px 6px;
+}
+
+.cyd-sidebar-compacta .cyd-recurso-titulo {
+  font-size: 0.7rem;
+}
+
+.cyd-sidebar-compacta .cyd-recurso-inputs {
+  gap: 3px;
+}
+
+.cyd-sidebar-compacta .cyd-valor-grande {
+  font-size: 0.98rem;
+}
+
+.cartas-y-dados .window-content .cyd-sidebar-compacta .cyd-recurso-inputs input[type="number"],
+.cartas-y-dados .window-content .cyd-sidebar-compacta .cyd-atributo-fila-valores input[type="number"] {
+  width: 34px;
+  height: 24px;
+  padding: 0 2px;
+}
+
+.cartas-y-dados .window-content .cyd-sidebar-compacta .cyd-recurso-caja > select {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 2px;
+  font-size: 0.8rem;
+}
+
+/* Tarjetas de Característica compactas (rejilla 2×2) */
+.cyd-sidebar-compacta .cyd-atributo-tarjeta {
+  gap: 3px;
+  padding: 4px 6px;
+  min-width: 0;
+}
+
+.cyd-sidebar-compacta .cyd-atributo-cabecera {
+  gap: 5px;
+}
+
+.cyd-sidebar-compacta .cyd-atributo-nombre {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+
+.cyd-sidebar-compacta .cyd-atributo-fila-valores {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.cyd-sidebar-compacta .cyd-atributo-total {
+  gap: 3px;
+  font-size: 0.95rem;
+}
+
+/* Ficha estrecha (< 640px): la columna lateral pasa arriba a todo el ancho y
+   las rejillas se abren en fila (Recursos 3, Características 4). */
+@container cyd-hoja (max-width: 640px) {
+  .cyd-layout-dos-columnas.cyd-layout-sidebar-compacta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cyd-sidebar-atributos.cyd-sidebar-compacta {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cyd-rejilla-recursos {
+    --cyd-sb-cols: 3;
+  }
+
+  .cyd-rejilla-recursos > .cyd-ocupa-fila {
+    grid-column: auto;
+  }
+
+  .cyd-rejilla-caracteristicas {
+    --cyd-sb-cols: 4;
+  }
+}
+
+/* Muy estrecha (< 440px): Características vuelven a 2×2 */
+@container cyd-hoja (max-width: 440px) {
+  .cyd-rejilla-caracteristicas {
+    --cyd-sb-cols: 2;
+  }
+}
+
+/* ======================================================================== */
+/*  BARRA DE SALUD (v0.13.1)                                                 */
+/*  `<meter>` bajo el valor de Salud: verde > 50 %, naranja ≤ 50 %, rojo     */
+/*  < 25 % (clase calculada en `contextoBarraSalud`, config.mjs).            */
+/* ======================================================================== */
+
+.cyd-barra-salud {
+  --cyd-salud-color: var(--cyd-exito);
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 2px;
+  border: none;
+  border-radius: 3px;
+  background: var(--cyd-borde-suave);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.cyd-barra-salud.cyd-salud-media {
+  --cyd-salud-color: var(--color-level-warning, #ee9b3a);
+}
+
+.cyd-barra-salud.cyd-salud-baja {
+  --cyd-salud-color: var(--color-level-error, #d63031);
+}
+
+/* Chromium (Electron / navegadores Blink) */
+.cyd-barra-salud::-webkit-meter-bar {
+  height: 6px;
+  border: none;
+  border-radius: 3px;
+  background: var(--cyd-borde-suave);
+}
+
+.cyd-barra-salud::-webkit-meter-optimum-value,
+.cyd-barra-salud::-webkit-meter-suboptimum-value,
+.cyd-barra-salud::-webkit-meter-even-less-good-value {
+  border-radius: 3px;
+  background: var(--cyd-salud-color);
+  transition: inline-size 0.2s ease;
+}
+
+/* Firefox */
+.cyd-barra-salud::-moz-meter-bar {
+  border-radius: 3px;
+  background: var(--cyd-salud-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cyd-barra-salud::-webkit-meter-optimum-value {
+    transition: none;
+  }
+}

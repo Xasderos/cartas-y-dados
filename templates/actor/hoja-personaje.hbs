@@ -64,96 +64,44 @@
     </div>
   </header>
 
+  {{!-- Pestañas (v0.13.1): navegación nativa de ApplicationV2 (`static TABS`, acción "tab") --}}
+  <nav class="sheet-tabs tabs cyd-pestanas" aria-roledescription="Pestañas de la ficha">
+    <a data-action="tab" data-group="primary" data-tab="principal" class="{{tabs.principal.cssClass}}"><i class="fa-solid fa-id-card" inert></i> <span>Principal</span></a>
+    <a data-action="tab" data-group="primary" data-tab="raza" class="{{tabs.raza.cssClass}}"><i class="fa-solid fa-dna" inert></i> <span>Raza</span></a>
+  </nav>
+
+
   <main class="cyd-cuerpo-hoja">
 
+  <section class="tab cyd-pestana-principal {{tabs.principal.cssClass}}" data-group="primary" data-tab="principal">
   {{!-- ================= 2. LAYOUT DOS COLUMNAS: ATRIBUTOS IZQUIERDA | CONTENIDO DERECHA ================= --}}
-  <div class="cyd-layout-dos-columnas">
+  <div class="cyd-layout-dos-columnas cyd-layout-sidebar-compacta">
 
-    {{!-- COLUMNA IZQUIERDA: CARACTERÍSTICAS ================= --}}
-    <aside class="cyd-sidebar-atributos">
-      <div class="cyd-cabecera-seccion">
-        <h3><i class="fa-solid fa-star-of-life"></i> Características</h3>
-      </div>
-
-      <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.fisico}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.fisico}}">
-        <div class="cyd-atributo-cabecera">
-          <span class="cyd-atributo-sello"><i class="fa-solid fa-hand-fist"></i></span>
-          <span class="cyd-atributo-nombre">Físico</span>
-          <span class="cyd-atributo-abrev">FISC</span>
-        </div>
-        <div class="cyd-atributo-fila-valores">
-          <span class="cyd-mini-etiqueta">Base</span>
-          <input type="number" name="system.caracteristicas.fisico" value="{{system.caracteristicas.fisico}}" min="1" max="10" title="Valor Base" />
-          <span class="cyd-atributo-total" title="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.fisico}}</span>
-        </div>
-      </div>
-
-      <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.consciencia}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.consciencia}}">
-        <div class="cyd-atributo-cabecera">
-          <span class="cyd-atributo-sello"><i class="fa-solid fa-eye"></i></span>
-          <span class="cyd-atributo-nombre">Consciencia</span>
-          <span class="cyd-atributo-abrev">CONS</span>
-        </div>
-        <div class="cyd-atributo-fila-valores">
-          <span class="cyd-mini-etiqueta">Base</span>
-          <input type="number" name="system.caracteristicas.consciencia" value="{{system.caracteristicas.consciencia}}" min="1" max="10" title="Valor Base" />
-          <span class="cyd-atributo-total" title="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.consciencia}}</span>
-        </div>
-      </div>
-
-      <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.social}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.social}}">
-        <div class="cyd-atributo-cabecera">
-          <span class="cyd-atributo-sello"><i class="fa-solid fa-masks-theater"></i></span>
-          <span class="cyd-atributo-nombre">Social</span>
-          <span class="cyd-atributo-abrev">SOC</span>
-        </div>
-        <div class="cyd-atributo-fila-valores">
-          <span class="cyd-mini-etiqueta">Base</span>
-          <input type="number" name="system.caracteristicas.social" value="{{system.caracteristicas.social}}" min="1" max="10" title="Valor Base" />
-          <span class="cyd-atributo-total" title="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.social}}</span>
-        </div>
-      </div>
-
-      <div class="cyd-atributo-tarjeta" data-tooltip="Base: {{system.caracteristicas.misticismo}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.misticismo}}">
-        <div class="cyd-atributo-cabecera">
-          <span class="cyd-atributo-sello"><i class="fa-solid fa-moon"></i></span>
-          <span class="cyd-atributo-nombre">Misticismo</span>
-          <span class="cyd-atributo-abrev">MIST</span>
-        </div>
-        <div class="cyd-atributo-fila-valores">
-          <span class="cyd-mini-etiqueta">Base</span>
-          <input type="number" name="system.caracteristicas.misticismo" value="{{system.caracteristicas.misticismo}}" min="1" max="10" title="Valor Base" />
-          <span class="cyd-atributo-total" title="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.misticismo}}</span>
-        </div>
-      </div>
-    </aside>
-
-    {{!-- COLUMNA DERECHA: RECURSOS, MOVIMIENTO, PILAS, CARTAS, EQUIPO ================= --}}
-    <section class="cyd-contenido-derecha">
-
-      {{!-- Recursos vitales ================= --}}
-      <div class="cyd-recursos-barra cyd-recursos-vitales cyd-cols-3">
-        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.saludMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base: {{system.salud.max}} | Físico: +{{system.salud.bonoFisico}} | Otros: +{{system.salud.bonoOtros}}{{#if system.agotamiento.efectos.saludMitad}} | Agotamiento: {{system.salud.maxSinAgotamiento}} ÷ 2{{/if}} | Total: {{system.salud.maxTotal}}">
+    {{!-- COLUMNA IZQUIERDA: RECURSOS, CARACTERÍSTICAS Y MOVIMIENTO ================= --}}
+    <aside class="cyd-sidebar-atributos cyd-sidebar-compacta">
+      {{!-- Recursos vitales (v0.13.1: rejilla compacta encima de las Características; Salud ocupa la fila) ================= --}}
+      <div class="cyd-rejilla-sidebar cyd-rejilla-recursos cyd-recursos-vitales">
+        <div class="cyd-recurso-caja cyd-ocupa-fila{{#if system.agotamiento.efectos.saludMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base: {{system.salud.max}} | Físico: +{{system.salud.bonoFisico}} | Otros: +{{system.salud.bonoOtros}}{{#if system.agotamiento.efectos.saludMitad}} | Agotamiento: {{system.salud.maxSinAgotamiento}} ÷ 2{{/if}} | Total: {{system.salud.maxTotal}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart-pulse"></i> Salud</span>
           <div class="cyd-recurso-inputs">
-            <input type="number" name="system.salud.value" value="{{system.salud.value}}" />
+            <input type="number" name="system.salud.value" value="{{system.salud.value}}" aria-label="Salud actual" />
             <span class="cyd-valor-sep">/</span>
             <span class="cyd-valor-grande">{{system.salud.maxTotal}}</span>{{#if system.agotamiento.efectos.saludMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
           </div>
+          <meter class="cyd-barra-salud {{barraSalud.estado}}" min="0" max="{{barraSalud.maximo}}" value="{{barraSalud.valor}}" aria-label="Salud" data-tooltip="Salud: {{barraSalud.valor}} / {{barraSalud.maximo}} ({{barraSalud.porcentaje}} %)"></meter>
         </div>
 
         <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo/Raza: +{{system.bonificadorDefensa}}{{#if system.bonoDefensaRaza}} (Rasgo racial: +{{system.bonoDefensaRaza}}){{/if}} | Total: {{system.defensaTotal}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Defensa</span>
           <div class="cyd-recurso-inputs">
-            <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" />
+            <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" aria-label="Defensa base" />
             <span class="cyd-valor-sep">→</span>
             <span class="cyd-valor-grande">{{system.defensaTotal}}</span>
           </div>
         </div>
 
-
-        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.manoMitad}} cyd-afectado-agotamiento{{/if}}{{#if system.manoMitadPorSangreFria}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base: {{system.manoConfig.base}} | Nivel Clase: +{{system.manoConfig.bonificadorClase}} | Raza/Origen/Equipo: +{{system.manoConfig.bonificadorObjetos}}{{#if system.agotamiento.efectos.manoMitad}} | Agotamiento: {{system.limiteManoSinAgotamiento}} ÷ 2{{/if}}{{#if system.manoMitadPorSangreFria}} | Sangre fría: ÷ 2{{/if}}">
-          <span class="cyd-recurso-titulo"><i class="fa-solid fa-hand"></i> Mano Máx.</span>
+        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.manoMitad}} cyd-afectado-agotamiento{{/if}}{{#if system.manoMitadPorSangreFria}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Mano Máx. · Base: {{system.manoConfig.base}} | Nivel Clase: +{{system.manoConfig.bonificadorClase}} | Raza/Origen/Equipo: +{{system.manoConfig.bonificadorObjetos}}{{#if system.agotamiento.efectos.manoMitad}} | Agotamiento: {{system.limiteManoSinAgotamiento}} ÷ 2{{/if}}{{#if system.manoMitadPorSangreFria}} | Sangre fría: ÷ 2{{/if}}">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-hand"></i> Mano</span>
           <div class="cyd-recurso-inputs">
             <span class="cyd-valor-grande">{{#if contadoresPilas}}{{contadoresPilas.manoActual}}{{else}}0{{/if}}</span>
             <span class="cyd-valor-sep">/</span>
@@ -161,6 +109,82 @@
           </div>
         </div>
       </div>
+
+      {{!-- Características en rejilla 2×2 (abreviatura visible; nombre completo y desglose en el tooltip) --}}
+      <div class="cyd-cabecera-seccion">
+        <h3><i class="fa-solid fa-star-of-life"></i> Características</h3>
+      </div>
+      <div class="cyd-rejilla-sidebar cyd-rejilla-caracteristicas">
+        <div class="cyd-atributo-tarjeta" data-tooltip="Físico · Base: {{system.caracteristicas.fisico}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.fisico}} | Dados: {{system.caracteristicasTotales.fisico}}">
+          <div class="cyd-atributo-cabecera">
+            <span class="cyd-atributo-sello"><i class="fa-solid fa-hand-fist"></i></span>
+            <span class="cyd-atributo-nombre">FISC</span>
+          </div>
+          <div class="cyd-atributo-fila-valores">
+            <input type="number" name="system.caracteristicas.fisico" value="{{system.caracteristicas.fisico}}" min="1" max="10" aria-label="Físico base" />
+            <span class="cyd-atributo-total" aria-label="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.fisico}}</span>
+          </div>
+        </div>
+
+        <div class="cyd-atributo-tarjeta" data-tooltip="Consciencia · Base: {{system.caracteristicas.consciencia}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.consciencia}} | Dados: {{system.caracteristicasTotales.consciencia}}">
+          <div class="cyd-atributo-cabecera">
+            <span class="cyd-atributo-sello"><i class="fa-solid fa-eye"></i></span>
+            <span class="cyd-atributo-nombre">CONS</span>
+          </div>
+          <div class="cyd-atributo-fila-valores">
+            <input type="number" name="system.caracteristicas.consciencia" value="{{system.caracteristicas.consciencia}}" min="1" max="10" aria-label="Consciencia base" />
+            <span class="cyd-atributo-total" aria-label="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.consciencia}}</span>
+          </div>
+        </div>
+
+        <div class="cyd-atributo-tarjeta" data-tooltip="Social · Base: {{system.caracteristicas.social}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.social}} | Dados: {{system.caracteristicasTotales.social}}">
+          <div class="cyd-atributo-cabecera">
+            <span class="cyd-atributo-sello"><i class="fa-solid fa-masks-theater"></i></span>
+            <span class="cyd-atributo-nombre">SOC</span>
+          </div>
+          <div class="cyd-atributo-fila-valores">
+            <input type="number" name="system.caracteristicas.social" value="{{system.caracteristicas.social}}" min="1" max="10" aria-label="Social base" />
+            <span class="cyd-atributo-total" aria-label="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.social}}</span>
+          </div>
+        </div>
+
+        <div class="cyd-atributo-tarjeta" data-tooltip="Misticismo · Base: {{system.caracteristicas.misticismo}} | Bono Raza/Origen/Equipo: {{system.bonificadoresCaracteristicas.misticismo}} | Dados: {{system.caracteristicasTotales.misticismo}}">
+          <div class="cyd-atributo-cabecera">
+            <span class="cyd-atributo-sello"><i class="fa-solid fa-moon"></i></span>
+            <span class="cyd-atributo-nombre">MIST</span>
+          </div>
+          <div class="cyd-atributo-fila-valores">
+            <input type="number" name="system.caracteristicas.misticismo" value="{{system.caracteristicas.misticismo}}" min="1" max="10" aria-label="Misticismo base" />
+            <span class="cyd-atributo-total" aria-label="Dados totales a lanzar"><i class="fa-solid fa-dice-d20"></i>{{system.caracteristicasTotales.misticismo}}</span>
+          </div>
+        </div>
+      </div>
+
+      {{!-- ================= MOVIMIENTO Y TAMAÑO (v0.13.1: fila compacta bajo las Características) ================= --}}
+      <div class="cyd-rejilla-sidebar cyd-rejilla-movimiento">
+        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.velocidadMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Movimiento · Base editable / Total. Total = Base + (Físico Total × 5) metros{{#if system.agotamiento.efectos.velocidadMitad}} | Agotamiento: {{system.movimiento.maxSinAgotamiento}} ÷ 2{{/if}}">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-person-running"></i> Mov. (m)</span>
+          <div class="cyd-recurso-inputs">
+            <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" aria-label="Movimiento base" />
+            <span class="cyd-valor-sep">/</span>
+            <span class="cyd-valor-grande">{{system.movimiento.max}}</span>{{#if system.agotamiento.efectos.velocidadMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
+          </div>
+        </div>
+        <div class="cyd-recurso-caja" data-tooltip="Categoría de tamaño de la criatura">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-ruler-vertical"></i> Tamaño</span>
+          <select name="system.categoriaTamano" aria-label="Tamaño">
+            <option value="Diminuto" {{#if (eq system.categoriaTamano "Diminuto")}}selected{{/if}}>Diminuto</option>
+            <option value="Pequeño" {{#if (eq system.categoriaTamano "Pequeño")}}selected{{/if}}>Pequeño</option>
+            <option value="Mediano" {{#if (eq system.categoriaTamano "Mediano")}}selected{{/if}}>Mediano</option>
+            <option value="Grande" {{#if (eq system.categoriaTamano "Grande")}}selected{{/if}}>Grande</option>
+            <option value="Enorme" {{#if (eq system.categoriaTamano "Enorme")}}selected{{/if}}>Enorme</option>
+          </select>
+        </div>
+      </div>
+    </aside>
+
+    {{!-- COLUMNA DERECHA: AGOTAMIENTO, RASGOS A MANO, PILAS, CARTAS, EQUIPO ================= --}}
+    <section class="cyd-contenido-derecha">
 
       {{!-- Agotamiento (v0.12.0): barra de 8 segmentos (clic para fijar el nivel) y consecuencias en vigor ================= --}}
       <section class="cyd-panel cyd-panel-agotamiento{{#if agotamiento.muerto}} cyd-muerto{{/if}}">
@@ -185,97 +209,50 @@
         {{/if}}
       </section>
 
-      {{!-- ================= 3. MOVIMIENTO Y TAMAÑO ================= --}}
-      <section class="cyd-panel cyd-panel-movimiento-tamano">
-        <div class="cyd-cabecera-seccion">
-          <h3><i class="fa-solid fa-shoe-prints"></i> Movimiento y Tamaño</h3>
-        </div>
-        <div class="cyd-recursos-barra cyd-cols-2">
-          <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.velocidadMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base de Movimiento editable en esta ficha. El Total se calcula automáticamente: Base + (Físico Total × 5) metros{{#if system.agotamiento.efectos.velocidadMitad}} | Agotamiento: {{system.movimiento.maxSinAgotamiento}} ÷ 2{{/if}}">
-            <span class="cyd-recurso-titulo"><i class="fa-solid fa-person-running"></i> Movimiento · Base / Total</span>
-            <div class="cyd-recurso-inputs">
-              <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" />
-              <span class="cyd-valor-sep">/</span>
-              <span class="cyd-valor-grande">{{system.movimiento.max}}</span>{{#if system.agotamiento.efectos.velocidadMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
-              <span class="cyd-unidad">m</span>
-            </div>
-          </div>
-          <div class="cyd-recurso-caja" data-tooltip="Categoría de tamaño de la criatura">
-            <span class="cyd-recurso-titulo"><i class="fa-solid fa-ruler-vertical"></i> Tamaño</span>
-            <select name="system.categoriaTamano">
-              <option value="Diminuto" {{#if (eq system.categoriaTamano "Diminuto")}}selected{{/if}}>Diminuto</option>
-              <option value="Pequeño" {{#if (eq system.categoriaTamano "Pequeño")}}selected{{/if}}>Pequeño</option>
-              <option value="Mediano" {{#if (eq system.categoriaTamano "Mediano")}}selected{{/if}}>Mediano</option>
-              <option value="Grande" {{#if (eq system.categoriaTamano "Grande")}}selected{{/if}}>Grande</option>
-              <option value="Enorme" {{#if (eq system.categoriaTamano "Enorme")}}selected{{/if}}>Enorme</option>
-            </select>
-          </div>
-        </div>
-      </section>
-
-      {{!-- ================= 3b. RASGOS RACIALES (v0.13.0) ================= --}}
-      {{#if rasgosRaza}}
-      <section class="cyd-panel cyd-panel-rasgos-raza">
+      {{!-- ================= 3. RASGOS RACIALES A MANO (v0.13.1) =================
+           Solo los rasgos con control o estado en juego (`aMano` en RAZAS_BASE); los
+           textos completos están en la pestaña Raza. --}}
+      {{#if rasgosRaza.aMano.length}}
+      <section class="cyd-panel cyd-panel-rasgos-raza cyd-rasgos-a-mano">
         <div class="cyd-cabecera-seccion">
           <h3><i class="fa-solid fa-dna"></i> Rasgos Raciales · {{rasgosRaza.nombre}}</h3>
+          <a class="cyd-enlace-pestana" data-action="tab" data-group="primary" data-tab="raza" data-tooltip="Ver todos los rasgos de la raza"><i class="fa-solid fa-book-open" inert></i> Ver todos</a>
         </div>
-        <div class="cyd-dos-columnas cyd-rasgos-columnas">
-          <div class="cyd-rasgos-grupo">
-            <h4><i class="fa-solid fa-circle-plus"></i> Beneficios</h4>
-            <ul class="cyd-lista-rasgos">
-              {{#each rasgosRaza.beneficios as |rasgo|}}
-                <li class="cyd-rasgo">
-                  <div class="cyd-rasgo-cabecera">
-                    <strong data-tooltip="{{rasgo.texto}}" data-tooltip-class="cyd-tooltip"><i class="fa-solid {{rasgo.icono}}"></i> {{rasgo.nombre}}</strong>
-                    {{#if (eq rasgo.clave "esperaUnMomento")}}
-                      <label class="cyd-rasgo-control" data-tooltip="Se recarga al descansar. Úsalo desde el botón de tus tiradas en el chat.">
-                        <input type="checkbox" name="system.rasgosRaza.esperaUnMomentoUsado" {{checked @root.system.rasgosRaza.esperaUnMomentoUsado}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Usado
-                      </label>
-                    {{/if}}
-                    {{#if (eq rasgo.clave "tradicionAlquimica")}}
-                      {{#if @root.esPropietario}}
-                        <button type="button" class="cyd-btn-mini" data-action="usarAlquimia" {{#if @root.system.rasgosRaza.alquimiaUsada}}disabled{{/if}} data-tooltip="Cura {{@root.system.nivelEfectivo}} de Salud a ti o al objetivo marcado (T)"><i class="fa-solid fa-flask"></i> Preparar</button>
-                      {{/if}}
-                      <label class="cyd-rasgo-control" data-tooltip="Se recarga con un descanso cómodo (1 vez al día).">
-                        <input type="checkbox" name="system.rasgosRaza.alquimiaUsada" {{checked @root.system.rasgosRaza.alquimiaUsada}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Usado hoy
-                      </label>
-                    {{/if}}
-                    {{#if (eq rasgo.clave "queMeDaAlgo")}}
-                      {{#if @root.system.queMeDaAlgoActivo}}
-                        <span class="cyd-rasgo-estado cyd-activo"><i class="fa-solid fa-circle-check"></i> Activo</span>
-                      {{else}}
-                        <span class="cyd-rasgo-estado">Inactivo</span>
-                      {{/if}}
-                    {{/if}}
-                  </div>
-                  <p class="cyd-rasgo-texto">{{rasgo.texto}}</p>
-                  {{#if rasgo.auto}}<p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{rasgo.auto}}</p>{{/if}}
-                </li>
-              {{/each}}
-            </ul>
-          </div>
-          <div class="cyd-rasgos-grupo">
-            <h4><i class="fa-solid fa-circle-minus"></i> Desventajas</h4>
-            <ul class="cyd-lista-rasgos">
-              {{#each rasgosRaza.desventajas as |rasgo|}}
-                <li class="cyd-rasgo">
-                  <div class="cyd-rasgo-cabecera">
-                    <strong data-tooltip="{{rasgo.texto}}" data-tooltip-class="cyd-tooltip"><i class="fa-solid {{rasgo.icono}}"></i> {{rasgo.nombre}}</strong>
-                    {{#if (eq rasgo.clave "sangreFria")}}
-                      <label class="cyd-rasgo-control" data-tooltip="Mientras esté activo, la Mano Máx. se reduce a la mitad.">
-                        <input type="checkbox" name="system.rasgosRaza.expuestoElementos" {{checked @root.system.rasgosRaza.expuestoElementos}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Expuesta a los elementos
-                      </label>
-                    {{/if}}
-                  </div>
-                  <p class="cyd-rasgo-texto">{{rasgo.texto}}</p>
-                  {{#if rasgo.auto}}<p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{rasgo.auto}}</p>{{/if}}
-                </li>
-              {{else}}
-                <li class="cyd-rasgo"><p class="cyd-rasgo-texto">{{rasgosRaza.sinDesventajas}}</p></li>
-              {{/each}}
-            </ul>
-          </div>
-        </div>
+        <ul class="cyd-lista-rasgos">
+          {{#each rasgosRaza.aMano as |rasgo|}}
+            <li class="cyd-rasgo">
+              <div class="cyd-rasgo-cabecera">
+                <strong data-tooltip="{{rasgo.texto}}{{#if rasgo.auto}}<br><em>{{rasgo.auto}}</em>{{/if}}" data-tooltip-class="cyd-tooltip"><i class="fa-solid {{rasgo.icono}}"></i> {{rasgo.nombre}}</strong>
+                <span class="cyd-rasgo-tipo">{{#if rasgo.esDesventaja}}Desventaja{{else}}Beneficio{{/if}}</span>
+                {{#if (eq rasgo.clave "esperaUnMomento")}}
+                  <label class="cyd-rasgo-control" data-tooltip="Se recarga al descansar. Úsalo desde el botón de tus tiradas en el chat.">
+                    <input type="checkbox" name="system.rasgosRaza.esperaUnMomentoUsado" {{checked @root.system.rasgosRaza.esperaUnMomentoUsado}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Usado
+                  </label>
+                {{/if}}
+                {{#if (eq rasgo.clave "tradicionAlquimica")}}
+                  {{#if @root.esPropietario}}
+                    <button type="button" class="cyd-btn-mini" data-action="usarAlquimia" {{#if @root.system.rasgosRaza.alquimiaUsada}}disabled{{/if}} data-tooltip="Cura {{@root.system.nivelEfectivo}} de Salud a ti o al objetivo marcado (T)"><i class="fa-solid fa-flask"></i> Preparar</button>
+                  {{/if}}
+                  <label class="cyd-rasgo-control" data-tooltip="Se recarga con un descanso cómodo (1 vez al día).">
+                    <input type="checkbox" name="system.rasgosRaza.alquimiaUsada" {{checked @root.system.rasgosRaza.alquimiaUsada}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Usado hoy
+                  </label>
+                {{/if}}
+                {{#if (eq rasgo.clave "queMeDaAlgo")}}
+                  {{#if @root.system.queMeDaAlgoActivo}}
+                    <span class="cyd-rasgo-estado cyd-activo"><i class="fa-solid fa-circle-check"></i> Activo</span>
+                  {{else}}
+                    <span class="cyd-rasgo-estado">Inactivo</span>
+                  {{/if}}
+                {{/if}}
+                {{#if (eq rasgo.clave "sangreFria")}}
+                  <label class="cyd-rasgo-control" data-tooltip="Mientras esté activo, la Mano Máx. se reduce a la mitad.">
+                    <input type="checkbox" name="system.rasgosRaza.expuestoElementos" {{checked @root.system.rasgosRaza.expuestoElementos}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Expuesta a los elementos
+                  </label>
+                {{/if}}
+              </div>
+            </li>
+          {{/each}}
+        </ul>
       </section>
       {{/if}}
 
@@ -510,6 +487,64 @@
     </section>
 
   </div>
+  </section>
+
+  {{!-- ================= PESTAÑA RAZA (v0.13.1): descripción completa de los rasgos raciales =================
+       Sin controles editables: los rasgos activables están en la pestaña Principal
+       (evita inputs duplicados con el mismo `name` en el formulario). --}}
+  <section class="tab cyd-pestana-raza {{tabs.raza.cssClass}}" data-group="primary" data-tab="raza">
+    {{#if rasgosRaza}}
+      <section class="cyd-panel cyd-panel-rasgos-raza">
+        <div class="cyd-cabecera-seccion">
+          <h3><i class="fa-solid fa-dna"></i> Rasgos Raciales · {{rasgosRaza.nombre}}</h3>
+        </div>
+        <div class="cyd-dos-columnas cyd-rasgos-columnas">
+          <div class="cyd-rasgos-grupo">
+            <h4><i class="fa-solid fa-circle-plus"></i> Beneficios</h4>
+            <ul class="cyd-lista-rasgos cyd-lista-rasgos-completa">
+              {{#each rasgosRaza.beneficios as |rasgo|}}
+                <li class="cyd-rasgo">
+                  <div class="cyd-rasgo-cabecera">
+                    <strong><i class="fa-solid {{rasgo.icono}}"></i> {{rasgo.nombre}}</strong>
+                    {{#if rasgo.aMano}}<span class="cyd-rasgo-tipo" data-tooltip="Su control está en la pestaña Principal"><i class="fa-solid fa-thumbtack"></i> En Principal</span>{{/if}}
+                  </div>
+                  <p class="cyd-rasgo-texto">{{rasgo.texto}}</p>
+                  {{#if rasgo.auto}}<p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{rasgo.auto}}</p>{{/if}}
+                </li>
+              {{/each}}
+            </ul>
+          </div>
+          <div class="cyd-rasgos-grupo">
+            <h4><i class="fa-solid fa-circle-minus"></i> Desventajas</h4>
+            <ul class="cyd-lista-rasgos cyd-lista-rasgos-completa">
+              {{#each rasgosRaza.desventajas as |rasgo|}}
+                <li class="cyd-rasgo">
+                  <div class="cyd-rasgo-cabecera">
+                    <strong><i class="fa-solid {{rasgo.icono}}"></i> {{rasgo.nombre}}</strong>
+                    {{#if rasgo.aMano}}<span class="cyd-rasgo-tipo" data-tooltip="Su control está en la pestaña Principal"><i class="fa-solid fa-thumbtack"></i> En Principal</span>{{/if}}
+                  </div>
+                  <p class="cyd-rasgo-texto">{{rasgo.texto}}</p>
+                  {{#if rasgo.auto}}<p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{rasgo.auto}}</p>{{/if}}
+                </li>
+              {{else}}
+                <li class="cyd-rasgo"><p class="cyd-rasgo-texto">{{rasgosRaza.sinDesventajas}}</p></li>
+              {{/each}}
+            </ul>
+          </div>
+        </div>
+      </section>
+    {{else}}
+      <p class="cyd-texto-vacio">Este personaje no tiene una Raza base. Elígela en la ranura Raza de la cabecera o con el Asistente de Clase.</p>
+    {{/if}}
+    {{#if itemRaza.system.descripcion}}
+      <section class="cyd-panel">
+        <div class="cyd-cabecera-seccion">
+          <h3><i class="fa-solid fa-feather-pointed"></i> Descripción · {{itemRaza.name}}</h3>
+        </div>
+        <p class="cyd-rasgo-texto cyd-texto-multilinea">{{itemRaza.system.descripcion}}</p>
+      </section>
+    {{/if}}
+  </section>
 
   </main>
 </div>

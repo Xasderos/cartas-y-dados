@@ -7,7 +7,7 @@
 import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 
-import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoRasgosRaza } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud, contextoRasgosRaza } from "../config.mjs";
 import { preguntarTipoDescanso } from "../documents/actor.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -20,7 +20,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     classes: ["cartas-y-dados", "sheet", "actor"],
     position: {
       width: 860,
-      height: 820
+      height: 1000
     },
     tag: "form",
     form: {
@@ -51,6 +51,24 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       usarHabilidad: HojaPersonajeActor.#onUsarHabilidad,
       subirNivel: HojaPersonajeActor.#onSubirNivel,
       usarAlquimia: HojaPersonajeActor.#onUsarAlquimia
+    }
+  };
+
+  /**
+   * Pestañas de la ficha (v0.13.1). Navegación nativa de ApplicationV2: la plantilla
+   * usa `data-action="tab"` y `.tab[data-group="primary"]`; `context.tabs` lo prepara
+   * `ApplicationV2#_prepareContext` (una sola agrupación de pestañas).
+   * - `principal`: recursos, características, agotamiento, rasgos a mano, cartas y equipo.
+   * - `raza`: descripción completa de los rasgos raciales.
+   * @override
+   */
+  static TABS = {
+    primary: {
+      tabs: [
+        { id: "principal", icon: "fa-solid fa-id-card", label: "Principal" },
+        { id: "raza", icon: "fa-solid fa-dna", label: "Raza" }
+      ],
+      initial: "principal"
     }
   };
 
@@ -141,10 +159,12 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
 
     return {
       ...context,
+      tabs: context.tabs ?? this._prepareTabs("primary"),
       actor,
       system,
       esPropietario: actor.isOwner,
       agotamiento: contextoAgotamiento(system.cansancio?.value),
+      barraSalud: contextoBarraSalud(system.salud?.value, system.salud?.maxTotal),
       rasgosRaza: contextoRasgosRaza(system.razaBase),
       pilasInicializadas,
       contadoresPilas,

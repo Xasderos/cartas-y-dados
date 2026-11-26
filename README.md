@@ -4,7 +4,7 @@
 
 A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal card decks with dice rolls. No external modules required.
 
-**Current version:** 0.13.0 (beta)
+**Current version:** 0.13.1 (beta)
 
 ## How it plays
 - **Card + Dice (`XdY`):** a card's **suit** picks the Characteristic that sets how many dice you roll: Espadas → Physical (FISC), Bastos → Awareness (CONS), Oros → Social (SOC), Copas → Mysticism (MIST). Its **number (1–5)** sets the die: d4, d6, d8, d10, d12.
@@ -19,7 +19,7 @@ A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal c
 - **NPCs:** per-Characteristic dice with direct rolls and an optional Boss Deck.
 - **GM Panel** (crown button in Token controls): Difficulty, group actions and a party overview.
 - **Portraits:** click any sheet image to view it full size; small Edit and Token buttons sit right below it.
-- **Responsive windows:** every sheet, panel and dialog fits the screen, reflows when resized and scrolls wherever content can grow.
+- **Responsive windows:** every sheet, panel and dialog fits the screen, reflows when resized and scrolls wherever content can grow; the window menu (⋮) can stretch a sheet to the full screen height. Character sheets have a Main tab and a Race tab with the full racial traits.
 
 ## Installation
 1. Clone into `Data/systems/` as `cartas-y-dados`:

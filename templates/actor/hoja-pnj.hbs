@@ -43,8 +43,39 @@
   {{!-- 2. LAYOUT DOS COLUMNAS: ATRIBUTOS IZQUIERDA | CONTENIDO DERECHA ================= --}}
   <div class="cyd-layout-dos-columnas">
 
-    {{!-- COLUMNA IZQUIERDA: CARACTERÍSTICAS ================= --}}
+    {{!-- COLUMNA IZQUIERDA: RECURSOS, CARACTERÍSTICAS Y MOVIMIENTO ================= --}}
     <aside class="cyd-sidebar-atributos">
+      {{!-- Recursos vitales (v0.13.1: encima de las Características) ================= --}}
+      <div class="cyd-recursos-barra cyd-recursos-vitales cyd-cols-3">
+        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.saludMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base: {{system.salud.max}} + Físico: {{system.salud.bonoFisico}} + Bonos: {{system.salud.bonoOtros}}{{#if system.agotamiento.efectos.saludMitad}} = {{system.salud.maxSinAgotamiento}} | Agotamiento: ÷ 2{{/if}} = {{system.salud.maxTotal}}">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart-pulse"></i> Salud</span>
+          <div class="cyd-recurso-inputs">
+            <input type="number" name="system.salud.value" value="{{system.salud.value}}" />
+            <span class="cyd-valor-sep">/</span>
+            <span class="cyd-valor-grande">{{system.salud.maxTotal}}</span>{{#if system.agotamiento.efectos.saludMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
+          </div>
+          <meter class="cyd-barra-salud {{barraSalud.estado}}" min="0" max="{{barraSalud.maximo}}" value="{{barraSalud.valor}}" aria-label="Salud" data-tooltip="Salud: {{barraSalud.valor}} / {{barraSalud.maximo}} ({{barraSalud.porcentaje}} %)"></meter>
+        </div>
+
+        <div class="cyd-recurso-caja" data-tooltip="Salud Base de la criatura (antes de Físico y bonos)">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart"></i> Salud Base</span>
+          <div class="cyd-recurso-inputs">
+            <input type="number" name="system.salud.max" value="{{system.salud.max}}" />
+          </div>
+        </div>
+
+        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo: +{{system.bonificadorDefensa}} | Total: {{system.defensaTotal}}">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Defensa</span>
+          <div class="cyd-recurso-inputs">
+            <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" />
+            <span class="cyd-valor-sep">→</span>
+            <span class="cyd-valor-grande">{{system.defensaTotal}}</span>
+          </div>
+        </div>
+
+      </div>
+
+
       <div class="cyd-cabecera-seccion">
         <h3><i class="fa-solid fa-star-of-life"></i> Características</h3>
       </div>
@@ -141,64 +172,8 @@
         <i class="fa-solid fa-circle-info"></i>
         <span>Valor base · dado · tirada directa sin cartas.</span>
       </p>
-    </aside>
 
-    {{!-- COLUMNA DERECHA: RECURSOS, MOVIMIENTO, MAZO DE JEFE ================= --}}
-    <section class="cyd-contenido-derecha">
-
-      {{!-- Recursos vitales ================= --}}
-      <div class="cyd-recursos-barra cyd-recursos-vitales cyd-cols-3">
-        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.saludMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base: {{system.salud.max}} + Físico: {{system.salud.bonoFisico}} + Bonos: {{system.salud.bonoOtros}}{{#if system.agotamiento.efectos.saludMitad}} = {{system.salud.maxSinAgotamiento}} | Agotamiento: ÷ 2{{/if}} = {{system.salud.maxTotal}}">
-          <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart-pulse"></i> Salud</span>
-          <div class="cyd-recurso-inputs">
-            <input type="number" name="system.salud.value" value="{{system.salud.value}}" />
-            <span class="cyd-valor-sep">/</span>
-            <span class="cyd-valor-grande">{{system.salud.maxTotal}}</span>{{#if system.agotamiento.efectos.saludMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
-          </div>
-        </div>
-
-        <div class="cyd-recurso-caja" data-tooltip="Salud Base de la criatura (antes de Físico y bonos)">
-          <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart"></i> Salud Base</span>
-          <div class="cyd-recurso-inputs">
-            <input type="number" name="system.salud.max" value="{{system.salud.max}}" />
-          </div>
-        </div>
-
-        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo: +{{system.bonificadorDefensa}} | Total: {{system.defensaTotal}}">
-          <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Defensa</span>
-          <div class="cyd-recurso-inputs">
-            <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" />
-            <span class="cyd-valor-sep">→</span>
-            <span class="cyd-valor-grande">{{system.defensaTotal}}</span>
-          </div>
-        </div>
-
-      </div>
-
-      {{!-- Agotamiento (v0.12.0): barra de 8 segmentos (clic para fijar el nivel) y consecuencias en vigor ================= --}}
-      <section class="cyd-panel cyd-panel-agotamiento{{#if agotamiento.muerto}} cyd-muerto{{/if}}">
-        <div class="cyd-cabecera-seccion">
-          <h3 data-tooltip="{{agotamiento.tooltipHtml}}" data-tooltip-class="cyd-tooltip"><i class="fa-solid fa-hourglass-half"></i> Agotamiento</h3>
-        </div>
-        <div class="cyd-barra-agotamiento{{#if esPropietario}} cyd-editable{{/if}}" role="meter" aria-label="Agotamiento" aria-valuemin="0" aria-valuemax="{{agotamiento.maximo}}" aria-valuenow="{{agotamiento.nivel}}">
-          {{#each agotamiento.segmentos as |seg|}}
-            <span class="cyd-segmento-agotamiento{{#if seg.activo}} cyd-lleno{{/if}}{{#if seg.esMuerte}} cyd-segmento-muerte{{/if}}"
-                  {{#if @root.esPropietario}}data-action="fijarAgotamiento" data-nivel="{{seg.nivel}}" tabindex="0"{{/if}}
-                  data-tooltip="Nivel {{seg.nivel}}: {{seg.texto}}"></span>
-          {{/each}}
-        </div>
-        {{#if agotamiento.nivel}}
-          <ul class="cyd-lista-agotamiento">
-            {{#each agotamiento.activos as |efecto|}}
-              <li><i class="fa-solid {{efecto.icono}}"></i> <strong>{{efecto.nivel}}.</strong> {{efecto.texto}}</li>
-            {{/each}}
-          </ul>
-        {{else}}
-          <p class="cyd-agotamiento-vacio">Sin Agotamiento.</p>
-        {{/if}}
-      </section>
-
-      {{!-- ================= 3. MOVIMIENTO Y TAMAÑO ================= --}}
+      {{!-- ================= MOVIMIENTO Y TAMAÑO (v0.13.1: bajo las Características) ================= --}}
       <section class="cyd-panel cyd-panel-movimiento-tamano">
         <div class="cyd-cabecera-seccion">
           <h3><i class="fa-solid fa-shoe-prints"></i> Movimiento y Tamaño</h3>
@@ -225,6 +200,34 @@
           </div>
         </div>
       </section>
+    </aside>
+
+    {{!-- COLUMNA DERECHA: AGOTAMIENTO, MAZO DE JEFE ================= --}}
+    <section class="cyd-contenido-derecha">
+
+      {{!-- Agotamiento (v0.12.0): barra de 8 segmentos (clic para fijar el nivel) y consecuencias en vigor ================= --}}
+      <section class="cyd-panel cyd-panel-agotamiento{{#if agotamiento.muerto}} cyd-muerto{{/if}}">
+        <div class="cyd-cabecera-seccion">
+          <h3 data-tooltip="{{agotamiento.tooltipHtml}}" data-tooltip-class="cyd-tooltip"><i class="fa-solid fa-hourglass-half"></i> Agotamiento</h3>
+        </div>
+        <div class="cyd-barra-agotamiento{{#if esPropietario}} cyd-editable{{/if}}" role="meter" aria-label="Agotamiento" aria-valuemin="0" aria-valuemax="{{agotamiento.maximo}}" aria-valuenow="{{agotamiento.nivel}}">
+          {{#each agotamiento.segmentos as |seg|}}
+            <span class="cyd-segmento-agotamiento{{#if seg.activo}} cyd-lleno{{/if}}{{#if seg.esMuerte}} cyd-segmento-muerte{{/if}}"
+                  {{#if @root.esPropietario}}data-action="fijarAgotamiento" data-nivel="{{seg.nivel}}" tabindex="0"{{/if}}
+                  data-tooltip="Nivel {{seg.nivel}}: {{seg.texto}}"></span>
+          {{/each}}
+        </div>
+        {{#if agotamiento.nivel}}
+          <ul class="cyd-lista-agotamiento">
+            {{#each agotamiento.activos as |efecto|}}
+              <li><i class="fa-solid {{efecto.icono}}"></i> <strong>{{efecto.nivel}}.</strong> {{efecto.texto}}</li>
+            {{/each}}
+          </ul>
+        {{else}}
+          <p class="cyd-agotamiento-vacio">Sin Agotamiento.</p>
+        {{/if}}
+      </section>
+
 
     {{!-- 4. ZONA DE MAZO DE JEFE (SOLO SI ESTÁ ACTIVO; SIN TRINKETS) --}}
     {{#if tieneMazoJefe}}

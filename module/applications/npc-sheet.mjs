@@ -8,7 +8,7 @@
 import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 
-import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento } from "../config.mjs";
+import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud } from "../config.mjs";
 import { preguntarTipoDescanso } from "../documents/actor.mjs";
 import { htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 
@@ -112,6 +112,7 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       system,
       esPropietario: actor.isOwner,
       agotamiento: contextoAgotamiento(system.cansancio?.value),
+      barraSalud: contextoBarraSalud(system.salud?.value, system.salud?.maxTotal),
       habilidades,
       objetos,
       tieneMazoJefe,
