@@ -4,11 +4,11 @@
 
 A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal card decks with dice rolls. No external modules required.
 
-**Current version:** 0.14.0 (beta)
+**Current version:** 0.14.1 (beta)
 
 ## How it plays
 - **Card + Dice (`XdY`):** a card's **suit** picks the Characteristic that sets how many dice you roll: Espadas → Physical (FISC), Bastos → Awareness (CONS), Oros → Social (SOC), Copas → Mysticism (MIST). Its **number (1–5)** sets the die: d4, d6, d8, d10, d12.
-- **Criticals & Fumbles:** every die that rolls its maximum is rerolled once and added. If at least half the dice show 1, those dice are rerolled and subtracted; a negative result is an automatic failure (in opposed rolls the opponent adds its absolute value).
+- **Criticals & Fumbles:** every die that rolls its maximum is rerolled once and added. If at least half the dice show 1, those dice are rerolled and subtracted; a negative result is an automatic failure (in opposed rolls the opponent adds its absolute value). A world setting chooses whether these extra dice roll automatically or by clicking buttons on the roll's chat card.
 - **Resolution:** attacks roll against the target's Defense (the difference is damage); only the GM sees the Defense and damage and can apply it from chat; other actions roll against the GM's Difficulty.
 - **Six piles per character:** Deck, Hand, Discard, Burned, Trinkets and In Play. Trinkets are named, levelled cards that give ongoing bonuses without rolling.
 - **Exhaustion (0–8):** running out of cards reshuffles your discard and adds 1 Exhaustion. Levels stack: halved hand size (1), speed (2) and max health (3), no reactions (4), only one active Trinket (5), halved roll results, except negative ones (6), used cards are burned (7) and death (8). A comfortable, safe rest removes 1 point (max. once per day). Ending a scene recovers most cards; resting recovers everything.

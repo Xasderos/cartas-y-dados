@@ -16,6 +16,23 @@ const SYSTEM_ID = "cartas-y-dados";
 export const PRESETS_DIFICULTAD_POR_DEFECTO = [2, 5, 9, 12, 14, 17, 21];
 
 /**
+ * Categorías de tamaño válidas (ajuste "tamanoBase" y `system.categoriaTamano` del Actor).
+ * @type {string[]}
+ */
+export const CATEGORIAS_TAMANO = ["Diminuto", "Pequeño", "Mediano", "Grande", "Enorme"];
+
+/**
+ * Tamaño por defecto para nuevos Actores según el ajuste "tamanoBase" (v0.14.1). Convierte los
+ * índices ("0".."4") que guardaba la versión anterior del ajuste y descarta valores no válidos.
+ * @returns {string}
+ */
+export function leerTamanoBase() {
+  const valor = String(leerAjuste("tamanoBase", "Mediano"));
+  if (CATEGORIAS_TAMANO.includes(valor)) return valor;
+  return CATEGORIAS_TAMANO[Number(valor)] ?? "Mediano";
+}
+
+/**
  * Lee de forma segura un ajuste del sistema. Si aún no está inicializado,
  * devuelve el valor por defecto indicado.
  *
@@ -103,7 +120,9 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
     scope: "world",
     config: true,
     type: String,
-    choices: ["Diminuto", "Pequeño", "Mediano", "Grande", "Enorme"],
+    // (v0.14.1) Objeto clave → etiqueta: con un array, Foundry usa los índices como valor y el
+    // valor por defecto "Mediano" no coincidía con ninguna opción (se mostraba "Diminuto").
+    choices: Object.fromEntries(CATEGORIAS_TAMANO.map(t => [t, t])),
     default: "Mediano",
     onChange: onUpdateCallback
   });
@@ -119,7 +138,21 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
     onChange: onUpdateCallback
   });
 
-  // 10. Valores de los botones de dificultad rápida del Panel del Master (7 botones).
+  // 10. (v0.14.1) Modo de lanzar los dados de Crítico y Pifia.
+  game.settings.register(SYSTEM_ID, "modoCriticosPifias", {
+    name: "Tirar Críticos y Pifias",
+    hint: "Automático: los dados extra del Crítico y la Pifia se lanzan solos. Manual: la tarjeta de la tirada muestra los botones «Tirar Crítico» / «Tirar Pifia» y quien lanzó la tirada debe pulsarlos para completarla.",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      automatico: "Automático",
+      manual: "Manual (clic en la tarjeta de la tirada)"
+    },
+    default: "automatico"
+  });
+
+  // 11. Valores de los botones de dificultad rápida del Panel del Master (7 botones).
   //     Oculto en la configuración: se edita con clic derecho sobre cada botón del panel.
   game.settings.register(SYSTEM_ID, "presetsDificultad", {
     name: "Presets de Dificultad del Panel del Master",

@@ -194,7 +194,8 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
     // Tirada con Crítico y Pifia (v0.11.0, `module/dados.mjs`).
     const tirada = await tirarDadosSistema({
       cantidadDados: valorBase, tipoDado, rollData: actor.getRollData(),
-      mitadPorAgotamiento: actor._tiradasAMitadPorAgotamiento()
+      mitadPorAgotamiento: actor._tiradasAMitadPorAgotamiento(),
+      speaker: ChatMessage.getSpeaker({ actor }), titulo: `Tirada de Atributo: ${nombreCaract}`
     });
     const contenidoHtml = htmlResolucionDificultad(tirada);
 

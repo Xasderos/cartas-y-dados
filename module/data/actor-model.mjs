@@ -6,7 +6,7 @@
  */
 
 import { SISTEMA_CONFIG, estadoAgotamiento, razaBaseDeActor } from "../config.mjs";
-import { leerAjuste } from "../settings.mjs";
+import { CATEGORIAS_TAMANO, leerAjuste, leerTamanoBase } from "../settings.mjs";
 
 const { TypeDataModel } = foundry.abstract;
 const { BooleanField, NumberField, SchemaField, StringField, HTMLField, ForeignDocumentField } = foundry.data.fields;
@@ -114,8 +114,8 @@ export class BaseActorDataModel extends TypeDataModel {
 
       categoriaTamano: new StringField({
         required: true,
-        initial: () => leerAjuste("tamanoBase", "Mediano"),
-        choices: ["Diminuto", "Pequeño", "Mediano", "Grande", "Enorme"]
+        initial: () => leerTamanoBase(),
+        choices: CATEGORIAS_TAMANO
       }),
 
       manoConfig: new SchemaField({

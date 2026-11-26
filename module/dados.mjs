@@ -13,7 +13,14 @@
  *
  * Todas las tiradas del sistema (Cartas de Acción, Habilidades, Acciones rápidas y tiradas
  * de Atributo de PNJ) pasan por `tirarDadosSistema()` y se publican con `publicarTirada()`.
+ *
+ * - **Modo de Crítico y Pifia (v0.14.1, ajuste `modoCriticosPifias`):** en "automatico" las
+ *   repeticiones se lanzan solas; en "manual" se publica la tarjeta de la tirada con los dados
+ *   base y botones «Tirar Crítico»/«Tirar Pifia» (solo los pulsa quien lanzó la tirada); al
+ *   pulsarlos todos, `publicarTirada()` convierte esa misma tarjeta en el resultado final.
  */
+
+import { leerAjuste } from "./settings.mjs";
 
 /**
  * @typedef {Object} ResultadoTiradaSistema
@@ -31,6 +38,8 @@
  * @property {number} cantidadDados - Nº de dados lanzados (para repetir la tirada, v0.13.0).
  * @property {string} tipoDado - Dado lanzado ("d6").
  * @property {number} bono - Bonificador plano aplicado.
+ * @property {string[]} mensajesPendientes - (v0.14.1) Ids de las tarjetas de tirada pendiente
+ *   (modo manual de Crítico/Pifia); `publicarTirada()` reutiliza la primera y borra el resto.
  * @property {string} html - Bloque HTML `.cyd-tirada-detalle` con el desglose para el chat.
  */
 
@@ -56,9 +65,16 @@ function valoresDados(roll) {
  * @param {boolean} [opciones.parcial=false] - (v0.14.0) La tirada es parte de otra mayor
  *   (`combinarTiradas`): su desglose no anuncia el fallo automático por negativo, que se
  *   decide con el total combinado.
- * @returns {Promise<ResultadoTiradaSistema>}
+ * @param {Object|null} [opciones.speaker=null] - (v0.14.1) Hablante de la tarjeta pendiente en modo
+ *   manual de Crítico/Pifia (por defecto, `ChatMessage.getSpeaker()`).
+ * @param {string} [opciones.titulo=""] - (v0.14.1) Título de la tarjeta pendiente en modo manual.
+ * @returns {Promise<ResultadoTiradaSistema>} En modo manual, no se resuelve hasta que se pulsan
+ *   los botones de Crítico/Pifia de la tarjeta.
  */
-export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rollData = {}, mitadPorAgotamiento = false, parcial = false }) {
+export async function tirarDadosSistema({
+  cantidadDados, tipoDado, bono = 0, rollData = {}, mitadPorAgotamiento = false, parcial = false,
+  speaker = null, titulo = ""
+}) {
   const n = Math.max(1, Math.floor(Number(cantidadDados) || 1));
   const caras = Math.max(2, Number(String(tipoDado ?? "d6").replace(/^d/i, "")) || 6);
   const bonoNum = Number(bono) || 0;
@@ -70,23 +86,43 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
 
   // Crítico: una única repetición por cada dado máximo (sin encadenar).
   const maximos = resultadosBase.filter(v => v === caras).length;
-  let resultadosCritico = [];
-  if (maximos > 0) {
-    const tiradaCritico = await new Roll(`${maximos}d${caras}`).evaluate();
-    rolls.push(tiradaCritico);
-    resultadosCritico = valoresDados(tiradaCritico);
-  }
-  const sumaCritico = resultadosCritico.reduce((a, b) => a + b, 0);
-
   // Pifia: al menos la mitad de los dados base en 1 → se repiten esos dados y se restan.
   const minimos = resultadosBase.filter(v => v === 1).length;
   const esPifia = minimos > 0 && minimos * 2 >= n;
-  let resultadosPifia = [];
-  if (esPifia) {
-    const tiradaPifia = await new Roll(`${minimos}d${caras}`).evaluate();
-    rolls.push(tiradaPifia);
-    resultadosPifia = valoresDados(tiradaPifia);
-  }
+
+  // Modo manual (ajuste `modoCriticosPifias`): la tarjeta se publica con los dados base y
+  // botones para lanzar el Crítico y/o la Pifia; la tirada continúa al pulsarlos.
+  /** @type {TarjetaPendiente|null} */
+  const pendiente = (maximos > 0 || esPifia) && leerAjuste("modoCriticosPifias", "automatico") === "manual"
+    ? await crearTarjetaPendiente({
+      speaker: speaker ?? ChatMessage.getSpeaker(), titulo, tiradaBase, resultadosBase,
+      formula: `${n}d${caras}`, caras, maximos, minimos, n
+    })
+    : null;
+
+  /**
+   * Lanza las repeticiones de Crítico o Pifia (esperando antes al clic en modo manual).
+   * @param {"critico"|"pifia"} tipo
+   * @param {number} cantidad
+   * @returns {Promise<Roll|null>}
+   */
+  const repetir = async (tipo, cantidad) => {
+    if (cantidad <= 0) return null;
+    if (pendiente) await pendiente.esperar(tipo);
+    const roll = await new Roll(`${cantidad}d${caras}`).evaluate();
+    if (pendiente) await pendiente.mostrar(tipo, roll);
+    return roll;
+  };
+  // En modo manual ambos botones pueden pulsarse en cualquier orden.
+  const [tiradaCritico, tiradaPifia] = await Promise.all([
+    repetir("critico", maximos),
+    repetir("pifia", esPifia ? minimos : 0)
+  ]);
+  if (tiradaCritico) rolls.push(tiradaCritico);
+  if (tiradaPifia) rolls.push(tiradaPifia);
+  const resultadosCritico = valoresDados(tiradaCritico);
+  const resultadosPifia = valoresDados(tiradaPifia);
+  const sumaCritico = resultadosCritico.reduce((a, b) => a + b, 0);
   const sumaPifia = resultadosPifia.reduce((a, b) => a + b, 0);
 
   const apuntado = sumaBase + sumaCritico + bonoNum;
@@ -111,6 +147,7 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
     cantidadDados: n,
     tipoDado: `d${caras}`,
     bono: bonoNum,
+    mensajesPendientes: pendiente ? [pendiente.mensajeId] : [],
     html: ""
   };
   resultado.html = htmlDetalleTirada(resultado, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial });
@@ -197,6 +234,7 @@ export function combinarTiradas(partes, { mitad = false, motivoMitad = "" } = {}
     esNegativo,
     totalSinAgotamiento: suma,
     formula: partes.map(p => p.tirada.formula).join(" + "),
+    mensajesPendientes: partes.flatMap(p => p.tirada.mensajesPendientes ?? []),
     combinada: true,
     html: `
       <div class="cyd-tirada-combinada">
@@ -209,6 +247,135 @@ export function combinarTiradas(partes, { mitad = false, motivoMitad = "" } = {}
       </div>
     `
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Crítico y Pifia en modo manual (v0.14.1)                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @typedef {Object} TarjetaPendiente
+ * @property {string} mensajeId - Id del `ChatMessage` de la tirada pendiente.
+ * @property {(tipo: "critico"|"pifia") => Promise<void>} esperar - Se resuelve al pulsar el botón.
+ * @property {(tipo: "critico"|"pifia", roll: Roll) => Promise<void>} mostrar - Muestra los dados
+ *   lanzados (Dice So Nice o sonido) y actualiza la tarjeta.
+ */
+
+/**
+ * Tiradas pendientes de este cliente: id del mensaje → resolutores de cada botón. Solo vive en
+ * el cliente que lanzó la tirada; tras recargar la página la tarjeta deja de estar activa.
+ * @type {Map<string, {resolutores: Object<string, Function>}>}
+ */
+const TIRADAS_PENDIENTES = new Map();
+
+/**
+ * Publica la tarjeta de una tirada con Crítico y/o Pifia pendientes de lanzar (modo manual).
+ * El estado se guarda en `flags.cartas-y-dados.pendiente` (`{critico, pifia}`: `true` mientras
+ * falta pulsar el botón, `number[]` con los dados ya lanzados) y el botón lo añade
+ * `activarBotonesTiradaPendiente()` al renderizar el mensaje.
+ * @param {Object} datos
+ * @returns {Promise<TarjetaPendiente>}
+ */
+async function crearTarjetaPendiente({ speaker, titulo, tiradaBase, resultadosBase, formula, caras, maximos, minimos, n }) {
+  const info = { titulo, formula, resultadosBase, caras, maximos, minimos, n };
+  const estado = { critico: maximos > 0 ? true : null, pifia: minimos > 0 && minimos * 2 >= n ? true : null };
+  const mensaje = await ChatMessage.create({
+    speaker,
+    content: htmlTarjetaPendiente(info, estado),
+    rolls: [tiradaBase],
+    sound: CONFIG.sounds.dice,
+    flags: { "cartas-y-dados": { pendiente: { ...estado, info } } }
+  });
+  const registro = { resolutores: {} };
+  TIRADAS_PENDIENTES.set(mensaje.id, registro);
+
+  return {
+    mensajeId: mensaje.id,
+    esperar: tipo => new Promise(resolve => { registro.resolutores[tipo] = resolve; }),
+    mostrar: async (tipo, roll) => {
+      if (game.dice3d) await game.dice3d.showForRoll(roll, game.user, true);
+      else foundry.audio.AudioHelper.play({ src: CONFIG.sounds.dice }, false);
+      estado[tipo] = valoresDados(roll);
+      if (estado.critico !== true && estado.pifia !== true) TIRADAS_PENDIENTES.delete(mensaje.id);
+      const actual = game.messages.get(mensaje.id);
+      if (!actual?.getFlag("cartas-y-dados", "pendiente")) return;
+      await actual.update({
+        content: htmlTarjetaPendiente(info, estado),
+        "flags.cartas-y-dados.pendiente": { ...estado, info }
+      });
+    }
+  };
+}
+
+/**
+ * HTML de la tarjeta de tirada pendiente: dados base y, por cada repetición, su resultado o el
+ * hueco donde `activarBotonesTiradaPendiente()` coloca el botón (`[data-cyd-pendiente]`).
+ * @param {Object} info - Datos fijos de la tirada (título, fórmula, dados base...).
+ * @param {{critico: (true|number[]|null), pifia: (true|number[]|null)}} estado
+ * @returns {string}
+ */
+function htmlTarjetaPendiente({ titulo, formula, resultadosBase, caras, maximos, minimos, n }, estado) {
+  const lista = valores => `[${valores.join(", ")}]`;
+  const suma = valores => valores.reduce((a, b) => a + b, 0);
+  const lineas = [];
+  if (estado.critico === true) {
+    lineas.push(`<p class="cyd-tirada-critico" data-cyd-pendiente="critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO</strong> · ${maximos} dado(s) al máximo (${caras}): falta lanzar ${maximos}d${caras}.</p>`);
+  } else if (Array.isArray(estado.critico)) {
+    lineas.push(`<p class="cyd-tirada-critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO</strong> · se repiten: ${lista(estado.critico)} <strong>+${suma(estado.critico)}</strong></p>`);
+  }
+  if (estado.pifia === true) {
+    lineas.push(`<p class="cyd-tirada-pifia" data-cyd-pendiente="pifia"><i class="fa-solid fa-skull-crossbones"></i> <strong>PIFIA</strong> · ${minimos} de ${n} dado(s) en 1: falta lanzar ${minimos}d${caras}.</p>`);
+  } else if (Array.isArray(estado.pifia)) {
+    lineas.push(`<p class="cyd-tirada-pifia"><i class="fa-solid fa-skull-crossbones"></i> <strong>PIFIA</strong> · se repiten: ${lista(estado.pifia)} <strong>−${suma(estado.pifia)}</strong></p>`);
+  }
+  return `
+    <div class="cyd-carta-jugada cyd-tirada-pendiente">
+      <h3><i class="fa-solid fa-hourglass-half"></i> ${titulo || "Tirada"} · pendiente</h3>
+      <div class="cyd-tirada-detalle">
+        <p><i class="fa-solid fa-dice-d20"></i> <strong>${formula}:</strong> ${lista(resultadosBase)}</p>
+        ${lineas.join("")}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Añade los botones «Tirar Crítico»/«Tirar Pifia» a una tarjeta de tirada pendiente
+ * (llamar desde `renderChatMessageHTML`). Solo quien lanzó la tirada puede pulsarlos (la tirada
+ * espera en su cliente); el resto ve un aviso de espera.
+ * @param {ChatMessage} message
+ * @param {HTMLElement} html
+ */
+export function activarBotonesTiradaPendiente(message, html) {
+  if (!message.getFlag("cartas-y-dados", "pendiente")) return;
+  for (const linea of html.querySelectorAll("[data-cyd-pendiente]")) {
+    const tipo = linea.dataset.cydPendiente;
+    if (message.author?.id !== game.user.id) {
+      const aviso = document.createElement("small");
+      aviso.className = "cyd-tirada-pendiente-aviso";
+      aviso.textContent = `Esperando a que ${message.author?.name ?? "quien tira"} lance los dados.`;
+      linea.after(aviso);
+      continue;
+    }
+    const boton = document.createElement("button");
+    boton.type = "button";
+    boton.className = "cyd-btn-tirada-pendiente";
+    boton.innerHTML = tipo === "critico"
+      ? '<i class="fa-solid fa-star"></i> Tirar Crítico'
+      : '<i class="fa-solid fa-skull-crossbones"></i> Tirar Pifia';
+    boton.addEventListener("click", ev => {
+      ev.preventDefault();
+      const resolver = TIRADAS_PENDIENTES.get(message.id)?.resolutores?.[tipo];
+      if (!resolver) {
+        ui.notifications.warn("Esta tirada ya no está activa (se ha recargado la página). Vuelve a lanzarla.");
+        return;
+      }
+      boton.disabled = true;
+      delete TIRADAS_PENDIENTES.get(message.id).resolutores[tipo];
+      resolver();
+    });
+    linea.after(boton);
+  }
 }
 
 /** Canal de socket del sistema (requiere `"socket": true` en `system.json`). */
@@ -228,6 +395,9 @@ const CANAL_SOCKET = "system.cartas-y-dados";
  *   «Espera un momento» (`SistemaActor#_datosRepeticionTirada`); se guardan en
  *   `flags.cartas-y-dados.repeticion` y el chat muestra el botón al propietario.
  * @returns {Promise<ChatMessage>}
+ *
+ * (v0.14.1) Si la tirada dejó tarjetas pendientes (modo manual de Crítico/Pifia), la primera se
+ * convierte en el mensaje final (misma tarjeta) y las demás se borran.
  */
 export async function publicarTirada(tirada, { speaker, flavor, htmlMaster = "", repeticion = null }) {
   const datosMensaje = {
@@ -238,7 +408,20 @@ export async function publicarTirada(tirada, { speaker, flavor, htmlMaster = "",
     sound: CONFIG.sounds.dice
   };
   if (repeticion) datosMensaje.flags = { "cartas-y-dados": { repeticion } };
-  const mensaje = await ChatMessage.create(datosMensaje);
+
+  const [idTarjeta, ...idsSobrantes] = tirada.mensajesPendientes ?? [];
+  const tarjeta = idTarjeta ? game.messages.get(idTarjeta) : null;
+  let mensaje;
+  if (tarjeta) {
+    delete datosMensaje.sound;
+    datosMensaje.flags = { "cartas-y-dados": { ...(datosMensaje.flags?.["cartas-y-dados"] ?? {}), pendiente: null } };
+    mensaje = await tarjeta.update(datosMensaje) ?? tarjeta;
+  } else {
+    mensaje = await ChatMessage.create(datosMensaje);
+  }
+  const sobrantes = idsSobrantes.filter(id => game.messages.has(id));
+  if (sobrantes.length) await ChatMessage.deleteDocuments(sobrantes);
+
   if (htmlMaster) await enviarMensajeSoloMaster({ speaker, content: htmlMaster });
   return mensaje;
 }

@@ -417,6 +417,25 @@ button.cyd-btn-aplicar-dano:disabled i {
   color: var(--cyd-peligro);
 }
 
+/* Crítico y Pifia en modo manual (v0.14.1): botones de la tarjeta de tirada pendiente */
+button.cyd-btn-tirada-pendiente {
+  width: 100%;
+  margin: 2px 0 4px;
+}
+
+button.cyd-btn-tirada-pendiente .fa-star {
+  color: var(--cyd-oro);
+}
+
+button.cyd-btn-tirada-pendiente .fa-skull-crossbones {
+  color: var(--cyd-peligro);
+}
+
+.cyd-tirada-pendiente-aviso {
+  display: block;
+  opacity: 0.8;
+}
+
 /* Reducción a la mitad por Agotamiento 6+ (v0.12.0) */
 .cyd-tirada-agotamiento i {
   color: var(--color-level-warning, #ee9b3a);

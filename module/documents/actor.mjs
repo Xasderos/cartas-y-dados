@@ -714,7 +714,9 @@ export class SistemaActor extends Actor {
         bono: Number(c.system.automatizacion?.bonoTirada) || 0,
         rollData: this.getRollData(),
         mitadPorAgotamiento,
-        parcial: hayPartes
+        parcial: hayPartes,
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        titulo: `${configAccion ? `${configAccion.nombre} · ` : ""}${nombreVisibleCarta(c)}`
       });
       const partes = [{ tirada: await tirarCarta(carta, claveCaract), etiqueta: nombreVisibleCarta(carta) }];
       if (cartaApuntado) {
@@ -1667,7 +1669,8 @@ export class SistemaActor extends Actor {
 
     const tirada = await tirarDadosSistema({
       cantidadDados: datos.cantidadDados, tipoDado: datos.tipoDado, bono: datos.bono,
-      rollData: this.getRollData(), mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento()
+      rollData: this.getRollData(), mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
+      speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `Espera un momento · ${datos.titulo}`
     });
     const tokenObjetivo = datos.objetivoTokenUuid ? (fromUuidSync(datos.objetivoTokenUuid) ?? null) : null;
     const resolucion = this._htmlResolucionTirada(tirada, datos.esAtaque, datos.etiquetaDificultad, { tokenObjetivo });
@@ -1808,7 +1811,8 @@ export class SistemaActor extends Actor {
     const bono = Number(bonoTirada) || 0;
     const tirada = await tirarDadosSistema({
       cantidadDados, tipoDado, bono, rollData: this.getRollData(),
-      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento()
+      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
+      speaker: ChatMessage.getSpeaker({ actor: this }), titulo
     });
     const resolucion = this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
     const bloqueResolucionHtml = tirada.html + resolucion.publico;
@@ -1952,7 +1956,8 @@ export class SistemaActor extends Actor {
     const bono = bonoTirada;
     const tirada = await tirarDadosSistema({
       cantidadDados, tipoDado, bono, rollData: this.getRollData(),
-      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento()
+      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
+      speaker: ChatMessage.getSpeaker({ actor: this }), titulo: item.name
     });
     const resolucion = this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
     const bloqueResolucionHtml = resolucion.publico;

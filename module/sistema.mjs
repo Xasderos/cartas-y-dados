@@ -22,8 +22,8 @@ import { PanelMasterApp } from "./applications/gm-panel.mjs";
 import { HojaPnjActor } from "./applications/npc-sheet.mjs";
 import { personalizarBannerPausa } from "./applications/game-pause.mjs";
 import { registrarReajusteEnResize } from "./applications/ventana-dinamica.mjs";
-import { registrarSocketDados } from "./dados.mjs";
-import { registrarAjustesDelSistema } from "./settings.mjs";
+import { activarBotonesTiradaPendiente, registrarSocketDados } from "./dados.mjs";
+import { leerTamanoBase, registrarAjustesDelSistema } from "./settings.mjs";
 import { limpiarNombreCarta, nombreVisibleCarta, tieneRasgoRacial } from "./config.mjs";
 
 const { DocumentSheetConfig } = foundry.applications.apps;
@@ -164,6 +164,11 @@ Hooks.once("ready", async () => {
   registrarReajusteEnResize();
   // Crítico/Pifia y privacidad de ataques (v0.11.0): mensajes solo Master pedidos por jugadores.
   registrarSocketDados();
+
+  // (v0.14.1) El ajuste "tamanoBase" guardaba índices ("0".."4"): se convierte al nombre del tamaño.
+  if (game.user.isGM && game.settings.get("cartas-y-dados", "tamanoBase") !== leerTamanoBase()) {
+    await game.settings.set("cartas-y-dados", "tamanoBase", leerTamanoBase());
+  }
 
   try {
     await sanearNombresCartasExistentes();
@@ -323,6 +328,7 @@ Hooks.on("deleteActor", async (actor) => {
 /* -------------------------------------------------------------------------- */
 
 Hooks.on("renderChatMessageHTML", (message, html) => {
+  activarBotonesTiradaPendiente(message, html);
   anadirBotonEsperaUnMomento(message, html);
   activarBotonCuracion(html);
 
