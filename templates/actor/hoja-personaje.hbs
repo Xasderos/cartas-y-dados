@@ -207,6 +207,23 @@
         {{else}}
           <p class="cyd-agotamiento-vacio">Sin Agotamiento.</p>
         {{/if}}
+        {{!-- (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este Actor --}}
+        {{#if estadosMisticos}}
+          <div class="cyd-estado-acciones cyd-estados-misticos">
+            {{#if estadosMisticos.malDeOjo}}
+              <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Mal de ojo{{#if estadosMisticos.malDeOjo.origen}} de {{estadosMisticos.malDeOjo.origen}}{{/if}}: tus cartas de Misticismo bajan una categoría de dado (una carta d4 da automáticamente 1). En combate pierde un turno al final de cada uno de tus turnos">
+                <i class="fa-solid fa-eye-slash"></i> Mal de ojo · {{estadosMisticos.malDeOjo.turnos}} turno(s)
+              </span>
+              {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="malDeOjo" data-tooltip="Retirar el Mal de ojo"><i class="fa-solid fa-xmark"></i></button>{{/if}}
+            {{/if}}
+            {{#if estadosMisticos.destinoSellado}}
+              <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Destino sellado{{#if estadosMisticos.destinoSellado.origen}} por {{estadosMisticos.destinoSellado.origen}}{{/if}}: tu siguiente acción debe ser de {{estadosMisticos.destinoSellado.caracteristica}}; después el efecto termina">
+                <i class="fa-solid fa-lock"></i> Destino sellado · {{estadosMisticos.destinoSellado.palo}}
+              </span>
+              {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="destinoSellado" data-tooltip="Retirar el destino sellado"><i class="fa-solid fa-xmark"></i></button>{{/if}}
+            {{/if}}
+          </div>
+        {{/if}}
       </section>
 
       {{!-- ================= 3. RASGOS RACIALES A MANO (v0.13.1) =================

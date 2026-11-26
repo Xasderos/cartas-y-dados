@@ -18,6 +18,7 @@ export class SistemaCombat extends Combat {
 
   /** @override */
   async nextTurn() {
+    await this.#finTurnoCombatiente();
     await super.nextTurn();
     await this.#robarCartasCombatienteActivo();
     return this;
@@ -25,6 +26,7 @@ export class SistemaCombat extends Combat {
 
   /** @override */
   async nextRound() {
+    await this.#finTurnoCombatiente();
     await super.nextRound();
     await this.#robarCartasCombatienteActivo();
     return this;
@@ -47,6 +49,15 @@ export class SistemaCombat extends Combat {
         actor.finalizarAccionOCombate();
       }
     }
+  }
+
+  /**
+   * Fin del turno del combatiente activo (v0.17.0): su «Mal de ojo» (Potens Mystica) pierde un turno.
+   */
+  async #finTurnoCombatiente() {
+    if (!this.started) return;
+    const actor = this.combatant?.actor;
+    if (actor?.isOwner) await actor.avanzarMalDeOjo?.();
   }
 
   /**

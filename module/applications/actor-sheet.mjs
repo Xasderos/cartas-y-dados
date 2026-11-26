@@ -57,7 +57,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       subirNivel: HojaPersonajeActor.#onSubirNivel,
       usarAlquimia: HojaPersonajeActor.#onUsarAlquimia,
       usarMonoculo: HojaPersonajeActor.#onUsarMonoculo,
-      descartarTiempoEmbotellado: HojaPersonajeActor.#onDescartarTiempoEmbotellado
+      descartarTiempoEmbotellado: HojaPersonajeActor.#onDescartarTiempoEmbotellado,
+      retirarEstadoMistico: HojaPersonajeActor.#onRetirarEstadoMistico
     }
   };
 
@@ -187,7 +188,9 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       subidaNivel,
       estadoAcciones: actor.contextoAcciones(),
       // (v0.16.0) Alta Scentia: primera carta del Mazo, artilugio y dados embotellados
-      altaScentia: actor.isOwner ? actor.contextoAltaScentia() : null
+      altaScentia: actor.isOwner ? actor.contextoAltaScentia() : null,
+      // (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este Actor
+      estadosMisticos: actor.contextoEstadosMisticos()
     };
   }
 
@@ -477,6 +480,16 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
   }
 
   /** (v0.16.0) Alta Scentia · Tiempo embotellado: descartar los dados embotellados que queden. */
+  /**
+   * (v0.17.0) Retira un estado de Potens Mystica del Actor (`data-estado`: `malDeOjo` o `destinoSellado`).
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onRetirarEstadoMistico(event, target) {
+    if (target.dataset.estado === "malDeOjo") await this.document.retirarMalDeOjo();
+    else if (target.dataset.estado === "destinoSellado") await this.document.retirarDestinoSellado();
+  }
+
   static async #onDescartarTiempoEmbotellado() {
     await this.document.descartarTiempoEmbotellado();
     this.render();

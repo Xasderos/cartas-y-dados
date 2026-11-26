@@ -55,7 +55,8 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       descansar: HojaPnjActor.#onDescansar,
       abrirPila: HojaPnjActor.#onAbrirPila,
       crearCartaEnMazo: HojaPnjActor.#onCrearCartaEnMazo,
-      tiradaAtributoPnj: HojaPnjActor.#onTiradaAtributoPnj
+      tiradaAtributoPnj: HojaPnjActor.#onTiradaAtributoPnj,
+      retirarEstadoMistico: HojaPnjActor.#onRetirarEstadoMistico
     }
   };
 
@@ -124,8 +125,20 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       objetos,
       tieneMazoJefe,
       contadoresPilas,
-      cartasEnMano
+      cartasEnMano,
+      // (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este PNJ
+      estadosMisticos: actor.contextoEstadosMisticos()
     };
+  }
+
+  /**
+   * (v0.17.0) Retira un estado de Potens Mystica del PNJ (`data-estado`: `malDeOjo` o `destinoSellado`).
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onRetirarEstadoMistico(event, target) {
+    if (target.dataset.estado === "malDeOjo") await this.document.retirarMalDeOjo();
+    else if (target.dataset.estado === "destinoSellado") await this.document.retirarDestinoSellado();
   }
 
   /* ======================================================================== */
@@ -192,10 +205,13 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
     const nombreCaract = nombresCaracteristicas[caracteristica] || caracteristica;
 
     // Tirada con Crítico y Pifia (v0.11.0, `module/dados.mjs`).
+    // (v0.17.0) Mal de ojo: el dado de Misticismo baja una categoría (d4 → resultado 1).
+    const malDeOjo = caracteristica === "misticismo" ? actor._ajusteMalDeOjo?.(tipoDado) ?? null : null;
     const tirada = await tirarDadosSistema({
-      cantidadDados: valorBase, tipoDado, rollData: actor.getRollData(),
+      cantidadDados: valorBase, tipoDado: malDeOjo?.tipoDado ?? tipoDado, rollData: actor.getRollData(),
       mitadPorAgotamiento: actor._tiradasAMitadPorAgotamiento(),
-      speaker: ChatMessage.getSpeaker({ actor }), titulo: `Tirada de Atributo: ${nombreCaract}`
+      speaker: ChatMessage.getSpeaker({ actor }), titulo: `Tirada de Atributo: ${nombreCaract}`,
+      resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
     });
     const contenidoHtml = htmlResolucionDificultad(tirada);
 
@@ -205,7 +221,8 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       flavor: `
         <div class="cyd-chat-tirada-pnj">
           <h4><i class="fa-solid fa-dice-d20"></i> Tirada de Atributo: ${nombreCaract}</h4>
-          <p><small>${actor.name} lanza ${valorBase}${tipoDado} (${caracteristicaTotal} dados totales)</small></p>
+          ${malDeOjo ? `<p class="cyd-tags-accion-fila">${actor._etiquetaMalDeOjo(tipoDado)}</p>` : ""}
+          <p><small>${actor.name} lanza ${valorBase}${malDeOjo?.tipoDado ?? tipoDado} (${caracteristicaTotal} dados totales)</small></p>
           ${tirada.html}
           ${contenidoHtml}
         </div>

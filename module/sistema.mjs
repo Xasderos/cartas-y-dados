@@ -347,6 +347,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   activarBotonCuracion(html);
   activarBotonesMendacium(message, html);
   activarBotonEstadoAlterado(html);
+  activarBotonesMasterPotens(html);
 
   const btnDano = html.querySelector(".cyd-btn-aplicar-dano");
   if (!btnDano) return;
@@ -372,12 +373,18 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
       return;
     }
 
-    const saludActual = actorObjetivo.system.salud.value;
-    const nuevaSalud = Math.max(0, saludActual - dano);
-    await actorObjetivo.update({ "system.salud.value": nuevaSalud });
-
+    // (v0.17.0) `aplicarDano` gestiona la Barrera espiritual (Potens Mystica) del objetivo.
     btnDano.disabled = true;
-    btnDano.innerHTML = `<i class="fa-solid fa-check"></i> ${dano} de Daño Aplicado (Salud: ${nuevaSalud})`;
+    const resultado = typeof actorObjetivo.aplicarDano === "function"
+      ? await actorObjetivo.aplicarDano(dano)
+      : null;
+    if (!resultado) {
+      btnDano.disabled = false;
+      return;
+    }
+    btnDano.innerHTML = resultado.mitigado > 0
+      ? `<i class="fa-solid fa-check"></i> ${resultado.aplicado} de Daño Aplicado · ${resultado.mitigado} mitigado (Salud: ${resultado.salud})`
+      : `<i class="fa-solid fa-check"></i> ${resultado.aplicado} de Daño Aplicado (Salud: ${resultado.salud})`;
   });
 });
 
@@ -470,8 +477,68 @@ function activarBotonEstadoAlterado(html) {
 }
 
 /**
+ * Potens Mystica (v0.17.0): botones solo del Master (se eliminan para el resto de usuarios):
+ * - `.cyd-btn-mal-de-ojo`: maldice al Actor `data-actor-uuid` durante `data-turnos` turnos.
+ * - `.cyd-btn-sellar-destino`: resuelve «Sellar destino» sobre el Actor con el palo `data-palo`.
+ * - `.cyd-btn-perder-vida` (Ojo por ojo): resta `data-cantidad` de Salud a los Actores de `data-uuids`
+ *   o, si no hay, a los Tokens que tenga marcados el Master. No es daño: no lo mitiga la Barrera.
+ * @param {HTMLElement} html
+ */
+function activarBotonesMasterPotens(html) {
+  const acciones = {
+    ".cyd-btn-mal-de-ojo": async b => {
+      const actor = await fromUuid(b.dataset.actorUuid);
+      if (!actor?.aplicarMalDeOjo) return false;
+      await actor.aplicarMalDeOjo(Number(b.dataset.turnos) || 1, b.dataset.origen ?? "");
+      return `Mal de ojo aplicado a ${b.dataset.nombre || actor.name}`;
+    },
+    ".cyd-btn-sellar-destino": async b => {
+      const actor = await fromUuid(b.dataset.actorUuid);
+      if (!actor?.resolverSellarDestino) return false;
+      await actor.resolverSellarDestino(b.dataset.palo, b.dataset.origen ?? "");
+      return `Destino de ${b.dataset.nombre || actor.name} resuelto`;
+    },
+    ".cyd-btn-perder-vida": async b => {
+      const cantidad = Math.max(0, Number(b.dataset.cantidad) || 0);
+      const uuids = String(b.dataset.uuids ?? "").split(",").filter(Boolean);
+      const actores = uuids.length
+        ? (await Promise.all(uuids.map(u => fromUuid(u)))).filter(Boolean)
+        : [...game.user.targets].map(t => t.actor).filter(Boolean);
+      if (!actores.length) {
+        ui.notifications.warn("Marca con T los Tokens de los enemigos que pierden vida.");
+        return false;
+      }
+      for (const actor of actores) {
+        const salud = Math.max(0, (Number(actor.system.salud?.value) || 0) - cantidad);
+        await actor.update({ "system.salud.value": salud });
+      }
+      return `${cantidad} de Salud restada a ${actores.map(a => a.name).join(", ")}`;
+    }
+  };
+  for (const [selector, accion] of Object.entries(acciones)) {
+    for (const boton of html.querySelectorAll(selector)) {
+      if (!game.user.isGM) {
+        boton.remove();
+        continue;
+      }
+      boton.addEventListener("click", async ev => {
+        ev.preventDefault();
+        boton.disabled = true;
+        const hecho = await accion(boton);
+        if (!hecho) {
+          boton.disabled = false;
+          return;
+        }
+        boton.innerHTML = `<i class="fa-solid fa-check"></i> ${foundry.utils.escapeHTML(hecho)}`;
+      });
+    }
+  }
+}
+
+/**
  * Mendacium Charisma (v0.15.0): botones «Robar carta (Empatía)» y «Elegir carta (Promesa)».
  * (v0.16.0) También «Descartar la primera carta del Mazo» (Visión del futuro, Alta Scentia).
+ * (v0.17.0) También «Ojo por ojo» y «Preservación espiritual» (Potens Mystica).
  * Solo los ve y usa el propietario del Actor indicado en `data-actor-uuid`; cada mensaje se
  * usa una sola vez por Actor (`flags.cartas-y-dados.ultimaEmpatia` / `ultimaPromesa`).
  * @param {ChatMessage} message
@@ -485,7 +552,12 @@ function activarBotonesMendacium(message, html) {
       usar: (actor, b) => actor.elegirCartaPromesa(Number(b.dataset.x) || 0, b.dataset.origen ?? "") },
     // (v0.16.0) Alta Scentia · Visión del futuro: descartar la primera carta del Mazo tras la tirada.
     { selector: ".cyd-btn-vision-futuro", flag: "ultimaVisionFuturo",
-      usar: actor => actor.descartarPrimeraCartaMazo() }
+      usar: actor => actor.descartarPrimeraCartaMazo() },
+    // (v0.17.0) Potens Mystica · Ojo por ojo y Preservación espiritual tras quemar una carta MIST.
+    { selector: ".cyd-btn-ojo-por-ojo", flag: "ultimaOjoPorOjo",
+      usar: (actor, b) => actor.usarOjoPorOjo(Number(b.dataset.valor) || 0) },
+    { selector: ".cyd-btn-preservacion", flag: "ultimaPreservacion",
+      usar: (actor, b) => actor.usarPreservacionEspiritual(b.dataset.cartaId) }
   ];
   for (const { selector, flag, usar } of botones) {
     for (const boton of html.querySelectorAll(selector)) {
@@ -527,6 +599,9 @@ Hooks.on("createCard", (carta, _opciones, userId) => {
   if (!(pila instanceof Cards)) return;
   const quemador = game.actors.find(a => a.type === "personaje" && a.system.pilas?.quemadasId === pila.id);
   if (!quemador) return;
+  // (v0.17.0) Potens Mystica: Ojo por ojo / Preservación espiritual al quemar una carta MIST.
+  quemador.avisarQuemaMisticismo?.(carta)
+    ?.catch(error => console.error("[Cartas y Dados] Error en el aviso de carta MIST quemada", error));
   clearTimeout(temporizadoresEmpatia.get(quemador.id));
   temporizadoresEmpatia.set(quemador.id, setTimeout(() => {
     temporizadoresEmpatia.delete(quemador.id);

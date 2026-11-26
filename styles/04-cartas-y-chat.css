@@ -616,3 +616,33 @@ button.cyd-btn-aplicar-estado i {
   margin-right: 4px;
   color: var(--cyd-azul);
 }
+
+/* ======================================================================== */
+/*  POTENS MYSTICA (v0.17.0): estados en la ficha y botones de chat         */
+/* ======================================================================== */
+
+/* Fila de la ficha: Mal de ojo y Destino sellado (el texto largo se parte) */
+.cyd-estados-misticos .cyd-chip-estado {
+  max-width: 100%;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Ojo por ojo, Preservación espiritual, Mal de ojo, Sellar destino y pérdida de vida */
+button.cyd-btn-ojo-por-ojo,
+button.cyd-btn-preservacion,
+button.cyd-btn-mal-de-ojo,
+button.cyd-btn-sellar-destino,
+button.cyd-btn-perder-vida {
+  width: 100%;
+  margin-top: 6px;
+}
+
+button.cyd-btn-ojo-por-ojo i,
+button.cyd-btn-preservacion i,
+button.cyd-btn-mal-de-ojo i,
+button.cyd-btn-sellar-destino i,
+button.cyd-btn-perder-vida i {
+  margin-right: 4px;
+  color: var(--cyd-azul);
+}

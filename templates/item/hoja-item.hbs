@@ -216,7 +216,7 @@
             {{#each opcionesOrigenHabilidad as |opcion|}}<option value="{{opcion.valor}}" {{#if opcion.seleccionado}}selected{{/if}}>{{opcion.etiqueta}}</option>{{/each}}
           </select>
         </div>
-        <div class="cyd-recurso-caja" data-tooltip="Automatización del valor X sobre el Token objetivo (requiere «Tirada = valor X»).">
+        <div class="cyd-recurso-caja" data-tooltip="Automatización del valor X sobre el Token objetivo (requiere «Tirada = valor X»). «Sellar destino» se usa sin tirada (desmarca «Requiere tirada»).">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-bullseye"></i> Efecto del valor X</span>
           <select name="flags.cartas-y-dados.efectoX">
             {{#each opcionesEfectoX as |opcion|}}<option value="{{opcion.valor}}" {{#if opcion.seleccionado}}selected{{/if}}>{{opcion.etiqueta}}</option>{{/each}}

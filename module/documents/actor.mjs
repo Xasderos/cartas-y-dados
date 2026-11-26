@@ -7,9 +7,10 @@
  */
 
 import {
-  SISTEMA_CONFIG, abalorioDeTrinket, abreviadoPalo, claveClaseDeItem, describirPackCartas, efectoPermanenteAbalorio,
-  esAbalorioEterno, estadoAgotamiento, generarNombreMisticoUnico, nombreEstadoElemento, nombreVisibleCarta, opcionesArtilugio,
-  opcionesTrinketsClase, razaBaseDeActor, tieneRasgoRacial
+  SISTEMA_CONFIG, abalorioDeTrinket, abreviadoPalo, claveClaseDeItem, dadoReducidoMalDeOjo, describirPackCartas,
+  efectoPermanenteAbalorio, esAbalorioEterno, estadoAgotamiento, generarNombreMisticoUnico, nombreCaracteristica,
+  nombreEstadoElemento, nombreVisibleCarta, opcionesArtilugio, opcionesTrinketsClase, razaBaseDeActor, tieneRasgoRacial,
+  valorCarta
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 import { combinarTiradas, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
@@ -265,7 +266,8 @@ export class SistemaActor extends Actor {
         system: {
           origenHabilidad: "clase",
           esActivable: true,
-          requiereTirada: true,
+          // (v0.17.0) Sellar destino no tiene tirada.
+          requiereTirada: habilidad.requiereTirada !== false,
           esAtaque: Boolean(habilidad.esAtaque),
           valorX: Boolean(habilidad.valorX),
           sinAccion: Boolean(habilidad.sinAccion),
@@ -887,6 +889,9 @@ export class SistemaActor extends Actor {
       reaccionPorExcepcion = permiso === "excepcion";
     }
 
+    // (v0.17.0) Sellar destino: la acción debe ser de la característica sellada (salvo excepción).
+    if (!(await this._cumplirDestinoSellado(claveCaract))) return null;
+
     // --- Tipo de resolución ----------------------------------------------------------------
     let tipoResolucion = resolucion && resolucion !== "auto"
       ? resolucion
@@ -905,6 +910,8 @@ export class SistemaActor extends Actor {
     // (v0.15.0) Abalorio Amistad: +1 dado a la carta principal si coincide con la característica de
     // la última acción del aliado enlazado (no en las acciones del compañero).
     const amistad = configAccion?.mitadAtributos ? null : this._bonoDadoAmistad(claveCaract, abalorios);
+    /** (v0.17.0) Alguna carta MIST de la acción tiró con el dado reducido por Mal de ojo. */
+    let usaMalDeOjo = false;
 
     if (tipoResolucion !== "sinTirada") {
       const mitadPorAgotamiento = this._tiradasAMitadPorAgotamiento();
@@ -912,16 +919,22 @@ export class SistemaActor extends Actor {
       const dadosDe = caract => configAccion?.mitadAtributos
         ? Math.max(1, Math.ceil(this._dadosDeCaracteristica(caract) / 2))
         : this._dadosDeCaracteristica(caract);
-      const tirarCarta = (c, caract, extra = 0) => tirarDadosSistema({
-        cantidadDados: dadosDe(caract) + extra,
-        tipoDado: c.system.tipoDado ?? "d6",
-        bono: Number(c.system.automatizacion?.bonoTirada) || 0,
-        rollData: this.getRollData(),
-        mitadPorAgotamiento,
-        parcial: hayPartes,
-        speaker: ChatMessage.getSpeaker({ actor: this }),
-        titulo: `${configAccion ? `${configAccion.nombre} · ` : ""}${nombreVisibleCarta(c)}`
-      });
+      const tirarCarta = (c, caract, extra = 0) => {
+        // (v0.17.0) Mal de ojo: las cartas MIST del Actor maldito bajan una categoría de dado.
+        const malDeOjo = c.system.palo === "copas" ? this._ajusteMalDeOjo(c.system.tipoDado ?? "d6") : null;
+        if (malDeOjo) usaMalDeOjo = true;
+        return tirarDadosSistema({
+          cantidadDados: dadosDe(caract) + extra,
+          tipoDado: malDeOjo?.tipoDado ?? c.system.tipoDado ?? "d6",
+          bono: Number(c.system.automatizacion?.bonoTirada) || 0,
+          rollData: this.getRollData(),
+          mitadPorAgotamiento,
+          parcial: hayPartes,
+          speaker: ChatMessage.getSpeaker({ actor: this }),
+          titulo: `${configAccion ? `${configAccion.nombre} · ` : ""}${nombreVisibleCarta(c)}`,
+          resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
+        });
+      };
       const partes = [{ tirada: await tirarCarta(carta, claveCaract, amistad ? 1 : 0), etiqueta: nombreVisibleCarta(carta) }];
       if (cartaApuntado) {
         partes.push({ tirada: await tirarCarta(cartaApuntado, caractApuntado), etiqueta: `${nombreVisibleCarta(cartaApuntado)} (apuntado)` });
@@ -968,6 +981,7 @@ export class SistemaActor extends Actor {
     // (v0.15.0) Última característica jugada (abalorio Amistad de los aliados); el compañero no cuenta.
     if (!configAccion?.mitadAtributos) await this._registrarUltimaCaracteristica(claveCaract);
     await this._marcarAccionMiniTurno();
+    await this.retirarDestinoSellado(); // (v0.17.0) Sellar destino: la acción ya se ha realizado
     this.prepareData();
 
     // --- Chat ----------------------------------------------------------------------------------
@@ -980,6 +994,7 @@ export class SistemaActor extends Actor {
     if (configAccion?.adicional) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-plus"></i> Acción adicional</span>');
     if (cartaApuntado) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-bullseye"></i> Ataque apuntado (÷ 2)</span>');
     if (cartaPotenciar) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-moon"></i> Potenciada</span>');
+    if (usaMalDeOjo) etiquetas.push(this._etiquetaMalDeOjo());
     if (nombreElemento) etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid ${SISTEMA_CONFIG.ELEMENTOS[elemento]?.icono ?? "fa-fire-flame-curved"}"></i> Elementalismo: ${foundry.utils.escapeHTML(nombreElemento)}</span>`);
     if (resolucion && resolucion !== "auto") etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-sliders"></i> ${SISTEMA_CONFIG.RESOLUCIONES_ACCION[resolucion] ?? resolucion}</span>`);
 
@@ -1774,6 +1789,499 @@ export class SistemaActor extends Actor {
     return { publico, master };
   }
 
+  /* ======================================================================== */
+  /*  5d. POTENS MYSTICA: ABALORIOS Y HABILIDADES (v0.17.0)                   */
+  /* ======================================================================== */
+
+  /**
+   * Usuarios que deben ver los avisos privados de este Actor: el Master y sus propietarios.
+   * @returns {string[]} IDs de usuario.
+   */
+  _destinatariosPrivados() {
+    return game.users.filter(u => u.isGM || this.testUserPermission(u, "OWNER")).map(u => u.id);
+  }
+
+  /**
+   * Avisos de chat al quemar una carta MIST (v0.17.0): con «Ojo por ojo» y/o «Preservación
+   * espiritual» En Juego, susurra al dueño (y al Master) los botones de cada abalorio para esa carta.
+   * Lo llama el hook `createCard` de `sistema.mjs` (pila de Quemadas del Actor).
+   * @param {Card} carta - Carta recién creada en Quemadas.
+   * @returns {Promise<void>}
+   */
+  async avisarQuemaMisticismo(carta) {
+    if (carta?.type !== "accion" || carta.system.palo !== "copas") return;
+    const abalorios = this.abaloriosActivos();
+    const ojo = abalorios.has("ojoPorOjo");
+    const preservacion = abalorios.has("preservacion");
+    if (!ojo && !preservacion) return;
+    const escapar = foundry.utils.escapeHTML;
+    const valor = valorCarta(carta);
+    const nombre = escapar(nombreVisibleCarta(carta));
+    const botones = [
+      ojo ? `<button type="button" class="cyd-btn-ojo-por-ojo" data-actor-uuid="${this.uuid}" data-carta-id="${carta.id}" data-valor="${valor}">
+        <i class="fa-solid fa-scale-balanced"></i> Ojo por ojo (descartar una carta: los enemigos pierden ${valor})
+      </button>` : "",
+      preservacion ? `<button type="button" class="cyd-btn-preservacion" data-actor-uuid="${this.uuid}" data-carta-id="${carta.id}" data-valor="${valor}">
+        <i class="fa-solid fa-recycle"></i> Preservación espiritual (tirada CONS ≥ ${valor})
+      </button>` : ""
+    ].join("");
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      whisper: this._destinatariosPrivados(),
+      content: `
+        <div class="cyd-chat-aviso"><i class="fa-solid fa-fire"></i><p><strong>${escapar(this.name)}</strong> ha quemado <strong>${nombre}</strong> (MIST · ${escapar(carta.system.tipoDado ?? "")}, valor ${valor}).</p></div>
+        ${botones}`
+    });
+  }
+
+  /**
+   * Ojo por ojo (v0.17.0): tras quemar una carta MIST, descarta otra carta de la mano para que los
+   * enemigos que puedas ver (los Tokens marcados con T) pierdan vida igual al valor de la carta MIST.
+   * La pérdida de vida no es daño (no la mitiga la Barrera espiritual); la aplica el Master con el
+   * botón `.cyd-btn-perder-vida`.
+   * @param {number} valor - Valor de la carta MIST quemada (caras de su dado).
+   * @returns {Promise<boolean>} true si se descartó la carta.
+   */
+  async usarOjoPorOjo(valor) {
+    if (!this.abaloriosActivos().has("ojoPorOjo")
+        && !(await this._confirmarExcepcion("Ojo por ojo no activo", ["El Trinket «Ojo por ojo» no está En Juego."]))) {
+      return false;
+    }
+    const { mano, descarte } = this.system.pilasDocumentos ?? {};
+    const cartas = mano?.cards.contents ?? [];
+    if (!cartas.length || !descarte) {
+      ui.notifications.warn(`${this.name} no tiene cartas en la mano para descartar.`);
+      return false;
+    }
+    const escapar = foundry.utils.escapeHTML;
+    const objetivos = [...game.user.targets].filter(t => t.actor && t.actor.id !== this.id);
+    const cartaId = await this._elegirCartaDeMano(cartas, {
+      titulo: "Ojo por ojo", icono: "fa-solid fa-scale-balanced",
+      texto: `<p>Elige la carta de tu mano que <strong>descartas</strong>: los enemigos que puedas ver pierden <strong>${valor}</strong> de vida.</p>
+        <p class="hint">${objetivos.length
+          ? `Objetivos marcados (T): ${objetivos.map(t => escapar(t.name)).join(", ")}.`
+          : "No has marcado objetivos con T: el Master lo aplicará a los Tokens que tenga marcados."}</p>`
+    });
+    if (!cartaId) return false;
+    const descartada = mano.cards.get(cartaId);
+    await this._moverCartaEntrePilas(mano, descarte, cartaId);
+    this.prepareData();
+    const uuids = objetivos.map(t => t.actor.uuid).join(",");
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-scale-balanced"></i> Ojo por ojo</h3>
+          ${this._lineaCartaUsada(descartada, "Descarta", "Descarte")}
+          <p><i class="fa-solid fa-droplet"></i> ${objetivos.length
+            ? `${objetivos.map(t => `<strong>${escapar(t.name)}</strong>`).join(", ")} pierden <strong>${valor}</strong> de vida.`
+            : `Todos los enemigos que ${escapar(this.name)} puede ver pierden <strong>${valor}</strong> de vida.`}</p>
+          <button type="button" class="cyd-btn-perder-vida" data-uuids="${uuids}" data-cantidad="${valor}">
+            <i class="fa-solid fa-droplet"></i> Restar ${valor} de Salud ${objetivos.length ? "a los objetivos" : "a los Tokens que tengas marcados"}
+          </button>
+        </div>`
+    });
+    if (this.sheet?.rendered) this.sheet.render();
+    return true;
+  }
+
+  /**
+   * Preservación espiritual (v0.17.0): una vez por turno (en combate), tras quemar una carta MIST,
+   * tira Consciencia con una carta CONS de la mano (que se descarta como en cualquier acción); si el
+   * total iguala o supera el valor máximo de la carta MIST (las caras de su dado), la carta vuelve
+   * de Quemadas al Mazo y se baraja.
+   * @param {string} cartaQuemadaId - ID de la carta en la pila de Quemadas.
+   * @returns {Promise<boolean>} true si se hizo la tirada.
+   */
+  async usarPreservacionEspiritual(cartaQuemadaId) {
+    const motivos = [];
+    if (!this.abaloriosActivos().has("preservacion")) motivos.push("El Trinket «Preservación espiritual» no está En Juego.");
+    if (this.estaEnCombate() && this.getFlag("cartas-y-dados", "preservacionUsada")) {
+      motivos.push("Ya has usado Preservación espiritual este turno.");
+    }
+    if (motivos.length && !(await this._confirmarExcepcion("Preservación espiritual", motivos))) return false;
+
+    const { mano, mazo, quemadas, descarte } = this.system.pilasDocumentos ?? {};
+    const cartaMist = quemadas?.cards.get(cartaQuemadaId) ?? null;
+    if (!cartaMist) {
+      ui.notifications.warn("La carta ya no está en tus Cartas Quemadas.");
+      return false;
+    }
+    const cartasCons = (mano?.cards.contents ?? []).filter(c => c.type === "accion" && c.system.palo === "bastos");
+    if (!cartasCons.length) {
+      ui.notifications.warn("Necesitas una carta de Consciencia (CONS) en la mano para la tirada de Preservación espiritual.");
+      return false;
+    }
+    const objetivo = valorCarta(cartaMist);
+    const dadosCons = this._dadosDeCaracteristica("consciencia");
+    const cartaId = await this._elegirCartaDeMano(cartasCons, {
+      titulo: "Preservación espiritual", icono: "fa-solid fa-recycle",
+      texto: `<p>Elige la carta CONS con la que tiras Consciencia (${dadosCons} dados). Si sacas <strong>${objetivo}</strong> o más, <strong>${foundry.utils.escapeHTML(nombreVisibleCarta(cartaMist))}</strong> vuelve a tu Mazo en vez de quedarse quemada.</p>`
+    });
+    if (!cartaId) return false;
+    const cartaCons = mano.cards.get(cartaId);
+
+    const tirada = await tirarDadosSistema({
+      cantidadDados: dadosCons, tipoDado: cartaCons.system.tipoDado ?? "d6",
+      bono: Number(cartaCons.system.automatizacion?.bonoTirada) || 0, rollData: this.getRollData(),
+      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
+      speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `Preservación espiritual · ${nombreVisibleCarta(cartaCons)}`
+    });
+    const exito = !tirada.esNegativo && tirada.total >= objetivo;
+    const quemarCons = Boolean(cartaCons.system.seQuema || this.system.agotamiento?.efectos?.quemarAlUsar);
+    await this._moverCartaEntrePilas(mano, quemarCons ? quemadas : descarte, cartaCons.id);
+    if (exito) await this._devolverCartaQuemadaAlMazo(cartaMist, { quemadas, mazo });
+    if (this.estaEnCombate()) await this.setFlag("cartas-y-dados", "preservacionUsada", true);
+    this.prepareData();
+
+    const nombreMist = foundry.utils.escapeHTML(nombreVisibleCarta(cartaMist));
+    await publicarTirada(tirada, {
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      flavor: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-recycle"></i> Preservación espiritual</h3>
+          ${this._lineaCartaUsada(cartaCons, "Carta", quemarCons ? "Carta Quemada" : "Descarte")}
+          <p><strong>Tirada:</strong> Consciencia × ${cartaCons.system.tipoDado} · necesita <strong>${objetivo}</strong> (valor máximo de ${nombreMist})</p>
+          ${tirada.html}
+          <div class="cyd-resolucion-caja ${exito ? "cyd-exito" : "cyd-fallo"}">
+            <p>${exito
+              ? `<i class="fa-solid fa-recycle"></i> <span class="cyd-resultado-exito">ÉXITO</span>: <strong>${nombreMist}</strong> se baraja en el Mazo en vez de quedarse quemada.`
+              : `<i class="fa-solid fa-fire"></i> <span class="cyd-resultado-fallo">FALLO</span>: <strong>${nombreMist}</strong> sigue en Cartas Quemadas.`}</p>
+          </div>
+        </div>`
+    });
+    if (this.sheet?.rendered) this.sheet.render();
+    return true;
+  }
+
+  /**
+   * Devuelve una carta de Quemadas a su Mazo y lo baraja (Preservación espiritual), reactivando la
+   * original por `sourceCardId` (motor de pilas propio, sin `Cards#pass()`).
+   * @param {Card} carta - Carta en Quemadas.
+   * @param {{quemadas: Cards, mazo: Cards}} pilas
+   * @returns {Promise<void>}
+   */
+  async _devolverCartaQuemadaAlMazo(carta, { quemadas, mazo }) {
+    if (!carta || !quemadas || !mazo) return;
+    const sourceId = carta.getFlag("cartas-y-dados", "sourceCardId");
+    const original = sourceId ? mazo.cards.get(sourceId) : null;
+    if (original?.drawn) {
+      await mazo.updateEmbeddedDocuments("Card", [{ _id: original.id, drawn: false }]);
+      await quemadas.deleteEmbeddedDocuments("Card", [carta.id]);
+    } else {
+      const datos = carta.toObject();
+      delete datos._id;
+      datos.drawn = false;
+      datos.origin = null;
+      await mazo.createEmbeddedDocuments("Card", [this._normalizarPayloadCarta(datos)]);
+      await quemadas.deleteEmbeddedDocuments("Card", [carta.id]);
+    }
+    await mazo.shuffle({ chatNotification: false });
+  }
+
+  /**
+   * Diálogo para elegir una carta de una lista (v0.17.0; Ojo por ojo, Preservación, Sellar destino).
+   * @param {Card[]} cartas
+   * @param {{titulo: string, icono: string, texto: string}} opciones
+   * @returns {Promise<string|null>} ID de la carta elegida o null si se cancela.
+   */
+  async _elegirCartaDeMano(cartas, { titulo, icono, texto }) {
+    const escapar = foundry.utils.escapeHTML;
+    const botones = cartas.map(c => ({
+      action: c.id,
+      label: c.type === "trinket"
+        ? `${nombreVisibleCarta(c)} (Trinket)`
+        : `${nombreVisibleCarta(c)} · ${abreviadoPalo(c.system.palo)} ${c.system.tipoDado ?? ""}`,
+      callback: () => c.id
+    }));
+    botones.push({ action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => null });
+    const eleccion = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 440, lista: true }),
+      window: { title: escapar(titulo), icon: icono },
+      content: texto,
+      buttons: botones,
+      rejectClose: false
+    });
+    return typeof eleccion === "string" && eleccion !== "cancelar" ? eleccion : null;
+  }
+
+  /**
+   * Barrera espiritual (v0.17.0): si el Actor va a recibir daño con el abalorio En Juego, quema cartas
+   * de la parte superior de su Mazo; cada una resta la mitad de su valor (caras del dado, redondeo
+   * hacia arriba) hasta anular el daño o vaciar el Mazo (vaciarlo no baraja el Descarte).
+   * @param {number} dano - Daño entrante.
+   * @returns {Promise<{restante: number, quemadas: Card[], mitigado: number}>}
+   */
+  async _mitigarConBarrera(dano) {
+    const { mazo, quemadas } = this.system.pilasDocumentos ?? {};
+    const resultado = { restante: dano, quemadas: [], mitigado: 0 };
+    if (!mazo || !quemadas) return resultado;
+    while (resultado.restante > 0) {
+      const carta = this.primeraCartaMazo();
+      if (!carta) break;
+      const [quemada] = await this._extraerCartasDeMazo(mazo, quemadas, [carta.id]);
+      if (!quemada) break;
+      const mitiga = Math.ceil(valorCarta(quemada) / 2);
+      resultado.quemadas.push({ carta: quemada, mitiga });
+      resultado.mitigado += Math.min(mitiga, resultado.restante);
+      resultado.restante = Math.max(0, resultado.restante - mitiga);
+    }
+    return resultado;
+  }
+
+  /**
+   * Aplica daño a la Salud del Actor (v0.17.0; botón «Aplicar daño» del Master). Con la Barrera
+   * espiritual En Juego y cartas en el Mazo pregunta antes si se usa (excepción) y publica, en privado
+   * para el Master y los dueños, las cartas quemadas y el daño mitigado.
+   * @param {number} dano
+   * @returns {Promise<{aplicado: number, mitigado: number, salud: number}|null>} null si se cancela.
+   */
+  async aplicarDano(dano) {
+    let restante = Math.max(0, Number(dano) || 0);
+    let mitigado = 0;
+    const mazo = this.system.pilasDocumentos?.mazo;
+    if (restante > 0 && this.abaloriosActivos().has("barrera") && mazo?.availableCards.length) {
+      const usar = await foundry.applications.api.DialogV2.wait({
+        ...opcionesDialogoSistema({ width: 420 }),
+        window: { title: "Barrera espiritual", icon: "fa-solid fa-shield-heart" },
+        content: `<p><strong>${foundry.utils.escapeHTML(this.name)}</strong> tiene la Barrera espiritual En Juego: en vez de recibir <strong>${restante}</strong> de daño, quema cartas de la parte superior de su Mazo (cada una resta la mitad de su valor).</p>`,
+        buttons: [
+          { action: "barrera", label: "Usar la Barrera", icon: "fa-solid fa-shield-heart", default: true, callback: () => "barrera" },
+          { action: "dano", label: "Recibir el daño (excepción)", icon: "fa-solid fa-droplet", callback: () => "dano" },
+          { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => null }
+        ],
+        rejectClose: false
+      });
+      if (!usar) return null;
+      if (usar === "barrera") {
+        const barrera = await this._mitigarConBarrera(restante);
+        restante = barrera.restante;
+        mitigado = barrera.mitigado;
+        const escapar = foundry.utils.escapeHTML;
+        const lineas = barrera.quemadas.map(({ carta, mitiga }) =>
+          `<li>${escapar(nombreVisibleCarta(carta))} · ${abreviadoPalo(carta.system.palo)} ${carta.system.tipoDado ?? ""} <strong>−${mitiga}</strong></li>`).join("");
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: this }),
+          whisper: this._destinatariosPrivados(),
+          content: `
+            <div class="cyd-carta-jugada">
+              <h3><i class="fa-solid fa-shield-heart"></i> Barrera espiritual</h3>
+              <p>Quema ${barrera.quemadas.length} carta(s) de la parte superior del Mazo:</p>
+              <ul>${lineas}</ul>
+              <p><strong>${mitigado}</strong> de daño mitigado${restante > 0 ? ` · recibe <strong>${restante}</strong> (Mazo vacío)` : " · daño anulado por completo"}.</p>
+            </div>`
+        });
+      }
+    }
+    const antes = Number(this.system.salud?.value) || 0;
+    const salud = Math.max(0, antes - restante);
+    if (salud !== antes) await this.update({ "system.salud.value": salud });
+    this.prepareData();
+    return { aplicado: restante, mitigado, salud };
+  }
+
+  /**
+   * Maldición «Mal de ojo» activa (`flags.cartas-y-dados.malDeOjo`).
+   * @returns {{turnos: number, origen: string}|null}
+   */
+  malDeOjo() {
+    const datos = this.getFlag("cartas-y-dados", "malDeOjo");
+    return Number(datos?.turnos) > 0 ? datos : null;
+  }
+
+  /**
+   * Dado de una carta MIST (o del dado de Misticismo de un PNJ) con «Mal de ojo» (v0.17.0).
+   * @param {string} tipoDado - Dado original.
+   * @returns {{tipoDado: string, resultadoFijo: number|null, motivoFijo: string}|null} null sin maldición.
+   */
+  _ajusteMalDeOjo(tipoDado) {
+    if (!this.malDeOjo()) return null;
+    return { ...dadoReducidoMalDeOjo(tipoDado), motivoFijo: "Mal de ojo (carta d4)" };
+  }
+
+  /**
+   * Etiqueta de chat de una tirada afectada por «Mal de ojo».
+   * @param {string} [dadoOriginal=""] - Dado antes de reducirlo.
+   * @returns {string}
+   */
+  _etiquetaMalDeOjo(dadoOriginal = "") {
+    const reducido = dadoOriginal ? dadoReducidoMalDeOjo(dadoOriginal) : null;
+    const detalle = reducido
+      ? (reducido.resultadoFijo !== null ? `: ${dadoOriginal} → resultado 1` : `: ${dadoOriginal} → ${reducido.tipoDado}`)
+      : ": −1 categoría de dado MIST";
+    return `<span class="cyd-tag-accion"><i class="fa-solid fa-eye-slash"></i> Mal de ojo${detalle}</span>`;
+  }
+
+  /**
+   * Aplica (o renueva) «Mal de ojo» durante `turnos` turnos (botón del Master).
+   * @param {number} turnos
+   * @param {string} [origen=""] - Nombre de quien maldice.
+   * @returns {Promise<void>}
+   */
+  async aplicarMalDeOjo(turnos, origen = "") {
+    const n = Math.max(1, Math.floor(Number(turnos) || 1));
+    await this.setFlag("cartas-y-dados", "malDeOjo", { turnos: n, origen: String(origen ?? "") });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-eye-slash"></i><p><strong>${foundry.utils.escapeHTML(this.name)}</strong> está bajo el <strong>Mal de ojo</strong>${origen ? ` de ${foundry.utils.escapeHTML(origen)}` : ""} durante <strong>${n} turno(s)</strong>: sus cartas de Misticismo bajan una categoría de dado.</p></div>`
+    });
+  }
+
+  /**
+   * Retira «Mal de ojo» (ficha o fin de su duración).
+   * @returns {Promise<void>}
+   */
+  async retirarMalDeOjo() {
+    if (this.getFlag("cartas-y-dados", "malDeOjo")) await this.unsetFlag("cartas-y-dados", "malDeOjo");
+  }
+
+  /**
+   * Fin de turno en combate (`SistemaCombat`): «Mal de ojo» pierde un turno y, al llegar a 0, termina.
+   * @returns {Promise<void>}
+   */
+  async avanzarMalDeOjo() {
+    const datos = this.malDeOjo();
+    if (!datos || !this.isOwner) return;
+    const turnos = Number(datos.turnos) - 1;
+    if (turnos > 0) {
+      await this.setFlag("cartas-y-dados", "malDeOjo", { ...datos, turnos });
+      return;
+    }
+    await this.retirarMalDeOjo();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-eye"></i><p>El <strong>Mal de ojo</strong> sobre <strong>${foundry.utils.escapeHTML(this.name)}</strong> se desvanece.</p></div>`
+    });
+  }
+
+  /**
+   * Destino sellado activo (`flags.cartas-y-dados.destinoSellado`, «Sellar destino»).
+   * @returns {{palo: string, origen: string}|null}
+   */
+  destinoSellado() {
+    const datos = this.getFlag("cartas-y-dados", "destinoSellado");
+    return datos?.palo ? datos : null;
+  }
+
+  /**
+   * Comprueba el destino sellado antes de una acción (v0.17.0): la siguiente acción debe ser de la
+   * característica sellada; otra distinta pide confirmar una excepción. Realizada la acción, el
+   * efecto termina (`retirarDestinoSellado`, junto a `_marcarAccionMiniTurno`): cancelar un diálogo
+   * posterior no lo consume.
+   * @param {string} claveCaract - Característica de la acción.
+   * @returns {Promise<boolean>} false si el usuario cancela.
+   */
+  async _cumplirDestinoSellado(claveCaract) {
+    const destino = this.destinoSellado();
+    if (!destino || !this.isOwner) return true;
+    const caractSellada = SISTEMA_CONFIG.palosCartas[destino.palo]?.caracteristicaAsociada ?? null;
+    if (caractSellada && caractSellada !== claveCaract
+        && !(await this._confirmarExcepcion("Destino sellado", [
+          `${destino.origen || "Alguien"} ha sellado tu destino: tu acción debe ser de ${nombreCaracteristica(caractSellada)} (${abreviadoPalo(destino.palo)}).`
+        ]))) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Retira el destino sellado (ficha).
+   * @returns {Promise<void>}
+   */
+  async retirarDestinoSellado() {
+    if (this.getFlag("cartas-y-dados", "destinoSellado")) await this.unsetFlag("cartas-y-dados", "destinoSellado");
+  }
+
+  /**
+   * Sellar destino (v0.17.0), antes de consumir la carta MIST: elige la carta de la mano que se
+   * descarta (no la MIST de la habilidad) y la descarta. El objetivo es el Token marcado con T.
+   * @param {Item} item - Habilidad.
+   * @param {Card|null} cartaMist - Carta MIST que se quema (se excluye de la elección).
+   * @returns {Promise<{html: string}|null>} HTML del efecto para el chat; null si se cancela.
+   */
+  async _prepararSellarDestino(item, cartaMist) {
+    const { mano, descarte } = this.system.pilasDocumentos ?? {};
+    const cartas = (mano?.cards.contents ?? []).filter(c => c.type === "accion" && c.id !== cartaMist?.id);
+    if (!cartas.length || !descarte) {
+      ui.notifications.warn("Sellar destino necesita otra Carta de Acción en tu mano para descartarla.");
+      return null;
+    }
+    const escapar = foundry.utils.escapeHTML;
+    const token = game.user.targets.first() ?? null;
+    const objetivo = token?.actor && token.actor.id !== this.id ? token.actor : null;
+    const cartaId = await this._elegirCartaDeMano(cartas, {
+      titulo: item.name, icono: "fa-solid fa-lock",
+      texto: `<p>Elige la carta que <strong>descartas</strong>: ${objetivo
+        ? `<strong>${escapar(token.name)}</strong>` : "la criatura objetivo"} deberá realizar una acción de su característica.</p>
+        ${objetivo ? "" : '<p class="hint"><i class="fa-solid fa-crosshairs"></i> Marca con <strong>T</strong> el Token objetivo para automatizar el efecto.</p>'}`
+    });
+    if (!cartaId) return null;
+    const carta = mano.cards.get(cartaId);
+    const palo = carta.system.palo;
+    const caract = nombreCaracteristica(SISTEMA_CONFIG.palosCartas[palo]?.caracteristicaAsociada);
+    await this._moverCartaEntrePilas(mano, descarte, cartaId);
+    const nombreObjetivo = objetivo ? escapar(token.name ?? objetivo.name) : "";
+    const html = `
+      ${this._lineaCartaUsada(carta, "Descarta", "Descarte")}
+      <div class="cyd-resolucion-caja">
+        <p><i class="fa-solid fa-lock"></i> ${objetivo ? `<strong>${nombreObjetivo}</strong>` : "La criatura objetivo"} está obligada a realizar una acción de <strong>${escapar(caract)} (${abreviadoPalo(palo)})</strong>. Si no tiene ninguna carta de ese palo en la mano, descarta la mano, roba una nueva y el efecto desaparece.</p>
+        ${objetivo ? `
+        <button type="button" class="cyd-btn-sellar-destino" data-actor-uuid="${objetivo.uuid}" data-palo="${palo}" data-origen="${escapar(this.name)}" data-nombre="${nombreObjetivo}">
+          <i class="fa-solid fa-lock"></i> Sellar el destino de ${nombreObjetivo}
+        </button>` : ""}
+      </div>`;
+    return { html };
+  }
+
+  /**
+   * Resuelve «Sellar destino» sobre este Actor (botón del Master, v0.17.0): si tiene mano y ninguna
+   * Carta de Acción del palo sellado, descarta la mano y roba una nueva (el efecto desaparece); si no,
+   * guarda el destino sellado hasta su siguiente acción. Un PNJ sin Mazo de Jefe queda sellado
+   * (el Master comprueba sus opciones).
+   * @param {string} palo - Palo de la carta descartada.
+   * @param {string} [origen=""] - Quien sella el destino.
+   * @returns {Promise<void>}
+   */
+  async resolverSellarDestino(palo, origen = "") {
+    const escapar = foundry.utils.escapeHTML;
+    const { mano, descarte } = this.system.pilasDocumentos ?? {};
+    const etiqueta = `${nombreCaracteristica(SISTEMA_CONFIG.palosCartas[palo]?.caracteristicaAsociada)} (${abreviadoPalo(palo)})`;
+    let texto;
+    if (mano && descarte && !mano.cards.some(c => c.type === "accion" && c.system.palo === palo)) {
+      for (const id of mano.cards.map(c => c.id)) await this._moverCartaEntrePilas(mano, descarte, id);
+      await this.robarHastaLimiteMano();
+      await this.retirarDestinoSellado();
+      texto = `<strong>${escapar(this.name)}</strong> no tiene cartas de ${etiqueta} en la mano: la descarta, roba una nueva y el destino sellado desaparece.`;
+    } else {
+      await this.setFlag("cartas-y-dados", "destinoSellado", { palo, origen: String(origen ?? "") });
+      texto = `${origen ? `${escapar(origen)} sella` : "Queda sellado"} el destino de <strong>${escapar(this.name)}</strong>: su siguiente acción debe ser de <strong>${etiqueta}</strong>.`;
+    }
+    this.prepareData();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-lock"></i><p>${texto}</p></div>`
+    });
+    if (this.sheet?.rendered) this.sheet.render();
+  }
+
+  /**
+   * Estados de Potens Mystica sobre este Actor para las fichas de PJ y PNJ (v0.17.0).
+   * @returns {{malDeOjo: object|null, destinoSellado: object|null}|null} null si no hay ninguno.
+   */
+  contextoEstadosMisticos() {
+    const mal = this.malDeOjo();
+    const destino = this.destinoSellado();
+    if (!mal && !destino) return null;
+    return {
+      malDeOjo: mal ? { turnos: Number(mal.turnos), origen: mal.origen ?? "" } : null,
+      destinoSellado: destino ? {
+        palo: abreviadoPalo(destino.palo),
+        caracteristica: nombreCaracteristica(SISTEMA_CONFIG.palosCartas[destino.palo]?.caracteristicaAsociada),
+        origen: destino.origen ?? ""
+      } : null
+    };
+  }
+
   /**
    * Vuelve a dejar disponible la reacción (inicio del turno del Actor, fin de combate,
    * descanso o a mano desde la ficha).
@@ -1781,8 +2289,8 @@ export class SistemaActor extends Actor {
    */
   async restablecerReaccion() {
     if (!this.isOwner) return;
-    // (v0.15.0) También el uso por turno del abalorio Empatía.
-    for (const clave of ["reaccionUsada", "empatiaUsada"]) {
+    // (v0.15.0) También el uso por turno de los abalorios Empatía y (v0.17.0) Preservación espiritual.
+    for (const clave of ["reaccionUsada", "empatiaUsada", "preservacionUsada"]) {
       if (this.getFlag("cartas-y-dados", clave)) await this.unsetFlag("cartas-y-dados", clave);
     }
   }
@@ -2148,7 +2656,7 @@ export class SistemaActor extends Actor {
    */
   async _limpiarEstadoAcciones() {
     if (!this.isOwner) return;
-    for (const clave of ["reaccionUsada", "miniTurno", "empatiaUsada"]) {
+    for (const clave of ["reaccionUsada", "miniTurno", "empatiaUsada", "preservacionUsada"]) {
       if (this.getFlag("cartas-y-dados", clave)) await this.unsetFlag("cartas-y-dados", clave);
     }
   }
@@ -2392,6 +2900,8 @@ export class SistemaActor extends Actor {
       valorX: Boolean(valorX),
       efectoX: efectoX ?? null,
       numeroCarta: numeroCarta ?? null, // (v0.16.0) Manifestar arma
+      // (v0.17.0) Mal de ojo sobre una carta d4: la repetición vuelve a dar el resultado fijo.
+      resultadoFijo: tirada.resultadosBase?.length === 0 && !tirada.combinada ? tirada.total : null,
       totalAnterior: tirada.total
     };
   }
@@ -2423,13 +2933,17 @@ export class SistemaActor extends Actor {
     const tirada = await tirarDadosSistema({
       cantidadDados: datos.cantidadDados, tipoDado: datos.tipoDado, bono: datos.bono,
       rollData: this.getRollData(), mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
-      speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `Espera un momento · ${datos.titulo}`
+      speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `Espera un momento · ${datos.titulo}`,
+      resultadoFijo: datos.resultadoFijo ?? null, motivoFijo: "Mal de ojo (carta d4)"
     });
     const tokenObjetivo = datos.objetivoTokenUuid ? (fromUuidSync(datos.objetivoTokenUuid) ?? null) : null;
     // (v0.16.0) Tiempo embotellado: la nueva tirada sustituye a los dados apuntados.
     if (datos.efectoX === "tiempoEmbotellado") await this._guardarTiempoEmbotellado(tirada);
     const resolucion = datos.valorX
-      ? { publico: this._htmlValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo, numeroCarta: datos.numeroCarta ?? null }), master: "" }
+      ? {
+        publico: this._htmlValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo, numeroCarta: datos.numeroCarta ?? null }),
+        master: this._htmlMasterValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo })
+      }
       : this._htmlResolucionTirada(tirada, datos.esAtaque, datos.etiquetaDificultad, { tokenObjetivo });
 
     const saborChat = `
@@ -2561,15 +3075,20 @@ export class SistemaActor extends Actor {
     descripcion = ""
   } = {}) {
     this.prepareData();
+    // (v0.17.0) Sellar destino: la acción debe ser de la característica sellada (salvo excepción).
+    if (!(await this._cumplirDestinoSellado(caracteristica))) return null;
     const cantidadDados = this.system.caracteristicasTotales?.[caracteristica]
       ?? this.system.caracteristicas?.[caracteristica]
       ?? 1;
 
     const bono = Number(bonoTirada) || 0;
+    // (v0.17.0) Mal de ojo: el dado de Misticismo baja una categoría.
+    const malDeOjo = caracteristica === "misticismo" ? this._ajusteMalDeOjo(tipoDado) : null;
     const tirada = await tirarDadosSistema({
-      cantidadDados, tipoDado, bono, rollData: this.getRollData(),
+      cantidadDados, tipoDado: malDeOjo?.tipoDado ?? tipoDado, bono, rollData: this.getRollData(),
       mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
-      speaker: ChatMessage.getSpeaker({ actor: this }), titulo
+      speaker: ChatMessage.getSpeaker({ actor: this }), titulo,
+      resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
     });
     const resolucion = this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
     const bloqueResolucionHtml = tirada.html + resolucion.publico;
@@ -2578,7 +3097,8 @@ export class SistemaActor extends Actor {
     const saborChat = `
       <div class="cyd-carta-jugada">
         <h3>${esAtaque ? '<i class="fa-solid fa-crosshairs"></i>' : '<i class="fa-solid fa-bolt"></i>'} ${titulo}</h3>
-        <p><strong>Atributo:</strong> ${caracteristica.toUpperCase()} (${cantidadDados}${tipoDado})</p>
+        ${malDeOjo ? `<p class="cyd-tags-accion-fila">${this._etiquetaMalDeOjo(tipoDado)}</p>` : ""}
+        <p><strong>Atributo:</strong> ${caracteristica.toUpperCase()} (${cantidadDados}${malDeOjo?.tipoDado ?? tipoDado})</p>
         ${bloqueResolucionHtml}
         ${descripcion ? `<div class="cyd-efecto">${descripcion}</div>` : ""}
       </div>
@@ -2590,6 +3110,7 @@ export class SistemaActor extends Actor {
       htmlMaster,
       repeticion: this._datosRepeticionTirada(tirada, { titulo, esAtaque, etiquetaDificultad: "Dificultad" })
     });
+    await this.retirarDestinoSellado(); // (v0.17.0) Sellar destino: la acción ya se ha realizado
 
     return tirada;
   }
@@ -2667,6 +3188,13 @@ export class SistemaActor extends Actor {
       tipoDado = this.system.dadosCaracteristicas?.misticismo || "d6";
     }
 
+    // (v0.17.0) Sellar destino: una habilidad es una acción de Misticismo.
+    if (!(await this._cumplirDestinoSellado("misticismo"))) return null;
+    // (v0.17.0) Mal de ojo: la carta MIST (o el dado del PNJ) baja una categoría.
+    const malDeOjo = this._ajusteMalDeOjo(tipoDado);
+    const tipoDadoCarta = tipoDado;
+    if (malDeOjo) tipoDado = malDeOjo.tipoDado;
+
     // (v0.16.0) Descarga elemental (`flags.cartas-y-dados.elemento`): antes de tirar se eligen las
     // cartas CONS con las que potenciarla y, con Elementalismo, el elemento. Cancelar no gasta nada.
     const elementoBase = item.getFlag("cartas-y-dados", "elemento");
@@ -2688,7 +3216,7 @@ export class SistemaActor extends Actor {
 
     // Líneas de chat que solo aparecen si se consumió una carta de Misticismo.
     const lineaCartaUsada = cartaElegida
-      ? `<p><i class="fa-solid fa-moon"></i> <strong>Carta de Misticismo:</strong> ${nombreCarta} <small>MIST · ${tipoDado} (Valor ${numero})</small></p>`
+      ? `<p><i class="fa-solid fa-moon"></i> <strong>Carta de Misticismo:</strong> ${nombreCarta} <small>MIST · ${tipoDadoCarta} (Valor ${numero})</small></p>`
       : `<p><small>Sin Mazo de Jefe: habilidad usada sin consumir carta de Misticismo.</small></p>`;
     const lineaQuemada = cartaElegida
       ? `<p class="cyd-nota-quemada"><small><i class="fa-solid fa-fire"></i> La carta <strong>${nombreCarta}</strong> fue <strong>quemada</strong> y enviada a Cartas Quemadas.</small></p>`
@@ -2696,13 +3224,18 @@ export class SistemaActor extends Actor {
 
     // Habilidad sin tirada: efecto directo, consumiendo la carta de Misticismo.
     if (item.system.requiereTirada === false) {
+      // (v0.17.0) Sellar destino: antes se elige la carta que se descarta (cancelar no gasta nada).
+      const sellar = item.getFlag("cartas-y-dados", "efectoX") === "sellarDestino"
+        ? await this._prepararSellarDestino(item, cartaElegida)
+        : null;
+      if (item.getFlag("cartas-y-dados", "efectoX") === "sellarDestino" && !sellar) return null;
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this }),
         content: `
           <div class="cyd-carta-jugada">
             <h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3>
             ${lineaCartaUsada}
-            <p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>
+            ${sellar?.html ?? "<p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>"}
             ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
             ${lineaQuemada}
           </div>
@@ -2715,6 +3248,7 @@ export class SistemaActor extends Actor {
       if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
       await this._registrarUltimaCaracteristica("misticismo"); // (v0.15.0) abalorio Amistad
     await this._marcarAccionMiniTurno();
+    await this.retirarDestinoSellado(); // (v0.17.0) Sellar destino: la acción ya se ha realizado
       this.prepareData();
       if (this.sheet?.rendered) this.sheet.render();
       return null;
@@ -2729,7 +3263,8 @@ export class SistemaActor extends Actor {
       tirada: await tirarDadosSistema({
         cantidadDados: cantidadDados + (amistad ? 1 : 0), tipoDado, bono, rollData: this.getRollData(),
         mitadPorAgotamiento, parcial: hayPartes,
-        speaker: ChatMessage.getSpeaker({ actor: this }), titulo: item.name
+        speaker: ChatMessage.getSpeaker({ actor: this }), titulo: item.name,
+        resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
       }),
       etiqueta: nombreCarta ? `${nombreCarta} (Misticismo)` : "Misticismo"
     }];
@@ -2756,7 +3291,10 @@ export class SistemaActor extends Actor {
     const numeroCarta = numero ?? (Number(Object.entries(SISTEMA_CONFIG.dadoPorNumeroCarta)
       .find(([, dado]) => dado === tipoDado)?.[0]) || null);
     const resolucion = usaValorX
-      ? { publico: this._htmlValorX(tirada, { efectoX, tokenObjetivo: tokenObjetivoX, numeroCarta }), master: "" }
+      ? {
+        publico: this._htmlValorX(tirada, { efectoX, tokenObjetivo: tokenObjetivoX, numeroCarta }),
+        master: this._htmlMasterValorX(tirada, { efectoX, tokenObjetivo: tokenObjetivoX })
+      }
       : this._htmlResolucionTirada(tirada, esAtaque || esDescarga, "Dificultad");
     // (v0.16.0) Descarga elemental: elemento y estado alterado (botón del Master).
     if (descarga) {
@@ -2779,7 +3317,9 @@ export class SistemaActor extends Actor {
       item.system.sinAccion ? '<span class="cyd-tag-accion"><i class="fa-solid fa-plus"></i> No gasta acción</span>' : "",
       amistad ? `<span class="cyd-tag-accion"><i class="fa-solid fa-handshake"></i> Amistad con ${foundry.utils.escapeHTML(amistad.aliado)}: +1 dado</span>` : "",
       cartasDescarga.length ? `<span class="cyd-tag-accion"><i class="fa-solid fa-book"></i> Potenciada con ${cartasDescarga.length} carta(s) CONS</span>` : "",
-      descarga && descarga.elemento !== elementoBase ? '<span class="cyd-tag-accion"><i class="fa-solid fa-fire-flame-curved"></i> Elementalismo</span>' : ""
+      descarga && descarga.elemento !== elementoBase ? '<span class="cyd-tag-accion"><i class="fa-solid fa-fire-flame-curved"></i> Elementalismo</span>' : "",
+      malDeOjo ? this._etiquetaMalDeOjo(tipoDadoCarta) : "",
+      efectoX === "flagelarEsencia" ? '<span class="cyd-tag-accion"><i class="fa-solid fa-crosshairs"></i> Ataque a la esencia</span>' : ""
     ].filter(Boolean);
     const etiquetaSinAccion = etiquetasHabilidad.length
       ? `<p class="cyd-tags-accion-fila">${etiquetasHabilidad.join(" ")}</p>`
@@ -2823,6 +3363,7 @@ export class SistemaActor extends Actor {
     if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
     await this._registrarUltimaCaracteristica("misticismo"); // (v0.15.0) abalorio Amistad
     await this._marcarAccionMiniTurno();
+    await this.retirarDestinoSellado(); // (v0.17.0) Sellar destino: la acción ya se ha realizado
     this.prepareData();
     if (this.sheet?.rendered) this.sheet.render();
     return tirada;
@@ -2880,6 +3421,18 @@ export class SistemaActor extends Actor {
           <button type="button" class="cyd-btn-promesa" data-actor-uuid="${actorObjetivo.uuid}" data-x="${valor}" data-origen="${escapar(this.name)}">
             <i class="fa-solid fa-hand-holding-hand"></i> Elegir carta (Promesa)
           </button>`;
+      } else if (efectoX === "malDeOjo") {
+        // (v0.17.0) Potens Mystica · Mal de ojo: el Master aplica la maldición al objetivo.
+        const nombre = escapar(tokenObjetivo.name ?? actorObjetivo.name);
+        htmlEfecto = `
+          <p><i class="fa-solid fa-eye-slash"></i> <strong>${nombre}</strong> queda maldito <strong>${valor} turno(s)</strong>: sus cartas de Misticismo bajan una categoría de dado (una carta d4 da automáticamente 1).</p>
+          <button type="button" class="cyd-btn-mal-de-ojo" data-actor-uuid="${actorObjetivo.uuid}" data-turnos="${valor}" data-origen="${escapar(this.name)}" data-nombre="${nombre}">
+            <i class="fa-solid fa-eye-slash"></i> Aplicar Mal de ojo a ${nombre} (${valor} turnos)
+          </button>`;
+      } else if (efectoX === "flagelarEsencia") {
+        // (v0.17.0) Potens Mystica · Flagelar esencia: el daño solo lo ve el Master (`_htmlMasterValorX`).
+        const nombre = escapar(tokenObjetivo.name ?? actorObjetivo.name);
+        htmlEfecto = `<p><i class="fa-solid fa-crosshairs"></i> Ataque a la esencia de <strong>${nombre}</strong>: X × Agotamiento de ${escapar(this.name)} × nivel de peligro. <small><i class="fa-solid fa-eye-slash"></i> El daño solo lo ve el Master.</small></p>`;
       }
     }
     return `
@@ -2888,6 +3441,46 @@ export class SistemaActor extends Actor {
         ${htmlEfecto}
       </div>
     `;
+  }
+
+  /**
+   * Bloque solo para el Master del valor X de una habilidad (v0.17.0). Hoy solo lo usa «Flagelar
+   * esencia» (Potens Mystica): daño = X × Agotamiento del lanzador × nivel de peligro del objetivo
+   * (Amenaza si es un PNJ; su nivel si es un PJ), con el botón para aplicarlo (`.cyd-btn-aplicar-dano`,
+   * que respeta la Barrera espiritual del objetivo).
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
+   * @param {Object} [opciones]
+   * @param {string|null} [opciones.efectoX=null]
+   * @param {Token|TokenDocument|null} [opciones.tokenObjetivo=null]
+   * @returns {string} HTML ("" si no aplica).
+   */
+  _htmlMasterValorX(tirada, { efectoX = null, tokenObjetivo = null } = {}) {
+    if (efectoX !== "flagelarEsencia") return "";
+    const valor = Math.max(0, Number(tirada.total) || 0);
+    const actorObjetivo = tokenObjetivo?.actor ?? null;
+    if (tirada.esNegativo || valor <= 0 || !actorObjetivo || actorObjetivo.id === this.id) return "";
+    const escapar = foundry.utils.escapeHTML;
+    const nombre = escapar(tokenObjetivo.name ?? actorObjetivo.name);
+    const agotamiento = Number(this.system.agotamiento?.nivel ?? this.system.cansancio?.value) || 0;
+    const peligro = actorObjetivo.type === "pnj"
+      ? Math.max(1, Number(actorObjetivo.system.amenaza) || 1)
+      : Math.max(1, Number(actorObjetivo.system.nivelEfectivo) || 1);
+    const etiquetaPeligro = actorObjetivo.type === "pnj" ? "Amenaza" : "Nivel";
+    const dano = valor * agotamiento * peligro;
+    const detalle = dano > 0
+      ? `<p><i class="fa-solid fa-burst"></i> <strong>Daño ${dano}</strong> <small>(X ${valor} × Agotamiento ${agotamiento} × ${etiquetaPeligro} ${peligro})</small></p>
+         <button type="button" class="cyd-btn-aplicar-dano" data-actor-uuid="${actorObjetivo.uuid}" data-dano="${dano}">
+           <i class="fa-solid fa-droplet"></i> Aplicar ${dano} de Daño a ${nombre}
+         </button>`
+      : `<p><i class="fa-solid fa-shield-halved"></i> <strong>0 Daño:</strong> ${escapar(this.name)} no tiene Agotamiento (X ${valor} × 0 × ${etiquetaPeligro} ${peligro}).</p>`;
+    return `
+      <div class="cyd-carta-jugada">
+        <h3><i class="fa-solid fa-eye-slash"></i> Flagelar esencia <small>(solo Master)</small></h3>
+        <div class="cyd-resolucion-caja ${dano > 0 ? "cyd-exito" : "cyd-fallo"}">
+          <p><i class="fa-solid fa-crosshairs"></i> <strong>${escapar(this.name)}</strong> → <strong>${nombre}</strong></p>
+          ${detalle}
+        </div>
+      </div>`;
   }
 
   /**

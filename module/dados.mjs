@@ -69,16 +69,22 @@ function valoresDados(roll) {
  * @param {Object|null} [opciones.speaker=null] - (v0.14.1) Hablante de la tarjeta pendiente en modo
  *   manual de Crítico/Pifia (por defecto, `ChatMessage.getSpeaker()`).
  * @param {string} [opciones.titulo=""] - (v0.14.1) Título de la tarjeta pendiente en modo manual.
+ * @param {number|null} [opciones.resultadoFijo=null] - (v0.17.0, Mal de ojo) Si se indica, no se lanzan
+ *   dados: el resultado es automáticamente este valor (sin bono, Crítico, Pifia ni Agotamiento).
+ * @param {string} [opciones.motivoFijo=""] - (v0.17.0) Texto del desglose para el resultado fijo.
  * @returns {Promise<ResultadoTiradaSistema>} En modo manual, no se resuelve hasta que se pulsan
  *   los botones de Crítico/Pifia de la tarjeta.
  */
 export async function tirarDadosSistema({
   cantidadDados, tipoDado, bono = 0, rollData = {}, mitadPorAgotamiento = false, parcial = false,
-  speaker = null, titulo = ""
+  speaker = null, titulo = "", resultadoFijo = null, motivoFijo = ""
 }) {
   const n = Math.max(1, Math.floor(Number(cantidadDados) || 1));
   const caras = Math.max(2, Number(String(tipoDado ?? "d6").replace(/^d/i, "")) || 6);
   const bonoNum = Number(bono) || 0;
+  if (resultadoFijo !== null && resultadoFijo !== undefined) {
+    return tiradaResultadoFijo(Number(resultadoFijo) || 0, { n, caras, motivo: motivoFijo });
+  }
 
   const tiradaBase = await new Roll(`${n}d${caras}`, rollData).evaluate();
   const rolls = [tiradaBase];
@@ -159,6 +165,39 @@ export async function tirarDadosSistema({
   };
   resultado.html = htmlDetalleTirada(resultado, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial });
   return resultado;
+}
+
+/**
+ * Tirada sin dados con un resultado fijo (v0.17.0, «Mal de ojo» sobre una carta d4: el resultado es
+ * automáticamente 1). Lleva una `Roll` constante para que el mensaje de chat tenga su tirada.
+ * @param {number} valor - Resultado fijo.
+ * @param {{n: number, caras: number, motivo: string}} datos
+ * @returns {Promise<ResultadoTiradaSistema>}
+ */
+async function tiradaResultadoFijo(valor, { n, caras, motivo }) {
+  const roll = await new Roll(String(valor)).evaluate();
+  return {
+    total: valor,
+    rolls: [roll],
+    resultadosBase: [],
+    resultadosCritico: [],
+    resultadosPifia: [],
+    esCritico: false,
+    esPifia: false,
+    esNegativo: valor < 0,
+    mitadPorAgotamiento: false,
+    totalSinAgotamiento: valor,
+    formula: String(valor),
+    cantidadDados: n,
+    tipoDado: `d${caras}`,
+    bono: 0,
+    mensajesPendientes: [],
+    sustituciones: [],
+    html: `
+      <div class="cyd-tirada-detalle">
+        <p><i class="fa-solid fa-eye-slash"></i> <strong>${motivo || "Resultado automático"}:</strong> no se lanzan dados (${n}d${caras}) = <strong>${valor}</strong></p>
+      </div>`
+  };
 }
 
 /**

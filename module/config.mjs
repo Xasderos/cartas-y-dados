@@ -592,18 +592,57 @@ export const SISTEMA_CONFIG = {
       nombre: "Potens Mystica",
       atributo: "misticismo",
       paloPrincipal: "copas",
-      trinkets: ["Ojo por ojo", "Preservación espiritual", "Barrera espiritual"],
+      tablaElecciones: [
+        { nivel: 1, beneficios: "Mazo Inicial (Misticismo) · Elección de abalorio" },
+        { nivel: 2, beneficios: "Elección de habilidad · Elección de cartas" },
+        { nivel: 3, beneficios: "Elección de especialización" }
+      ],
+      // (v0.17.0) El «valor» de una carta son las caras de su dado (d4 = 4 ... d12 = 12): ver `valorCarta`.
+      trinkets: [
+        {
+          clave: "ojoPorOjo", nombre: "Ojo por ojo", icono: "fa-scale-balanced",
+          texto: "Siempre que quemes una carta de misticismo, puedes descartar otra carta de tu mano para que todos los enemigos que puedas ver pierdan vida igual al valor de la carta de misticismo.",
+          auto: "En Juego: al quemar una carta MIST recibes en el chat el botón «Ojo por ojo»; eliges la carta de la mano que descartas y el Master resta el valor de la carta MIST (caras de su dado) a la Salud de los enemigos marcados con T."
+        },
+        {
+          clave: "preservacion", nombre: "Preservación espiritual", icono: "fa-recycle",
+          texto: "Una vez por turno, si quemas una carta de misticismo puedes hacer una tirada de consciencia; si igualas o superas el valor máximo de la carta de misticismo barajas la carta en tu mazo en vez de quemarla.",
+          auto: "En Juego: al quemar una carta MIST recibes en el chat el botón «Preservación espiritual»; tiras Consciencia con una carta CONS de la mano y, si igualas o superas las caras del dado de la carta MIST, vuelve de Quemadas a tu Mazo y se baraja. En combate, una vez por turno."
+        },
+        {
+          clave: "barrera", nombre: "Barrera espiritual", icono: "fa-shield-heart",
+          texto: "Si fueras a recibir daño, en vez de eso quemas cartas de la parte superior de tu mazo, por cada carta que quemes resta la mitad de su valor al daño, hasta mitigar por completo el daño.",
+          auto: "En Juego: cuando el Master aplica daño con el botón del chat, se queman cartas de la parte superior de tu Mazo; cada una resta la mitad de las caras de su dado (redondeo hacia arriba) hasta anular el daño o vaciar el Mazo."
+        }
+      ],
       progresion: {
         2: {
           habilidades: [
-            { nombre: "Mal de ojo", esAtaque: true },
-            { nombre: "Sellar destino", esAtaque: false },
-            { nombre: "Flagelar esencia", esAtaque: true }
+            {
+              nombre: "Mal de ojo", esAtaque: false, valorX: true, efectoX: "malDeOjo",
+              texto: "Maldices a un objetivo X turnos, reduciendo la categoría de sus cartas de misticismo en 1 dado (si es una carta de d4 el resultado será automáticamente 1). (X es el resultado de la tirada de misticismo)"
+            },
+            {
+              nombre: "Sellar destino", esAtaque: false, requiereTirada: false, efectoX: "sellarDestino",
+              texto: "Al usar esta habilidad, descarta otra carta de tu mano: la criatura objetivo está obligada a realizar una acción relacionada con esa carta. Si la criatura no tiene ninguna carta relacionada en su mano, descarta la mano y roba una nueva, y el efecto desaparece."
+            },
+            {
+              nombre: "Flagelar esencia", esAtaque: false, valorX: true, efectoX: "flagelarEsencia",
+              texto: "Realizas un ataque a la esencia del enemigo, haciendo X × nivel de agotamiento × nivel de peligro de daño. (X es el resultado de la tirada de misticismo)"
+            }
           ],
           packs: [
             [{ palo: "espadas", numero: 1 }, { palo: "copas", numero: 2 }],
-            [{ palo: "bastos", numero: 1 }, { palo: "copas", numero: 2 }],
-            [{ palo: "oros", numero: 1 }, { palo: "copas", numero: 2 }]
+            [{ palo: "oros", numero: 1 }, { palo: "copas", numero: 2 }],
+            [{ palo: "bastos", numero: 1 }, { palo: "copas", numero: 2 }]
+          ]
+        },
+        3: {
+          especializaciones: [
+            {
+              clave: "brujo", nombre: "Brujo",
+              texto: "Especialización de Potens Mystica. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+            }
           ]
         }
       }
@@ -781,8 +820,38 @@ export const EFECTOS_VALOR_X = {
   promesa: "Promesa: el objetivo elige entre sus X primeras cartas",
   // (v0.16.0) Alta Scentia
   manifestarArma: "Manifestar arma: categorías según el dado de la carta, X turnos",
-  tiempoEmbotellado: "Tiempo embotellado: guardar los dados para sustituirlos después"
+  tiempoEmbotellado: "Tiempo embotellado: guardar los dados para sustituirlos después",
+  // (v0.17.0) Potens Mystica
+  malDeOjo: "Mal de ojo: maldecir al objetivo X turnos (−1 categoría a sus dados MIST)",
+  flagelarEsencia: "Flagelar esencia: daño X × tu Agotamiento × Amenaza del objetivo",
+  sellarDestino: "Sellar destino: descartar una carta y obligar al objetivo (sin tirada)"
 };
+
+/**
+ * Valor de una carta (v0.17.0, Potens Mystica): las caras de su dado (d4 = 4 ... d12 = 12).
+ * Lo usan Ojo por ojo (vida perdida), Preservación espiritual (valor máximo a igualar) y Barrera
+ * espiritual (la mitad, redondeando hacia arriba, mitiga el daño).
+ * @param {Card|null} carta
+ * @returns {number} 0 si la carta no tiene dado (p. ej. un Trinket).
+ */
+export function valorCarta(carta) {
+  if (carta?.type !== "accion") return 0;
+  const dado = carta.system?.tipoDado || SISTEMA_CONFIG.dadoPorNumeroCarta[Number(carta.system?.numero)] || "";
+  return Number(String(dado).replace(/^d/i, "")) || 0;
+}
+
+/**
+ * Dado reducido una categoría por «Mal de ojo» (v0.17.0): d12 → d10 → d8 → d6 → d4; un d4 no tiene
+ * categoría inferior y su resultado es automáticamente 1 (`resultadoFijo`).
+ * @param {string} tipoDado - "d4".."d12".
+ * @returns {{tipoDado: string, resultadoFijo: number|null}}
+ */
+export function dadoReducidoMalDeOjo(tipoDado) {
+  const orden = ["d4", "d6", "d8", "d10", "d12"];
+  const i = orden.indexOf(String(tipoDado ?? "").toLowerCase());
+  if (i <= 0) return { tipoDado: "d4", resultadoFijo: 1 };
+  return { tipoDado: orden[i - 1], resultadoFijo: null };
+}
 
 /**
  * Nombre visible del estado alterado de un elemento (v0.16.0): la etiqueta localizada de
