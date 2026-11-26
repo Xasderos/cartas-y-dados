@@ -8,6 +8,10 @@ export class SistemaCombat extends Combat {
   /** @override */
   async startCombat() {
     await super.startCombat();
+    // (v0.14.0) Todos empiezan el combate con su reacción disponible.
+    for (const combatiente of this.combatants) {
+      if (combatiente.actor?.isOwner) await combatiente.actor.restablecerReaccion?.();
+    }
     await this.#robarCartasCombatienteActivo();
     return this;
   }
@@ -45,9 +49,14 @@ export class SistemaCombat extends Combat {
     }
   }
 
+  /**
+   * Inicio del turno del combatiente activo: recupera su reacción (v0.14.0; las reacciones se
+   * limitan a una hasta que vuelve a ser su turno) y roba hasta su Mano Máxima.
+   */
   async #robarCartasCombatienteActivo() {
     const actor = this.combatant?.actor;
     if (!actor) return;
+    if (actor.isOwner) await actor.restablecerReaccion?.();
 
     const pilas = actor.system.pilasDocumentos;
     if (pilas?.mazo && pilas?.mano && pilas?.descarte) {

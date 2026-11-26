@@ -287,6 +287,37 @@
             <button type="button" data-action="finCombate"><i class="fa-solid fa-rotate"></i> Fin de Combate</button>
             <button type="button" data-action="descansar"><i class="fa-solid fa-campground"></i> Descansar</button>
           </div>
+          {{!-- (v0.14.0) Estado de acción: combate, reacción y acción fuera de combate (mini turno) --}}
+          <div class="cyd-estado-acciones">
+            <span class="cyd-chip-estado{{#if estadoAcciones.enCombate}} cyd-activo{{/if}}" data-tooltip="{{#if estadoAcciones.enCombate}}En combate: usa las cartas de tu mano; robas al inicio de tu turno{{else}}Fuera de combate: roba el doble de tu Mano Máx. para cada acción{{/if}}">
+              <i class="fa-solid {{#if estadoAcciones.enCombate}}fa-khanda{{else}}fa-person-walking{{/if}}"></i> {{#if estadoAcciones.enCombate}}En combate{{else}}Fuera de combate{{/if}}
+            </span>
+            {{#if estadoAcciones.sinReacciones}}
+              <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Agotamiento 4+: no puede realizar reacciones (solo como excepción)"><i class="fa-solid fa-ban"></i> Sin reacciones</span>
+            {{else if estadoAcciones.reaccionUsada}}
+              <span class="cyd-chip-estado cyd-bloqueado" data-action="restablecerReaccion" data-tooltip="Reacción usada: se recupera al inicio de tu turno. Clic para recuperarla ahora (excepción)"><i class="fa-solid fa-bolt"></i> Reacción usada</span>
+            {{else}}
+              <span class="cyd-chip-estado" data-tooltip="Puedes realizar una reacción hasta que vuelva a ser tu turno"><i class="fa-solid fa-bolt"></i> Reacción disponible</span>
+            {{/if}}
+            {{#if estadoAcciones.miniTurno}}
+              <span class="cyd-chip-estado cyd-activo" data-tooltip="Cada mano robada (tantas cartas como tu Mano Máx.) equivale a un turno de tiempo">
+                <i class="fa-solid fa-stopwatch"></i> {{#if estadoAcciones.miniTurno.esReaccion}}Reacción{{else}}Acción{{/if}} fuera de combate · {{estadoAcciones.miniTurno.manos}} manos
+              </span>
+            {{/if}}
+          </div>
+          <div class="cyd-acciones-turno cyd-cols-2">
+            {{#if estadoAcciones.miniTurno}}
+              {{#if estadoAcciones.miniTurno.esReaccion}}
+              <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Una reacción fuera de combate solo roba una mano: si no tienes la carta adecuada, falla"><i class="fa-solid fa-ban"></i> Sin más robos</span>
+              {{else}}
+              <button type="button" data-action="otraManoMiniTurno" data-tooltip="Roba tantas cartas como tu Mano Máx.: la acción tarda un turno más"><i class="fa-solid fa-clone"></i> Robar otra mano</button>
+              {{/if}}
+              <button type="button" data-action="terminarMiniTurno" data-tooltip="{{#if estadoAcciones.miniTurno.esReaccion}}Termina la reacción; si no has usado ninguna carta, falla{{else}}Termina la acción y decide qué hacer con las cartas que quedan en la mano{{/if}}"><i class="fa-solid fa-hourglass-end"></i> {{#if estadoAcciones.miniTurno.esReaccion}}Terminar reacción{{else}}Terminar acción{{/if}}</button>
+            {{else}}
+              <button type="button" data-action="accionFueraCombate" data-reaccion="false" data-tooltip="Roba {{estadoAcciones.cartasMiniTurno}} cartas (el doble de tu Mano Máx.) y elige con cuál actuar"><i class="fa-solid fa-stopwatch"></i> Acción fuera de combate</button>
+              <button type="button" data-action="accionFueraCombate" data-reaccion="true" data-tooltip="Roba {{estadoAcciones.cartasMiniTurno}} cartas una sola vez, cuando quien inició la acción ya ha elegido su carta. Si no tienes la carta adecuada, la reacción falla"><i class="fa-solid fa-bolt"></i> Reacción fuera de combate</button>
+            {{/if}}
+          </div>
         {{/if}}
 
         <div class="cyd-resumen-pilas">
@@ -399,7 +430,7 @@
       <section class="cyd-panel-mano">
         <div class="cyd-cabecera-seccion">
           <h3><i class="fa-solid fa-hand"></i> Mano <span class="cyd-contador">{{contadoresPilas.manoActual}} / {{system.limiteMano}}{{#if system.agotamiento.efectos.manoMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}</span></h3>
-          <small class="cyd-ayuda"><i class="fa-solid fa-crosshairs"></i> Para atacar, marca un objetivo con <kbd>T</kbd> antes de jugar</small>
+          <small class="cyd-ayuda"><i class="fa-solid fa-crosshairs"></i> «Usar» abre el diálogo de acción · para atacar, marca un objetivo con <kbd>T</kbd> antes</small>
         </div>
 
         {{#if esPropietario}}
@@ -425,7 +456,7 @@
                   </div>
                   <div class="cyd-carta-efecto">{{{carta.efecto}}}</div>
                   <footer class="cyd-carta-acciones">
-                    <button type="button" class="cyd-btn-jugar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-modo="usar">
+                    <button type="button" class="cyd-btn-jugar" data-action="jugarCarta" data-carta-id="{{carta.id}}" data-modo="usar" data-tooltip="Elegir la acción (apuntar, potenciar, reacción...) y tirar">
                       <i class="fa-solid fa-dice-d20"></i> Usar
                     </button>
                     <button type="button" class="cyd-btn-descartar" data-action="descartarCarta" data-carta-id="{{carta.id}}" data-tooltip="Descartar sin tirar (se anuncia en el chat)">

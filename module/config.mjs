@@ -93,13 +93,100 @@ export const SISTEMA_CONFIG = {
     { nivel: 3, clave: "saludMitad", icono: "fa-heart-pulse", texto: "Tu salud máxima se reduce a la mitad, redondeando hacia arriba." },
     { nivel: 4, clave: "sinReacciones", icono: "fa-ban", texto: "No puedes realizar reacciones." },
     { nivel: 5, clave: "unTrinket", icono: "fa-gem", texto: "Solo puedes tener un Trinket (abalorio) activo; si tienes más, quema los de tu elección hasta tener uno." },
-    { nivel: 6, clave: "tiradasMitad", icono: "fa-dice-d20", texto: "El resultado de todas tus tiradas se reduce a la mitad, redondeando hacia arriba." },
+    { nivel: 6, clave: "tiradasMitad", icono: "fa-dice-d20", texto: "El resultado de todas tus tiradas se reduce a la mitad, redondeando hacia arriba (un resultado negativo no se reduce)." },
     { nivel: 7, clave: "quemarAlUsar", icono: "fa-fire", texto: "Cada vez que uses una carta, quémala en vez de descartarla." },
     { nivel: 8, clave: "muerte", icono: "fa-skull", texto: "Mueres." }
   ],
 
   /** Nivel de Agotamiento que provoca la muerte (y máximo de la escala). */
   AGOTAMIENTO_MAXIMO: 8,
+
+  /**
+   * Catálogo de acciones (v0.14.0). Es una guía, no una lista cerrada: la acción `libre`
+   * («Otra acción») cubre todo lo que acuerde la mesa con cualquier carta.
+   * Cada entrada:
+   * - `nombre`, `icono` (Font Awesome), `texto` (guía en texto plano).
+   * - `caracteristicas`: claves de característica cuyas cartas pueden realizarla.
+   * - `resolucion`: cómo se resuelve por defecto (el diálogo permite cambiarla):
+   *   `ataque` (contra la Defensa del objetivo), `dificultad` (contra la Dificultad del Master),
+   *   `enfrentada` (el Master la compara con la tirada rival), `puntoDebil` (contra la Defensa
+   *   del objetivo, sin daño), `ayuda` (suma a la tirada de un aliado), `segunCarta` (ataque si
+   *   la carta está marcada como ataque; si no, Dificultad) o `sinTirada` (efecto fijo).
+   * - `reaccion` (opcional): se marca como reacción por defecto.
+   * - `adicional` (opcional): puede realizarse además del resto de acciones.
+   * Las Habilidades (MIST) no están aquí: el diálogo las lista desde los Items del Actor.
+   */
+  ACCIONES: {
+    ataqueArma: {
+      nombre: "Ataque con arma", icono: "fa-khanda", caracteristicas: ["fisico"], resolucion: "ataque",
+      texto: "Usas el arma que tengas disponible para atacar a un enemigo."
+    },
+    defensa: {
+      nombre: "Defensa", icono: "fa-shield-halved", caracteristicas: ["fisico"], resolucion: "enfrentada", reaccion: true,
+      texto: "Esquivas, paras o desvías un ataque para reducir o negar su daño (reacción)."
+    },
+    agarre: {
+      nombre: "Agarre", icono: "fa-hands-holding", caracteristicas: ["fisico"], resolucion: "dificultad",
+      texto: "Agarras a tu objetivo: le cuesta moverse y actuar físicamente; debes mantener el agarre."
+    },
+    desarmar: {
+      nombre: "Desarmar", icono: "fa-hand-back-fist", caracteristicas: ["fisico"], resolucion: "dificultad",
+      texto: "Intentas dejar a tu oponente sin su arma."
+    },
+    correr: {
+      nombre: "Correr", icono: "fa-person-running", caracteristicas: ["fisico"], resolucion: "sinTirada",
+      texto: "Te esfuerzas para moverte más lejos en el mismo tiempo: duplicas tu movimiento."
+    },
+    magiaComun: {
+      nombre: "Magia común", icono: "fa-hat-wizard", caracteristicas: ["consciencia"], resolucion: "segunCarta",
+      texto: "Usas tu magia para producir un efecto (ataque, defensa...) dentro de tus limitaciones."
+    },
+    activarArtefacto: {
+      nombre: "Activar artefacto", icono: "fa-ring", caracteristicas: ["consciencia"], resolucion: "dificultad",
+      texto: "Activas un artilugio mágico de poder usando tu entendimiento de su funcionamiento."
+    },
+    identificarPuntoDebil: {
+      nombre: "Identificar punto débil", icono: "fa-magnifying-glass", caracteristicas: ["consciencia", "social"],
+      resolucion: "puntoDebil", adicional: true,
+      texto: "Lo descubres si tu resultado supera la Defensa del objetivo. Es una acción adicional."
+    },
+    ayudar: {
+      nombre: "Ayudar", icono: "fa-handshake-angle", caracteristicas: ["social"], resolucion: "ayuda",
+      texto: "Sumas tu resultado a la tirada de un aliado. Solo una ayuda por acción."
+    },
+    levantar: {
+      nombre: "Levantar", icono: "fa-hand-holding-heart", caracteristicas: ["social"], resolucion: "dificultad",
+      texto: "Ayudas a un compañero que sufre un estado alterado (levantarlo, socorrerlo...)."
+    },
+    libre: {
+      nombre: "Otra acción", icono: "fa-comments", caracteristicas: ["fisico", "consciencia", "social", "misticismo"],
+      resolucion: "segunCarta",
+      texto: "Cualquier otra acción acordada con la mesa y aprobada por el Master."
+    }
+  },
+
+  /**
+   * Resoluciones que el diálogo de acción permite forzar (excepciones acordadas en la mesa).
+   * `auto` usa la resolución de la acción elegida.
+   */
+  RESOLUCIONES_ACCION: {
+    auto: "Según la acción",
+    ataque: "Ataque contra la Defensa del objetivo",
+    dificultad: "Contra la Dificultad del Master",
+    enfrentada: "Tirada enfrentada (la compara el Master)",
+    puntoDebil: "Contra la Defensa, sin daño (punto débil)",
+    ayuda: "Ayuda: sumar a la tirada de un aliado",
+    sinResolucion: "Solo tirar, sin resolución",
+    sinTirada: "Sin tirada (efecto directo)"
+  },
+
+  /** Icono canónico de cada característica (ver `docs-ia/estilos.md`). */
+  ICONOS_CARACTERISTICA: {
+    fisico: "fa-hand-fist",
+    consciencia: "fa-eye",
+    social: "fa-masks-theater",
+    misticismo: "fa-moon"
+  },
 
   /**
    * Razas Base del sistema (v0.10.1; rasgos desde v0.13.0).
@@ -590,4 +677,27 @@ export function nombreVisibleCarta(carta) {
   const numero = Number(carta?.system?.numero) || "?";
   const dado = SISTEMA_CONFIG.dadoPorNumeroCarta?.[numero] ?? "?";
   return `Carta ${palo}${numero} (${dado})`;
+}
+
+/**
+ * Acciones del catálogo (`SISTEMA_CONFIG.ACCIONES`) disponibles para una característica (v0.14.0).
+ * @param {string} claveCaracteristica - `fisico`, `consciencia`, `social` o `misticismo`.
+ * @returns {Array<{clave: string, nombre: string, icono: string, texto: string, resolucion: string,
+ *   reaccion: boolean, adicional: boolean}>} La acción `libre` siempre va al final.
+ */
+export function accionesDeCaracteristica(claveCaracteristica) {
+  return Object.entries(SISTEMA_CONFIG.ACCIONES)
+    .filter(([, a]) => a.caracteristicas.includes(claveCaracteristica))
+    .map(([clave, a]) => ({ clave, ...a, reaccion: Boolean(a.reaccion), adicional: Boolean(a.adicional) }))
+    .sort((a, b) => (a.clave === "libre") - (b.clave === "libre"));
+}
+
+/**
+ * Nombre visible de una característica (localizado si hay traducción).
+ * @param {string} clave - `fisico`, `consciencia`, `social` o `misticismo`.
+ * @returns {string}
+ */
+export function nombreCaracteristica(clave) {
+  const etiqueta = SISTEMA_CONFIG.caracteristicas[clave];
+  return etiqueta ? game.i18n.localize(etiqueta) : String(clave ?? "");
 }

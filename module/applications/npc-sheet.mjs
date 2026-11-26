@@ -7,6 +7,7 @@
 
 import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
+import { abrirDialogoAccion } from "./dialogo-accion.mjs";
 
 import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud } from "../config.mjs";
 import { preguntarTipoDescanso } from "../documents/actor.mjs";
@@ -44,6 +45,10 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       inicializarPilasJefe: HojaPnjActor.#onInicializarPilasJefe,
       robarTurno: HojaPnjActor.#onRobarTurno,
       jugarCarta: HojaPnjActor.#onJugarCarta,
+      accionFueraCombate: HojaPnjActor.#onAccionFueraCombate,
+      otraManoMiniTurno: HojaPnjActor.#onOtraManoMiniTurno,
+      terminarMiniTurno: HojaPnjActor.#onTerminarMiniTurno,
+      restablecerReaccion: HojaPnjActor.#onRestablecerReaccion,
       descartarCarta: HojaPnjActor.#onDescartarCarta,
       quemarCarta: HojaPnjActor.#onQuemarCarta,
       finCombate: HojaPnjActor.#onFinCombate,
@@ -101,7 +106,8 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
             tipoDado: c.system?.tipoDado,
             caracteristica: c.system?.caracteristicaAsociada,
             cantidadDados: system.caracteristicasTotales?.[c.system?.caracteristicaAsociada] ?? 1,
-            seQuema: c.system?.seQuema,
+            // (v0.14.0) Las cartas MIST siempre se queman al usarse.
+            seQuema: Boolean(c.system?.seQuema) || c.system?.palo === "copas",
             efecto: c.system?.efecto
           }))
       : [];
@@ -110,6 +116,7 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       ...context,
       actor,
       system,
+      estadoAcciones: actor.contextoAcciones(),
       esPropietario: actor.isOwner,
       agotamiento: contextoAgotamiento(system.cansancio?.value),
       barraSalud: contextoBarraSalud(system.salud?.value, system.salud?.maxTotal),
@@ -222,10 +229,39 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
     this.render();
   }
 
+  /**
+   * Usar / Usar y Quemar una carta de la mano (v0.14.0): abre el diálogo «Realizar acción»
+   * (acción, Ataque apuntado, Potenciar, Reacción y excepciones). Los Trinkets se juegan directamente.
+   */
   static async #onJugarCarta(event, target) {
-    const cartaId = target.dataset.cartaId;
-    const modo = target.dataset.modo || "usar";
-    await this.document.jugarCarta(cartaId, { modo });
+    await abrirDialogoAccion(this.document, target.dataset.cartaId, { quemar: target.dataset.modo === "usar-y-quemar" });
+    this.render();
+  }
+
+  /**
+   * Acción o reacción fuera de combate (v0.14.0): inicia un mini turno robando el doble de la
+   * Mano Máx. (`data-reaccion="true"`: reacción, una sola vez).
+   */
+  static async #onAccionFueraCombate(event, target) {
+    await this.document.iniciarMiniTurno({ reaccion: target.dataset.reaccion === "true" });
+    this.render();
+  }
+
+  /** Mini turno: robar otra mano (la acción tarda un turno más). */
+  static async #onOtraManoMiniTurno() {
+    await this.document.robarOtraManoMiniTurno();
+    this.render();
+  }
+
+  /** Mini turno: terminar la acción fuera de combate y decidir qué pasa con las cartas sobrantes. */
+  static async #onTerminarMiniTurno() {
+    await this.document.terminarMiniTurno();
+    this.render();
+  }
+
+  /** Vuelve a dejar disponible la reacción (control manual para excepciones). */
+  static async #onRestablecerReaccion() {
+    await this.document.restablecerReaccion();
     this.render();
   }
 

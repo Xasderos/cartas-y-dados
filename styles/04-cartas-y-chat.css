@@ -440,3 +440,131 @@ button.cyd-btn-aplicar-curacion i {
   margin-right: 4px;
   color: var(--cyd-exito, var(--color-level-success, #26b231));
 }
+
+/* ======================================================================== */
+/*  ACCIONES (v0.14.0): estado en la ficha, diálogo y chat                  */
+/* ======================================================================== */
+
+/* Fila de estado: combate, reacción y acción fuera de combate */
+.cyd-estado-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-block: 6px;
+}
+
+.cyd-chip-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  color: var(--cyd-texto-suave);
+  background: var(--cyd-fondo-hundido);
+  border: 1px solid var(--cyd-borde-suave);
+  border-radius: var(--cyd-radio);
+  user-select: none;
+}
+
+.cyd-chip-estado i {
+  color: var(--cyd-azul);
+}
+
+.cyd-chip-estado.cyd-activo {
+  color: var(--cyd-texto);
+  border-color: var(--cyd-oro-linea);
+}
+
+.cyd-chip-estado.cyd-bloqueado i {
+  color: var(--color-level-warning, #ee9b3a);
+}
+
+.cyd-chip-estado[data-action] {
+  cursor: pointer;
+}
+
+.cyd-chip-estado[data-action]:hover {
+  color: var(--cyd-texto);
+  background: var(--cyd-tinte-hover);
+}
+
+/* Diálogo «Realizar acción» */
+.cyd-dialogo-accion fieldset {
+  margin-block: 8px 0;
+  padding: 4px 8px 6px;
+}
+
+.cyd-dialogo-accion legend i,
+.cyd-dialogo-accion-carta i,
+.cyd-dialogo-accion-guia summary i {
+  color: var(--cyd-azul);
+}
+
+.cyd-dialogo-accion-carta {
+  margin-block: 0 6px;
+  overflow-wrap: anywhere;
+}
+
+.cyd-dialogo-accion-texto {
+  margin-block: 4px 0;
+  min-height: 1.3em;
+}
+
+.cyd-dialogo-accion .cyd-aviso-reaccion i {
+  color: var(--color-level-warning, #ee9b3a);
+}
+
+.cyd-dialogo-accion-guia {
+  margin-top: 8px;
+}
+
+.cyd-dialogo-accion-guia summary {
+  cursor: pointer;
+}
+
+.cyd-dialogo-accion-guia ul {
+  max-height: 12rem;
+  overflow-y: auto;
+  margin: 4px 0;
+  padding-left: 1.2em;
+  font-size: 0.85rem;
+}
+
+/* Chat: etiquetas de la acción (Reacción, Ataque apuntado, Potenciada...) */
+.cyd-tags-accion-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block: 2px 4px;
+}
+
+.cyd-tag-accion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  border: 1px solid var(--cyd-borde-suave, var(--color-border));
+  border-radius: var(--cyd-radio, 3px);
+}
+
+.cyd-tag-accion i {
+  color: var(--cyd-azul);
+}
+
+/* Chat: tiradas combinadas (Ataque apuntado y Potenciar) */
+.cyd-tirada-parte {
+  padding-left: 6px;
+  border-left: 2px solid var(--cyd-oro-linea, var(--color-border));
+  margin-block: 4px;
+}
+
+.cyd-tirada-parte-titulo {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.cyd-tirada-mitad i {
+  color: var(--cyd-azul);
+}

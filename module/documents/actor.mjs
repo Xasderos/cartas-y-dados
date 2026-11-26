@@ -11,7 +11,7 @@ import {
   nombreVisibleCarta, razaBaseDeActor, tieneRasgoRacial
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
-import { htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
+import { combinarTiradas, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 
 export class SistemaActor extends Actor {
 
@@ -621,7 +621,36 @@ export class SistemaActor extends Actor {
     return { publico, master };
   }
 
-  async jugarCarta(cartaId, { quemar = false, modo = "usar" } = {}) {
+  /**
+   * Juega una carta de la mano (v0.14.0: acciones, Ataque apuntado, Potenciar y reacciones).
+   * - **Trinket:** no tira; va a `enJuego` (o a `quemadas` si se quema) y aplica su automatización.
+   * - **Carta de Acción:** realiza la acción `accion` de `SISTEMA_CONFIG.ACCIONES` (sin acción = la
+   *   carta decide: ataque si `esAtaque`, si no contra la Dificultad). Tira
+   *   `caracteristicasTotales[caracteristicaAsociada]` dados `tipoDado` + `automatizacion.bonoTirada`.
+   *   - Ataque apuntado (`cartaApuntadoId`): segunda carta del mismo palo; se suman ambas tiradas y el
+   *     resultado se divide entre 2 (redondeo hacia arriba). Por defecto se resuelve como ataque.
+   *   - Potenciar (`cartaPotenciarId`): otra carta MIST de la mano; su tirada de Misticismo se suma
+   *     y se quema siempre.
+   *   - Destino: las cartas MIST, las marcadas «Se quema» y todas con Agotamiento 7+ se queman; el
+   *     resto va al Descarte. `quemar` (booleano) fuerza el destino como excepción.
+   *   - Reacción (`reaccion`): con Agotamiento 4+ o, en combate, con la reacción ya usada, pide
+   *     confirmar una excepción; en combate la marca como usada hasta el turno del Actor.
+   * @param {string} cartaId - ID de la carta en la mano.
+   * @param {Object} [opciones]
+   * @param {boolean} [opciones.quemar] - Forzar quemar (true) o descartar (false); sin indicar, según las reglas.
+   * @param {string} [opciones.modo="usar"] - "usar-y-quemar" equivale a `quemar: true` (compatibilidad).
+   * @param {string|null} [opciones.accion=null] - Clave de `SISTEMA_CONFIG.ACCIONES`.
+   * @param {string|null} [opciones.cartaApuntadoId=null] - Segunda carta del Ataque apuntado.
+   * @param {boolean} [opciones.puntoDebil=false] - El Ataque apuntado va al punto débil (explotar su debilidad).
+   * @param {string|null} [opciones.cartaPotenciarId=null] - Carta MIST con la que se Potencia.
+   * @param {boolean} [opciones.reaccion=false] - La acción es una reacción.
+   * @param {string} [opciones.resolucion="auto"] - Clave de `SISTEMA_CONFIG.RESOLUCIONES_ACCION`.
+   * @returns {Promise<import("../dados.mjs").ResultadoTiradaSistema|null>} Tirada o null.
+   */
+  async jugarCarta(cartaId, {
+    quemar, modo = "usar", accion = null, cartaApuntadoId = null, puntoDebil = false,
+    cartaPotenciarId = null, reaccion = false, resolucion = "auto"
+  } = {}) {
     const { mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mano || !enJuego || !descarte || !quemadas) return null;
 
@@ -633,113 +662,137 @@ export class SistemaActor extends Actor {
 
     // Si el modo es "usar-y-quemar", forzar quemado de la carta tras usarla
     if (modo === "usar-y-quemar") quemar = true;
+    if (carta.type === "trinket") return this._jugarTrinket(carta, { quemar: quemar === true });
 
+    const quemarExplicito = typeof quemar === "boolean";
     const efectosAgotamiento = this.system.agotamiento?.efectos ?? {};
+    const configAccion = accion ? SISTEMA_CONFIG.ACCIONES[accion] ?? null : null;
+    const claveCaract = carta.system.caracteristicaAsociada;
 
-    // Agotamiento 5+: solo puede haber un Trinket activo en juego.
-    if (carta.type === "trinket" && !quemar && !carta.system.seQuema
-        && efectosAgotamiento.unTrinket && enJuego.cards.size >= 1) {
-      ui.notifications.warn(`${this.name} tiene Agotamiento ${this.system.agotamiento.nivel}: solo puede tener un Trinket activo. Retira o quema el que está en juego antes de jugar otro.`);
+    // --- Validar las cartas adicionales ---------------------------------------------
+    const cartaApuntado = cartaApuntadoId ? mano.cards.get(cartaApuntadoId) ?? null : null;
+    if (cartaApuntadoId && (!cartaApuntado || cartaApuntado.id === carta.id || cartaApuntado.type !== "accion"
+        || cartaApuntado.system.palo !== carta.system.palo)) {
+      ui.notifications.warn("El Ataque apuntado necesita una segunda carta del mismo palo en tu mano.");
+      return null;
+    }
+    const cartaPotenciar = cartaPotenciarId ? mano.cards.get(cartaPotenciarId) ?? null : null;
+    if (cartaPotenciarId && (!cartaPotenciar || [carta.id, cartaApuntado?.id].includes(cartaPotenciar.id)
+        || cartaPotenciar.type !== "accion" || cartaPotenciar.system.palo !== "copas")) {
+      ui.notifications.warn("Para Potenciar necesitas otra carta de Misticismo (MIST) en tu mano.");
       return null;
     }
 
-    const auto = carta.system.automatizacion ?? {};
-    const bonoTirada = Number(auto.bonoTirada) || 0;
+    // --- Reacción ------------------------------------------------------------------------
+    let reaccionPorExcepcion = false;
+    if (reaccion) {
+      const permiso = await this._autorizarReaccion();
+      if (!permiso) return null;
+      reaccionPorExcepcion = permiso === "excepcion";
+    }
 
+    // --- Tipo de resolución ----------------------------------------------------------------
+    let tipoResolucion = resolucion && resolucion !== "auto"
+      ? resolucion
+      : cartaApuntado ? "ataque" : configAccion?.resolucion ?? "segunCarta";
+    if (tipoResolucion === "segunCarta") tipoResolucion = carta.system.esAtaque ? "ataque" : "dificultad";
+    const esAtaque = tipoResolucion === "ataque";
+
+    // --- Tiradas ---------------------------------------------------------------------------------
     /** @type {import("../dados.mjs").ResultadoTiradaSistema|null} */
     let tirada = null;
     let bloqueResolucionHtml = "";
     /** HTML de resolución solo para el Master (Defensa y daño del objetivo). */
     let htmlMaster = "";
+    const hayPartes = Boolean(cartaApuntado || cartaPotenciar);
 
-    // Los Trinkets NO calculan ni lanzan dados XdY (v0.8.4): se mueven directamente
-    // a la pila `enJuego` ejecutando su automatización e indicando su Nivel en el chat.
-    const debeTirar = carta.type === "accion";
-
-    if (debeTirar) {
-      const claveCaract = carta.system.caracteristicaAsociada;
-      const cantidadDados = this.system.caracteristicasTotales?.[claveCaract]
-        ?? this.system.caracteristicas[claveCaract]
-        ?? 1;
-      const tipoDado = carta.system.tipoDado ?? "d6";
-      tirada = await tirarDadosSistema({
-        cantidadDados, tipoDado, bono: bonoTirada, rollData: this.getRollData(),
-        mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento()
+    if (tipoResolucion !== "sinTirada") {
+      const mitadPorAgotamiento = this._tiradasAMitadPorAgotamiento();
+      const tirarCarta = (c, caract) => tirarDadosSistema({
+        cantidadDados: this._dadosDeCaracteristica(caract),
+        tipoDado: c.system.tipoDado ?? "d6",
+        bono: Number(c.system.automatizacion?.bonoTirada) || 0,
+        rollData: this.getRollData(),
+        mitadPorAgotamiento,
+        parcial: hayPartes
       });
-      const resolucion = this._htmlResolucionTirada(tirada, Boolean(carta.system.esAtaque));
-      bloqueResolucionHtml = tirada.html + resolucion.publico;
-      htmlMaster = resolucion.master;
+      const partes = [{ tirada: await tirarCarta(carta, claveCaract), etiqueta: nombreVisibleCarta(carta) }];
+      if (cartaApuntado) {
+        partes.push({ tirada: await tirarCarta(cartaApuntado, claveCaract), etiqueta: `${nombreVisibleCarta(cartaApuntado)} (apuntado)` });
+      }
+      if (cartaPotenciar) {
+        partes.push({ tirada: await tirarCarta(cartaPotenciar, "misticismo"), etiqueta: `${nombreVisibleCarta(cartaPotenciar)} (Potenciar)` });
+      }
+      tirada = combinarTiradas(partes, { mitad: Boolean(cartaApuntado), motivoMitad: "Ataque apuntado" });
+      const res = this._htmlResolucionAccion(tirada, tipoResolucion);
+      bloqueResolucionHtml = tirada.html + res.publico;
+      htmlMaster = res.master;
     }
 
-    // Determinar pila destino: Quemadas, En Juego (si es Trinket) o Descarte
-    // Agotamiento 7+: las Cartas de Acción usadas se queman en vez de descartarse
-    // (los Trinkets no se descartan al jugarse: van a En Juego).
-    const quemaPorAgotamiento = carta.type === "accion" && Boolean(efectosAgotamiento.quemarAlUsar);
-    const seQuema = quemar || Boolean(carta.system.seQuema) || quemaPorAgotamiento;
-    let pilaDestino = descarte;
-    let etiquetaDestino = "Descarte";
+    // --- Destino de las cartas -------------------------------------------------------------
+    /** Motivos de reglas por los que una carta usada se quema en vez de descartarse. */
+    const motivosQuema = c => [
+      c.system.palo === "copas" ? "Misticismo" : null,
+      c.system.seQuema ? "Se quema" : null,
+      efectosAgotamiento.quemarAlUsar ? `Agotamiento ${this.system.agotamiento.nivel}` : null
+    ].filter(Boolean);
+    const seQuemaCarta = c => quemarExplicito ? quemar : motivosQuema(c).length > 0;
+    const etiquetaDestino = c => {
+      const motivos = motivosQuema(c);
+      if (quemarExplicito && quemar) return motivos.length ? `Carta Quemada · ${motivos.join(", ")}` : "Carta Quemada";
+      if (quemarExplicito && !quemar && motivos.length) return "Descarte · excepción: no se quema";
+      return motivos.length ? `Carta Quemada · ${motivos.join(", ")}` : "Descarte";
+    };
 
-    if (seQuema) {
-      pilaDestino = quemadas;
-      etiquetaDestino = quemaPorAgotamiento && !quemar && !carta.system.seQuema
-        ? "Carta Quemada por Agotamiento"
-        : "Carta Quemada";
-    } else if (carta.type === "trinket") {
-      pilaDestino = enJuego;
-      etiquetaDestino = "Trinket En Juego";
+    const lineasCartas = [this._lineaCartaUsada(carta, "Carta", etiquetaDestino(carta))];
+    await this._moverCartaEntrePilas(mano, seQuemaCarta(carta) ? quemadas : descarte, carta.id);
+    if (cartaApuntado) {
+      lineasCartas.push(this._lineaCartaUsada(cartaApuntado, "Ataque apuntado", etiquetaDestino(cartaApuntado)));
+      await this._moverCartaEntrePilas(mano, seQuemaCarta(cartaApuntado) ? quemadas : descarte, cartaApuntado.id);
+    }
+    if (cartaPotenciar) {
+      lineasCartas.push(this._lineaCartaUsada(cartaPotenciar, "Potenciar", "Carta Quemada · Misticismo"));
+      await this._moverCartaEntrePilas(mano, quemadas, cartaPotenciar.id);
     }
 
-    // Mover carta preservando flags y recalcular datos derivados del Actor (incluyendo Defensa)
-    await this._moverCartaEntrePilas(mano, pilaDestino, carta.id);
+    // --- Automatización de la carta principal -------------------------------------------------
+    const resumenEfectosAuto = await this._aplicarAutomatizacionCarta(carta);
 
-    const resumenEfectosAuto = [];
-    const updatesActor = {};
-
-    if (auto.curacion > 0) {
-      const nuevaSalud = Math.min(this.system.salud.maxTotal, this.system.salud.value + auto.curacion);
-      updatesActor["system.salud.value"] = nuevaSalud;
-      resumenEfectosAuto.push(`<i class="fa-solid fa-heart-pulse"></i> +${auto.curacion} Salud`);
-    }
-
-    if (auto.cambioCansancio !== 0) {
-      updatesActor["system.cansancio.value"] = SistemaActor.limitarAgotamiento(this.system.cansancio.value + auto.cambioCansancio);
-      const signo = auto.cambioCansancio > 0 ? `+${auto.cambioCansancio}` : auto.cambioCansancio;
-      resumenEfectosAuto.push(`<i class="fa-solid fa-hourglass-half"></i> ${signo} Agotamiento`);
-    }
-
-    if (Object.keys(updatesActor).length > 0) {
-      await this.update(updatesActor);
-    }
-
-    if (auto.robarCartas > 0) {
-      await this.robarCantidadCartas(auto.robarCartas);
-      resumenEfectosAuto.push(`<i class="fa-solid fa-clone"></i> Roba +${auto.robarCartas} carta(s)`);
-    }
-
-    const bonoDefTrinket = Number(carta.system.bonoDefensaEnJuego) || 0;
-    if (carta.type === "trinket" && bonoDefTrinket !== 0 && !seQuema) {
-      const signoDef = bonoDefTrinket > 0 ? `+${bonoDefTrinket}` : bonoDefTrinket;
-      resumenEfectosAuto.push(`<i class="fa-solid fa-shield-halved"></i> ${signoDef} Defensa (Activo en Juego)`);
-    }
-
-    // Garantizar que `defensaTotal` quede recalculada en el Actor
+    if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
+    await this._marcarAccionMiniTurno();
     this.prepareData();
 
+    // --- Chat ----------------------------------------------------------------------------------
+    const etiquetas = [];
+    if (reaccion) etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-bolt"></i> Reacción${reaccionPorExcepcion ? " (excepción)" : ""}</span>`);
+    if (configAccion?.adicional) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-plus"></i> Acción adicional</span>');
+    if (cartaApuntado) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-bullseye"></i> Ataque apuntado (÷ 2)</span>');
+    if (cartaPotenciar) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-moon"></i> Potenciada</span>');
+    if (resolucion && resolucion !== "auto") etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-sliders"></i> ${SISTEMA_CONFIG.RESOLUCIONES_ACCION[resolucion] ?? resolucion}</span>`);
+
+    const lineasExtra = [];
+    if (accion === "correr") {
+      const mov = Number(this.system.movimiento?.max) || 0;
+      lineasExtra.push(`<p><i class="fa-solid fa-person-running"></i> Movimiento duplicado: <strong>${mov * 2} m</strong> este turno (${mov} × 2).</p>`);
+    }
+    if (cartaApuntado && puntoDebil) {
+      lineasExtra.push('<p><i class="fa-solid fa-crosshairs"></i> Apunta al <strong>punto débil</strong>: si impacta, explota su debilidad (efecto a criterio del Master).</p>');
+    }
+
+    const efectoHtml = carta.system.efecto;
+    const titulo = configAccion ? `${configAccion.nombre} · ${nombreVisibleCarta(carta)}` : nombreVisibleCarta(carta);
+    const icono = configAccion ? configAccion.icono : esAtaque ? "fa-crosshairs" : "fa-diamond";
     const htmlEfectosAuto = resumenEfectosAuto.length > 0
       ? `<p class="cyd-tags-auto"><strong>Efectos aplicados:</strong> ${resumenEfectosAuto.join(" · ")}</p>`
       : "";
-
-    const efectoHtml = carta.type === "trinket"
-      ? carta.system.efectoAlJugar
-      : carta.system.efecto;
-
-    // Icono de cabecera: los Trinkets anuncian su entrada en juego con su Nivel (v0.8.4)
-    const iconoChat = carta.type === "trinket" ? '<i class="fa-solid fa-gem"></i>' : carta.system.esAtaque ? '<i class="fa-solid fa-crosshairs"></i>' : '<i class="fa-solid fa-diamond"></i>';
     const saborChat = `
       <div class="cyd-carta-jugada">
-        <h3>${iconoChat} ${nombreVisibleCarta(carta)} <small>(${etiquetaDestino})</small></h3>
-        ${this._infoCartaHtml(carta)}
+        <h3><i class="fa-solid ${icono}"></i> ${titulo}</h3>
+        ${etiquetas.length ? `<p class="cyd-tags-accion-fila">${etiquetas.join(" ")}</p>` : ""}
+        ${lineasCartas.join("")}
+        ${lineasExtra.join("")}
         ${bloqueResolucionHtml}
+        ${tipoResolucion === "sinTirada" ? '<p><small><i class="fa-solid fa-circle-info"></i> Acción sin tirada: su efecto se aplica directamente.</small></p>' : ""}
         ${htmlEfectosAuto}
         ${efectoHtml ? `<div class="cyd-efecto">${efectoHtml}</div>` : ""}
       </div>
@@ -750,18 +803,394 @@ export class SistemaActor extends Actor {
         speaker: ChatMessage.getSpeaker({ actor: this }),
         flavor: saborChat,
         htmlMaster,
-        repeticion: this._datosRepeticionTirada(tirada, {
-          titulo: nombreVisibleCarta(carta), esAtaque: Boolean(carta.system.esAtaque)
-        })
+        // «Espera un momento» solo repite tiradas simples (una carta).
+        repeticion: hayPartes ? null : this._datosRepeticionTirada(tirada, { titulo, esAtaque })
       });
     } else {
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: this }),
-        content: saborChat
-      });
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: this }), content: saborChat });
     }
 
     return tirada;
+  }
+
+  /**
+   * Juega un Trinket de la mano (sin tirada): va a `enJuego`, o a `quemadas` si se quema.
+   * Con Agotamiento 5+ solo puede haber un Trinket activo.
+   * @param {Card} carta - Trinket en la mano.
+   * @param {{quemar: boolean}} opciones
+   * @returns {Promise<null>}
+   */
+  async _jugarTrinket(carta, { quemar = false } = {}) {
+    const { mano, enJuego, quemadas } = this.system.pilasDocumentos;
+    const efectosAgotamiento = this.system.agotamiento?.efectos ?? {};
+    const seQuema = quemar || Boolean(carta.system.seQuema);
+
+    // Agotamiento 5+: solo puede haber un Trinket activo en juego.
+    if (!seQuema && efectosAgotamiento.unTrinket && enJuego.cards.size >= 1) {
+      ui.notifications.warn(`${this.name} tiene Agotamiento ${this.system.agotamiento.nivel}: solo puede tener un Trinket activo. Retira o quema el que está en juego antes de jugar otro.`);
+      return null;
+    }
+
+    await this._moverCartaEntrePilas(mano, seQuema ? quemadas : enJuego, carta.id);
+    const resumenEfectosAuto = await this._aplicarAutomatizacionCarta(carta);
+
+    const bonoDefTrinket = Number(carta.system.bonoDefensaEnJuego) || 0;
+    if (bonoDefTrinket !== 0 && !seQuema) {
+      const signoDef = bonoDefTrinket > 0 ? `+${bonoDefTrinket}` : bonoDefTrinket;
+      resumenEfectosAuto.push(`<i class="fa-solid fa-shield-halved"></i> ${signoDef} Defensa (Activo en Juego)`);
+    }
+    this.prepareData();
+
+    const htmlEfectosAuto = resumenEfectosAuto.length > 0
+      ? `<p class="cyd-tags-auto"><strong>Efectos aplicados:</strong> ${resumenEfectosAuto.join(" · ")}</p>`
+      : "";
+    const efectoHtml = carta.system.efectoAlJugar;
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-gem"></i> ${nombreVisibleCarta(carta)} <small>(${seQuema ? "Carta Quemada" : "Trinket En Juego"})</small></h3>
+          ${this._infoCartaHtml(carta)}
+          ${htmlEfectosAuto}
+          ${efectoHtml ? `<div class="cyd-efecto">${efectoHtml}</div>` : ""}
+        </div>
+      `
+    });
+    return null;
+  }
+
+  /**
+   * Aplica la automatización de una carta jugada (curación, Agotamiento y robo de cartas).
+   * @param {Card} carta
+   * @returns {Promise<string[]>} Resumen HTML de los efectos aplicados.
+   */
+  async _aplicarAutomatizacionCarta(carta) {
+    const auto = carta.system.automatizacion ?? {};
+    const resumen = [];
+    const updatesActor = {};
+
+    if (auto.curacion > 0) {
+      updatesActor["system.salud.value"] = Math.min(this.system.salud.maxTotal, this.system.salud.value + auto.curacion);
+      resumen.push(`<i class="fa-solid fa-heart-pulse"></i> +${auto.curacion} Salud`);
+    }
+    if (auto.cambioCansancio) {
+      updatesActor["system.cansancio.value"] = SistemaActor.limitarAgotamiento(this.system.cansancio.value + auto.cambioCansancio);
+      const signo = auto.cambioCansancio > 0 ? `+${auto.cambioCansancio}` : auto.cambioCansancio;
+      resumen.push(`<i class="fa-solid fa-hourglass-half"></i> ${signo} Agotamiento`);
+    }
+    if (Object.keys(updatesActor).length > 0) await this.update(updatesActor);
+
+    if (auto.robarCartas > 0) {
+      await this.robarCantidadCartas(auto.robarCartas);
+      resumen.push(`<i class="fa-solid fa-clone"></i> Roba +${auto.robarCartas} carta(s)`);
+    }
+    return resumen;
+  }
+
+  /**
+   * Línea de chat con una carta usada en una acción: nombre, característica, dado y destino.
+   * @param {Card} carta
+   * @param {string} rol - "Carta", "Ataque apuntado" o "Potenciar".
+   * @param {string} destino - Texto del destino (Descarte, Carta Quemada...).
+   * @returns {string}
+   */
+  _lineaCartaUsada(carta, rol, destino) {
+    return `<p><i class="fa-solid fa-diamond"></i> <strong>${rol}:</strong> ${nombreVisibleCarta(carta)} · <strong>${abreviadoPalo(carta.system.palo)}</strong> · ${carta.system.tipoDado} <small>(${destino})</small></p>`;
+  }
+
+  /**
+   * Nº de dados de una característica (total con bonos; mínimo 1).
+   * @param {string} clave
+   * @returns {number}
+   */
+  _dadosDeCaracteristica(clave) {
+    return Number(this.system.caracteristicasTotales?.[clave]) || Number(this.system.caracteristicas?.[clave]) || 1;
+  }
+
+  /**
+   * Bloques de resolución de una acción según su tipo (v0.14.0).
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
+   * @param {string} tipo - `ataque`, `dificultad`, `enfrentada`, `puntoDebil`, `ayuda` o `sinResolucion`.
+   * @returns {{publico: string, master: string}}
+   */
+  _htmlResolucionAccion(tirada, tipo) {
+    switch (tipo) {
+      case "ataque": return this._htmlResolucionTirada(tirada, true);
+      case "dificultad": return { publico: htmlResolucionDificultad(tirada), master: "" };
+      case "puntoDebil": return this._htmlResolucionPuntoDebil(tirada);
+      case "enfrentada":
+        return {
+          publico: `
+            <div class="cyd-resolucion-caja">
+              <p><i class="fa-solid fa-scale-balanced"></i> <strong>Tirada enfrentada: ${tirada.total}</strong></p>
+              <p><small>El Master la compara con la tirada rival${tirada.esNegativo ? `; el rival suma +${Math.abs(tirada.total)}` : ""}.</small></p>
+            </div>`,
+          master: ""
+        };
+      case "ayuda": {
+        const aliado = game.user.targets.first()?.name ?? "su aliado";
+        const aporta = tirada.esNegativo ? 0 : tirada.total;
+        return {
+          publico: `
+            <div class="cyd-resolucion-caja ${aporta > 0 ? "cyd-exito" : "cyd-fallo"}">
+              <p><i class="fa-solid fa-handshake-angle"></i> <strong>Ayuda a ${aliado}:</strong> ${aporta > 0
+                ? `<span class="cyd-resultado-exito">+${aporta}</span> a su tirada`
+                : '<span class="cyd-resultado-fallo">no aporta nada</span>'}</p>
+              <p><small>Solo se puede aplicar una ayuda por acción.</small></p>
+            </div>`,
+          master: ""
+        };
+      }
+      default: return { publico: "", master: "" };
+    }
+  }
+
+  /**
+   * Identificar punto débil: lo descubre si el total SUPERA la Defensa Total del objetivo (`T`).
+   * El público solo ve si lo encuentra; la Defensa va solo al Master (como en los ataques).
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
+   * @returns {{publico: string, master: string}}
+   */
+  _htmlResolucionPuntoDebil(tirada) {
+    const token = game.user.targets.first() ?? null;
+    const objetivo = token?.actor ?? null;
+    if (!objetivo) {
+      return {
+        publico: `
+          <div class="cyd-resolucion-caja">
+            <p><i class="fa-solid fa-magnifying-glass"></i> <strong>Resultado: ${tirada.total}</strong></p>
+            <p><small><i class="fa-solid fa-circle-info"></i> Marca el objetivo con <strong>T</strong> antes de tirar; si no, el Master lo compara con su Defensa.</small></p>
+          </div>`,
+        master: ""
+      };
+    }
+    objetivo.prepareData();
+    const defensa = objetivo.system.defensaTotal ?? objetivo.system.defensa ?? 0;
+    const encontrado = !tirada.esNegativo && tirada.total > defensa;
+    const texto = encontrado
+      ? '<span class="cyd-resultado-exito">PUNTO DÉBIL ENCONTRADO</span>'
+      : '<span class="cyd-resultado-fallo">NO LO ENCUENTRA</span>';
+    return {
+      publico: `
+        <div class="cyd-resolucion-caja ${encontrado ? "cyd-exito" : "cyd-fallo"}">
+          <p><i class="fa-solid fa-magnifying-glass"></i> <strong>Objetivo:</strong> ${token.name} · ${texto}</p>
+          <p><small><i class="fa-solid fa-eye-slash"></i> ${encontrado ? "El Master revela cuál es su punto débil." : "La Defensa solo la ve el Master."}</small></p>
+        </div>`,
+      master: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-eye-slash"></i> Punto débil <small>(solo Master)</small></h3>
+          <p><strong>${this.name}</strong> → <strong>${token.name}</strong> · Resultado ${tirada.total} vs Defensa ${defensa}: ${texto}</p>
+          ${encontrado ? "<p><small>Revela al jugador el punto débil del objetivo.</small></p>" : ""}
+        </div>`
+    };
+  }
+
+  /* ======================================================================== */
+  /*  4b. REACCIONES Y MINI TURNO FUERA DE COMBATE (v0.14.0)                   */
+  /* ======================================================================== */
+
+  /**
+   * El Actor participa en un combate iniciado (compara por `uuid` para Tokens no vinculados).
+   * @returns {boolean}
+   */
+  estaEnCombate() {
+    return game.combats?.some(c => c.started && c.combatants.some(cb => cb.actor?.uuid === this.uuid)) ?? false;
+  }
+
+  /**
+   * Comprueba si el Actor puede reaccionar: no con Agotamiento 4+ ni, en combate, si ya usó
+   * su reacción antes de volver a su turno. Si no puede, ofrece hacerlo como excepción.
+   * @returns {Promise<"ok"|"excepcion"|null>} null si se cancela.
+   */
+  async _autorizarReaccion() {
+    const motivos = [];
+    if (this.system.agotamiento?.efectos?.sinReacciones) {
+      motivos.push(`Tiene Agotamiento ${this.system.agotamiento.nivel}: no puede realizar reacciones.`);
+    }
+    if (this.estaEnCombate() && this.getFlag("cartas-y-dados", "reaccionUsada")) {
+      motivos.push("Ya ha usado su reacción: las reacciones se limitan a una hasta que vuelva a ser su turno.");
+    }
+    if (!motivos.length) return "ok";
+    return (await this._confirmarExcepcion("Reacción no permitida", motivos)) ? "excepcion" : null;
+  }
+
+  /**
+   * Pide confirmar que se salta una regla como excepción acordada con la mesa.
+   * @param {string} titulo - Título de la ventana.
+   * @param {string[]} motivos - Reglas que lo impiden (texto plano).
+   * @returns {Promise<boolean>}
+   */
+  async _confirmarExcepcion(titulo, motivos) {
+    const escapar = foundry.utils.escapeHTML;
+    return foundry.applications.api.DialogV2.confirm({
+      ...opcionesDialogoSistema({ width: 460 }),
+      window: { title: titulo, icon: "fa-solid fa-triangle-exclamation" },
+      content: `
+        <p><strong>${escapar(this.name)}</strong>:</p>
+        <ul>${motivos.map(m => `<li>${escapar(m)}</li>`).join("")}</ul>
+        <p>Continúa solo si la mesa y el Master lo aceptan como excepción.</p>`,
+      yes: { label: "Hacerlo igualmente (excepción)", icon: "fa-solid fa-check" },
+      no: { label: "Cancelar", icon: "fa-solid fa-xmark" },
+      defaultYes: false,
+      rejectClose: false
+    });
+  }
+
+  /**
+   * Vuelve a dejar disponible la reacción (inicio del turno del Actor, fin de combate,
+   * descanso o a mano desde la ficha).
+   * @returns {Promise<void>}
+   */
+  async restablecerReaccion() {
+    if (this.isOwner && this.getFlag("cartas-y-dados", "reaccionUsada")) {
+      await this.unsetFlag("cartas-y-dados", "reaccionUsada");
+    }
+  }
+
+  /**
+   * Estado de acciones para las fichas: combate, reacción y mini turno fuera de combate.
+   * @returns {{enCombate: boolean, reaccionUsada: boolean, sinReacciones: boolean,
+   *   miniTurno: {manos: number, esReaccion: boolean}|null, cartasMiniTurno: number}}
+   */
+  contextoAcciones() {
+    const mini = this.getFlag("cartas-y-dados", "miniTurno") ?? null;
+    return {
+      enCombate: this.estaEnCombate(),
+      reaccionUsada: Boolean(this.getFlag("cartas-y-dados", "reaccionUsada")),
+      sinReacciones: Boolean(this.system.agotamiento?.efectos?.sinReacciones),
+      miniTurno: mini?.manos ? { manos: Number(mini.manos) || 0, esReaccion: Boolean(mini.esReaccion) } : null,
+      cartasMiniTurno: Math.max(1, Number(this.system.limiteMano) || 1) * 2
+    };
+  }
+
+  /**
+   * Inicia un «mini turno» fuera de combate: roba el doble de su Mano Máx. Si es una reacción
+   * (de jugador o PNJ), solo podrá robar esta vez y solo cuando quien inició la acción haya
+   * elegido su carta (lo recuerda el chat). En combate pide confirmar como excepción.
+   * @param {{reaccion?: boolean}} [opciones]
+   * @returns {Promise<boolean>} true si se inició.
+   */
+  async iniciarMiniTurno({ reaccion = false } = {}) {
+    const { mazo, mano, descarte } = this.system.pilasDocumentos ?? {};
+    if (!mazo || !mano || !descarte) {
+      ui.notifications.warn("Inicializa las pilas de cartas antes de actuar fuera de combate.");
+      return false;
+    }
+    if (this.getFlag("cartas-y-dados", "miniTurno")?.manos) {
+      ui.notifications.warn(`${this.name} ya tiene una acción fuera de combate en curso: termínala antes de empezar otra.`);
+      return false;
+    }
+    const motivos = [];
+    if (this.estaEnCombate()) motivos.push("Está en combate: en combate las cartas se roban al inicio de su turno.");
+    if (reaccion && this.system.agotamiento?.efectos?.sinReacciones) {
+      motivos.push(`Tiene Agotamiento ${this.system.agotamiento.nivel}: no puede realizar reacciones.`);
+    }
+    if (motivos.length && !(await this._confirmarExcepcion("Acción fuera de combate", motivos))) return false;
+
+    const limite = Math.max(1, Number(this.system.limiteMano) || 1);
+    const cantidad = limite * 2;
+    await this.robarCantidadCartas(cantidad);
+    await this.setFlag("cartas-y-dados", "miniTurno", { manos: 2, esReaccion: reaccion });
+
+    const texto = reaccion
+      ? `reacciona fuera de combate: roba <strong>${cantidad}</strong> cartas (el doble de su Mano Máx. ${limite}), una sola vez: no puede robar más y, si no tiene la carta adecuada, la reacción falla. Solo puede reaccionar cuando quien inició la acción haya elegido su carta.`
+      : `inicia una acción fuera de combate: roba <strong>${cantidad}</strong> cartas (el doble de su Mano Máx. ${limite}). Puede seguir robando manos de ${limite}; cada mano extra tarda un turno más.`;
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid ${reaccion ? "fa-bolt" : "fa-hourglass-start"}"></i><p><strong>${this.name}</strong> ${texto}</p></div>`
+    });
+    return true;
+  }
+
+  /**
+   * Mini turno: roba otra mano (tantas cartas como la Mano Máx.); la acción tarda un turno más.
+   * Una reacción fuera de combate solo roba una vez: no puede robar más manos; si no tiene la
+   * carta adecuada, la reacción falla (`terminarMiniTurno`).
+   * @returns {Promise<boolean>}
+   */
+  async robarOtraManoMiniTurno() {
+    const mini = this.getFlag("cartas-y-dados", "miniTurno");
+    if (!mini?.manos) {
+      ui.notifications.warn("No hay ninguna acción fuera de combate en curso.");
+      return false;
+    }
+    if (mini.esReaccion) {
+      ui.notifications.warn("Una reacción fuera de combate solo roba una mano: si no tienes la carta adecuada, la reacción falla.");
+      return false;
+    }
+
+    const limite = Math.max(1, Number(this.system.limiteMano) || 1);
+    await this.robarCantidadCartas(limite);
+    const manos = (Number(mini.manos) || 2) + 1;
+    await this.setFlag("cartas-y-dados", "miniTurno", { ...mini, manos });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-clone"></i><p><strong>${this.name}</strong> no está satisfecho y roba otra mano (<strong>${limite}</strong> cartas). La acción ya le lleva <strong>${manos - 1}</strong> turno(s) más de lo normal.</p></div>`
+    });
+    return true;
+  }
+
+  /**
+   * Si hay un mini turno en curso, anota que ya se ha usado una carta en él (una reacción que
+   * termina sin usar ninguna falla).
+   * @returns {Promise<void>}
+   */
+  async _marcarAccionMiniTurno() {
+    const mini = this.getFlag("cartas-y-dados", "miniTurno");
+    if (mini?.manos && !mini.accionRealizada) {
+      await this.setFlag("cartas-y-dados", "miniTurno", { ...mini, accionRealizada: true });
+    }
+  }
+
+  /**
+   * Termina el mini turno fuera de combate. Pregunta qué hacer con las cartas que quedan en
+   * la mano: descartarlas (por defecto), devolverlas al Mazo o conservarlas (excepción).
+   * Una reacción que termina sin haber usado ninguna carta (`miniTurno.accionRealizada`) falla.
+   * @returns {Promise<boolean>} true si se terminó.
+   */
+  async terminarMiniTurno() {
+    const { mazo, mano, descarte } = this.system.pilasDocumentos ?? {};
+    const restantes = mano?.cards.size ?? 0;
+    const mini = this.getFlag("cartas-y-dados", "miniTurno") ?? {};
+    const reaccionFallida = Boolean(mini.esReaccion && !mini.accionRealizada);
+    let destino = "conservar";
+    if (restantes > 0) {
+      const respuesta = await foundry.applications.api.DialogV2.wait({
+        ...opcionesDialogoSistema({ width: 460, lista: true }),
+        window: { title: "Terminar acción fuera de combate", icon: "fa-solid fa-hourglass-end" },
+        content: `${reaccionFallida ? "<p><strong>No ha usado ninguna carta: la reacción falla.</strong></p>" : ""}<p>Quedan <strong>${restantes}</strong> carta(s) en la mano de <strong>${foundry.utils.escapeHTML(this.name)}</strong>. ¿Qué se hace con ellas?</p>`,
+        buttons: [
+          { action: "descartar", label: "Descartarlas", icon: "fa-solid fa-box-archive", default: true, callback: () => "descartar" },
+          { action: "mazo", label: "Devolverlas al Mazo y barajar", icon: "fa-solid fa-layer-group", callback: () => "mazo" },
+          { action: "conservar", label: "Conservarlas en la mano", icon: "fa-solid fa-hand", callback: () => "conservar" },
+          { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => "cancelar" }
+        ],
+        rejectClose: false
+      });
+      if (!["descartar", "mazo", "conservar"].includes(respuesta)) return false;
+      destino = respuesta;
+    }
+
+    if (destino === "descartar") {
+      for (const carta of [...mano.cards]) await this._moverCartaEntrePilas(mano, descarte, carta.id);
+    } else if (destino === "mazo") {
+      await this._devolverCartasASuMazoOriginal(mano);
+      await mazo.shuffle({ chatNotification: false });
+      if (this.system.pilasDocumentos.trinkets) await this.system.pilasDocumentos.trinkets.shuffle({ chatNotification: false });
+    }
+    await this.unsetFlag("cartas-y-dados", "miniTurno");
+    this.prepareData();
+
+    const textos = {
+      descartar: "y descarta las cartas que no ha usado",
+      mazo: "y devuelve a su Mazo las cartas que no ha usado",
+      conservar: restantes ? "y conserva en la mano las cartas que no ha usado" : ""
+    };
+    const mensaje = reaccionFallida
+      ? `<div class="cyd-chat-aviso"><i class="fa-solid fa-ban"></i><p><strong>${this.name}</strong> no encuentra la carta adecuada: <strong>la reacción falla</strong>${textos[destino] ? ` (${textos[destino].replace(/^y /, "")})` : ""}.</p></div>`
+      : `<div class="cyd-chat-aviso"><i class="fa-solid fa-hourglass-end"></i><p><strong>${this.name}</strong> termina su ${mini.esReaccion ? "reacción" : "acción"} fuera de combate ${textos[destino]}.</p></div>`;
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: this }), content: mensaje });
+    return true;
   }
 
   /* ======================================================================== */
@@ -909,6 +1338,8 @@ export class SistemaActor extends Actor {
     await mazo.shuffle({ chatNotification: false });
     if (trinkets) await trinkets.shuffle({ chatNotification: false });
 
+    // (v0.14.0) Termina la escena: reacción disponible y sin acción fuera de combate en curso.
+    await this._limpiarEstadoAcciones();
     this.prepareData();
 
     await ChatMessage.create({
@@ -947,6 +1378,7 @@ export class SistemaActor extends Actor {
     const recargaRasgos = { "system.rasgosRaza.esperaUnMomentoUsado": false };
     if (comodo) recargaRasgos["system.rasgosRaza.alquimiaUsada"] = false;
     await this.update(recargaRasgos);
+    await this._limpiarEstadoAcciones();
     this.prepareData();
 
     const textoAgotamiento = recupera
@@ -960,6 +1392,18 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-campground"></i><p><strong>${this.name}</strong> descansa: recupera su Mano, su Descarte y sus <strong>Cartas Quemadas</strong> y baraja sus mazos. ${textoAgotamiento}</p></div>`
     });
+  }
+
+  /**
+   * (v0.14.0) Restablece la reacción y cierra cualquier acción fuera de combate en curso
+   * (fin de escena/combate y descanso: las cartas de la mano ya han vuelto a su mazo).
+   * @returns {Promise<void>}
+   */
+  async _limpiarEstadoAcciones() {
+    if (!this.isOwner) return;
+    for (const clave of ["reaccionUsada", "miniTurno"]) {
+      if (this.getFlag("cartas-y-dados", clave)) await this.unsetFlag("cartas-y-dados", clave);
+    }
   }
 
   /* ======================================================================== */
@@ -1399,9 +1843,12 @@ export class SistemaActor extends Actor {
    * Si `requiereTirada === false` se aplica el efecto directamente sin lanzar dados;
    * en caso contrario se lanzan `caracteristicasTotales.misticismo` dados.
    * @param {string} itemId - ID del Item dentro de `this.items`.
+   * @param {Object} [opciones] - (v0.14.0) Desde el diálogo de acción de una carta MIST.
+   * @param {string|null} [opciones.cartaId=null] - Carta MIST de la mano ya elegida (sin diálogo de selección).
+   * @param {boolean} [opciones.reaccion=false] - Se usa como reacción (ver `_autorizarReaccion`).
    * @returns {Promise<import("../dados.mjs").ResultadoTiradaSistema|null>} Tirada (con Crítico/Pifia) o null.
    */
-  async usarHabilidad(itemId) {
+  async usarHabilidad(itemId, { cartaId = null, reaccion = false } = {}) {
     const item = this.items.get(itemId);
     if (!item) return null;
 
@@ -1413,6 +1860,9 @@ export class SistemaActor extends Actor {
       });
       return null;
     }
+
+    // (v0.14.0) Reacción: Agotamiento 4+ y una por turno en combate (salvo excepción).
+    if (reaccion && !(await this._autorizarReaccion())) return null;
 
     const pilas = this.system.pilasDocumentos ?? {};
     const mano = pilas.mano ?? null;
@@ -1445,7 +1895,8 @@ export class SistemaActor extends Actor {
         return null;
       }
 
-      cartaElegida = await this._elegirCartaMisticismo(cartasMisticismo, item.name);
+      cartaElegida = cartasMisticismo.find(c => c.id === cartaId)
+        ?? await this._elegirCartaMisticismo(cartasMisticismo, item.name);
       if (!cartaElegida) return null; // El jugador canceló la selección.
 
       numero = Number(cartaElegida.system.numero) || 1;
@@ -1490,6 +1941,8 @@ export class SistemaActor extends Actor {
       await this._aplicarAutomatizacionHabilidad(item);
 
       if (cartaElegida) await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
+      if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
+      await this._marcarAccionMiniTurno();
       this.prepareData();
       if (this.sheet?.rendered) this.sheet.render();
       return null;
@@ -1530,6 +1983,8 @@ export class SistemaActor extends Actor {
     // Automatización (curación, cambio de cansancio y robo de cartas) si está configurada.
     await this._aplicarAutomatizacionHabilidad(item);
 
+    if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
+    await this._marcarAccionMiniTurno();
     this.prepareData();
     if (this.sheet?.rendered) this.sheet.render();
     return tirada;

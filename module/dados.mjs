@@ -25,7 +25,7 @@
  * @property {boolean} esCritico - Al menos un dado base salió máximo.
  * @property {boolean} esPifia - Al menos la mitad de los dados base salieron 1.
  * @property {boolean} esNegativo - El total es menor que 0 (fallo automático).
- * @property {boolean} mitadPorAgotamiento - Se aplicó la mitad por Agotamiento 6+.
+ * @property {boolean} mitadPorAgotamiento - Se aplicó la mitad por Agotamiento 6+ (nunca a un resultado negativo).
  * @property {number} totalSinAgotamiento - Total antes de la reducción por Agotamiento.
  * @property {string} formula - Fórmula base legible ("3d6 + 2").
  * @property {number} cantidadDados - Nº de dados lanzados (para repetir la tirada, v0.13.0).
@@ -51,11 +51,14 @@ function valoresDados(roll) {
  * @param {number} [opciones.bono=0] - Bonificador plano sumado al resultado apuntado.
  * @param {Object} [opciones.rollData={}] - Datos de tirada del Actor (`getRollData()`).
  * @param {boolean} [opciones.mitadPorAgotamiento=false] - Agotamiento 6+ (v0.12.0): el resultado
- *   final se reduce a la mitad redondeando hacia arriba (en valor absoluto, de modo que un
- *   resultado negativo sigue siendo negativo y fallo automático).
+ *   final se reduce a la mitad redondeando hacia arriba. (v0.14.0) Un resultado negativo no se
+ *   divide: se mantiene entero (y sigue siendo fallo automático).
+ * @param {boolean} [opciones.parcial=false] - (v0.14.0) La tirada es parte de otra mayor
+ *   (`combinarTiradas`): su desglose no anuncia el fallo automático por negativo, que se
+ *   decide con el total combinado.
  * @returns {Promise<ResultadoTiradaSistema>}
  */
-export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rollData = {}, mitadPorAgotamiento = false }) {
+export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rollData = {}, mitadPorAgotamiento = false, parcial = false }) {
   const n = Math.max(1, Math.floor(Number(cantidadDados) || 1));
   const caras = Math.max(2, Number(String(tipoDado ?? "d6").replace(/^d/i, "")) || 6);
   const bonoNum = Number(bono) || 0;
@@ -88,9 +91,9 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
 
   const apuntado = sumaBase + sumaCritico + bonoNum;
   const totalSinAgotamiento = apuntado - sumaPifia;
-  const total = mitadPorAgotamiento
-    ? Math.sign(totalSinAgotamiento) * Math.ceil(Math.abs(totalSinAgotamiento) / 2)
-    : totalSinAgotamiento;
+  // Agotamiento 6+ (v0.14.0): un resultado negativo NO se divide (conserva toda su penalización).
+  const aplicaMitad = Boolean(mitadPorAgotamiento) && totalSinAgotamiento > 0;
+  const total = aplicaMitad ? Math.ceil(totalSinAgotamiento / 2) : totalSinAgotamiento;
   const formula = bonoNum !== 0 ? `${n}d${caras} ${bonoNum > 0 ? "+" : "-"} ${Math.abs(bonoNum)}` : `${n}d${caras}`;
 
   const resultado = {
@@ -102,7 +105,7 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
     esCritico: maximos > 0,
     esPifia,
     esNegativo: total < 0,
-    mitadPorAgotamiento: Boolean(mitadPorAgotamiento),
+    mitadPorAgotamiento: aplicaMitad,
     totalSinAgotamiento,
     formula,
     cantidadDados: n,
@@ -110,7 +113,7 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
     bono: bonoNum,
     html: ""
   };
-  resultado.html = htmlDetalleTirada(resultado, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia });
+  resultado.html = htmlDetalleTirada(resultado, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial });
   return resultado;
 }
 
@@ -120,7 +123,7 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
  * @param {Object} d - Datos intermedios del cálculo.
  * @returns {string}
  */
-function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia }) {
+function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial = false }) {
   const lista = valores => `[${valores.join(", ")}]`;
   const lineas = [];
 
@@ -133,7 +136,7 @@ function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, s
   if (t.mitadPorAgotamiento) {
     lineas.push(`<p class="cyd-tirada-agotamiento"><i class="fa-solid fa-hourglass-half"></i> <strong>AGOTAMIENTO</strong> · resultado a la mitad: ${t.totalSinAgotamiento} → <strong>${t.total}</strong></p>`);
   }
-  if (t.esNegativo) {
+  if (t.esNegativo && !parcial) {
     lineas.push(`<p class="cyd-tirada-negativa"><i class="fa-solid fa-circle-exclamation"></i> <strong>Resultado negativo (${t.total}):</strong> fallo automático. En una tirada enfrentada, el oponente suma <strong>+${Math.abs(t.total)}</strong> a su tirada.</p>`);
   }
 
@@ -149,6 +152,63 @@ function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, s
       ${lineas.join("")}
     </div>
   `;
+}
+
+/**
+ * Une varias tiradas del sistema en un único resultado (v0.14.0): Ataque apuntado (dos cartas,
+ * resultado a la mitad) y Potenciar (se suma una tirada de Misticismo). Las tiradas deben
+ * hacerse con `parcial: true`; el aviso de resultado negativo se decide con el total combinado.
+ * @param {Array<{tirada: ResultadoTiradaSistema, etiqueta: string}>} partes - Tiradas y su rótulo.
+ * @param {Object} [opciones]
+ * @param {boolean} [opciones.mitad=false] - Divide el total entre 2 redondeando hacia arriba; como el
+ *   Agotamiento, un total negativo (o 0) no se divide.
+ * @param {string} [opciones.motivoMitad=""] - Texto del motivo de la mitad ("Ataque apuntado").
+ * @returns {ResultadoTiradaSistema} Con `combinada: true`; `cantidadDados`/`tipoDado`/`bono` son los de la primera parte.
+ */
+export function combinarTiradas(partes, { mitad = false, motivoMitad = "" } = {}) {
+  const primera = partes[0].tirada;
+  if (partes.length === 1 && !mitad) return primera;
+
+  const suma = partes.reduce((acc, p) => acc + p.tirada.total, 0);
+  // Igual que el Agotamiento: un resultado negativo (o 0) no se divide.
+  const aplicaMitad = mitad && suma > 0;
+  const total = aplicaMitad ? Math.ceil(suma / 2) : suma;
+  const esNegativo = total < 0;
+
+  const bloques = partes.map(p => `
+    <div class="cyd-tirada-parte">
+      <p class="cyd-tirada-parte-titulo"><strong>${p.etiqueta}:</strong> ${p.tirada.total}</p>
+      ${p.tirada.html}
+    </div>`).join("");
+  const desglose = partes.map(p => p.tirada.total).join(" + ").replace(/\+ -/g, "− ");
+  const lineaMitad = aplicaMitad
+    ? `<p class="cyd-tirada-mitad"><i class="fa-solid fa-bullseye"></i> <strong>${motivoMitad || "Mitad"}</strong> · resultado a la mitad: ${suma} → <strong>${total}</strong></p>`
+    : "";
+  const lineaNegativa = esNegativo
+    ? `<p class="cyd-tirada-negativa"><i class="fa-solid fa-circle-exclamation"></i> <strong>Resultado negativo (${total}):</strong> fallo automático. En una tirada enfrentada, el oponente suma <strong>+${Math.abs(total)}</strong> a su tirada.</p>`
+    : "";
+
+  return {
+    ...primera,
+    total,
+    rolls: partes.flatMap(p => p.tirada.rolls),
+    esCritico: partes.some(p => p.tirada.esCritico),
+    esPifia: partes.some(p => p.tirada.esPifia),
+    esNegativo,
+    totalSinAgotamiento: suma,
+    formula: partes.map(p => p.tirada.formula).join(" + "),
+    combinada: true,
+    html: `
+      <div class="cyd-tirada-combinada">
+        ${bloques}
+        <div class="cyd-tirada-detalle">
+          <p><i class="fa-solid fa-dice-d20"></i> <strong>Total:</strong> ${desglose}${aplicaMitad ? " ÷ 2" : ""} = <strong>${total}</strong></p>
+          ${lineaMitad}
+          ${lineaNegativa}
+        </div>
+      </div>
+    `
+  };
 }
 
 /** Canal de socket del sistema (requiere `"socket": true` en `system.json`). */
