@@ -8,6 +8,7 @@
 import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica.mjs";
 
 import { PRESETS_DIFICULTAD_POR_DEFECTO } from "../settings.mjs";
+import { preguntarTipoDescanso } from "../documents/actor.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -263,8 +264,7 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
     const actor = game.actors.get(target.dataset.actorId);
     if (!actor) return;
     const delta = Number(target.dataset.delta) || 0;
-    const nuevo = Math.max(0, actor.system.cansancio.value + delta);
-    await actor.update({ "system.cansancio.value": nuevo });
+    await actor.cambiarAgotamiento(delta);
     this.render();
   }
 
@@ -283,8 +283,10 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
   }
 
   static async #onDescansoGrupo() {
+    const opciones = await preguntarTipoDescanso("el grupo");
+    if (!opciones) return;
     for (const actor of game.actors.filter(a => a.type === "personaje")) {
-      if (actor.system.pilasDocumentos?.mazo) await actor.realizarDescanso();
+      if (actor.system.pilasDocumentos?.mazo) await actor.realizarDescanso(opciones);
     }
     this.render();
   }

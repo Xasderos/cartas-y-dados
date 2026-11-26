@@ -7,7 +7,8 @@
  */
 
 import {
-  SISTEMA_CONFIG, abreviadoPalo, claveClaseDeItem, describirPackCartas, generarNombreMisticoUnico, nombreVisibleCarta
+  SISTEMA_CONFIG, abreviadoPalo, claveClaseDeItem, describirPackCartas, estadoAgotamiento, generarNombreMisticoUnico,
+  nombreVisibleCarta
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 import { htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
@@ -453,7 +454,7 @@ export class SistemaActor extends Actor {
   }
 
   /* ======================================================================== */
-  /*  3. ROBO DE TURNO Y BARAJADO CON CANSANCIO                               */
+  /*  3. ROBO DE TURNO Y BARAJADO CON AGOTAMIENTO                             */
   /* ======================================================================== */
 
   async robarHastaLimiteMano() {
@@ -505,18 +506,18 @@ export class SistemaActor extends Actor {
     await this._devolverCartasASuMazoOriginal(descarte);
     await mazo.shuffle({ chatNotification: false });
 
-    const nuevoCansancio = this.system.cansancio.value + 1;
-    await this.update({ "system.cansancio.value": nuevoCansancio });
-
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: `
         <div class="cyd-alerta-cansancio">
           <h4><i class="fa-solid fa-triangle-exclamation"></i> Mazo Agotado</h4>
-          <p><strong>${this.name}</strong> baraja su Descarte para formar un nuevo Mazo y recibe <strong>+1 de Cansancio</strong> (Total: ${nuevoCansancio}/${this.system.cansancio.maxTotal}).</p>
+          <p><strong>${this.name}</strong> baraja su Descarte para formar un nuevo Mazo y recibe <strong>+1 de Agotamiento</strong>.</p>
         </div>
       `
     });
+
+    // Las consecuencias del nuevo nivel las anuncia/aplica `_alCambiarAgotamiento` (hook updateActor).
+    await this.cambiarAgotamiento(1);
   }
 
   /* ======================================================================== */
@@ -623,6 +624,15 @@ export class SistemaActor extends Actor {
     // Si el modo es "usar-y-quemar", forzar quemado de la carta tras usarla
     if (modo === "usar-y-quemar") quemar = true;
 
+    const efectosAgotamiento = this.system.agotamiento?.efectos ?? {};
+
+    // Agotamiento 5+: solo puede haber un Trinket activo en juego.
+    if (carta.type === "trinket" && !quemar && !carta.system.seQuema
+        && efectosAgotamiento.unTrinket && enJuego.cards.size >= 1) {
+      ui.notifications.warn(`${this.name} tiene Agotamiento ${this.system.agotamiento.nivel}: solo puede tener un Trinket activo. Retira o quema el que está en juego antes de jugar otro.`);
+      return null;
+    }
+
     const auto = carta.system.automatizacion ?? {};
     const bonoTirada = Number(auto.bonoTirada) || 0;
 
@@ -642,20 +652,28 @@ export class SistemaActor extends Actor {
         ?? this.system.caracteristicas[claveCaract]
         ?? 1;
       const tipoDado = carta.system.tipoDado ?? "d6";
-      tirada = await tirarDadosSistema({ cantidadDados, tipoDado, bono: bonoTirada, rollData: this.getRollData() });
+      tirada = await tirarDadosSistema({
+        cantidadDados, tipoDado, bono: bonoTirada, rollData: this.getRollData(),
+        mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento()
+      });
       const resolucion = this._htmlResolucionTirada(tirada, Boolean(carta.system.esAtaque));
       bloqueResolucionHtml = tirada.html + resolucion.publico;
       htmlMaster = resolucion.master;
     }
 
     // Determinar pila destino: Quemadas, En Juego (si es Trinket) o Descarte
-    const seQuema = quemar || Boolean(carta.system.seQuema);
+    // Agotamiento 7+: las Cartas de Acción usadas se queman en vez de descartarse
+    // (los Trinkets no se descartan al jugarse: van a En Juego).
+    const quemaPorAgotamiento = carta.type === "accion" && Boolean(efectosAgotamiento.quemarAlUsar);
+    const seQuema = quemar || Boolean(carta.system.seQuema) || quemaPorAgotamiento;
     let pilaDestino = descarte;
     let etiquetaDestino = "Descarte";
 
     if (seQuema) {
       pilaDestino = quemadas;
-      etiquetaDestino = "Carta Quemada";
+      etiquetaDestino = quemaPorAgotamiento && !quemar && !carta.system.seQuema
+        ? "Carta Quemada por Agotamiento"
+        : "Carta Quemada";
     } else if (carta.type === "trinket") {
       pilaDestino = enJuego;
       etiquetaDestino = "Trinket En Juego";
@@ -674,10 +692,9 @@ export class SistemaActor extends Actor {
     }
 
     if (auto.cambioCansancio !== 0) {
-      const nuevoCansancio = Math.max(0, this.system.cansancio.value + auto.cambioCansancio);
-      updatesActor["system.cansancio.value"] = nuevoCansancio;
+      updatesActor["system.cansancio.value"] = SistemaActor.limitarAgotamiento(this.system.cansancio.value + auto.cambioCansancio);
       const signo = auto.cambioCansancio > 0 ? `+${auto.cambioCansancio}` : auto.cambioCansancio;
-      resumenEfectosAuto.push(`<i class="fa-solid fa-hourglass-half"></i> ${signo} Cansancio`);
+      resumenEfectosAuto.push(`<i class="fa-solid fa-hourglass-half"></i> ${signo} Agotamiento`);
     }
 
     if (Object.keys(updatesActor).length > 0) {
@@ -889,10 +906,13 @@ export class SistemaActor extends Actor {
 
   /**
    * Descanso completo:
-   * Devuelve Mano, En Juego, Descarte y Cartas Quemadas a sus mazos originales,
-   * los baraja y restablece el Cansancio a 0.
+   * Devuelve Mano, En Juego, Descarte y Cartas Quemadas a sus mazos originales y los baraja.
+   * Agotamiento (v0.12.0): solo un descanso cómodo en un lugar sin amenazas recupera
+   * 1 punto (máximo 1 por día; lo controla el Master al elegir el tipo de descanso).
+   * @param {Object} [opciones]
+   * @param {boolean} [opciones.comodo=false] - Descanso cómodo y seguro: −1 Agotamiento.
    */
-  async realizarDescanso() {
+  async realizarDescanso({ comodo = false } = {}) {
     const { mazo, trinkets, mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mazo) return;
 
@@ -905,12 +925,145 @@ export class SistemaActor extends Actor {
     await mazo.shuffle({ chatNotification: false });
     if (trinkets) await trinkets.shuffle({ chatNotification: false });
 
-    await this.update({ "system.cansancio.value": 0 });
+    const agotamientoAntes = Number(this.system.cansancio?.value) || 0;
+    const recupera = comodo && agotamientoAntes > 0;
+    if (recupera) await this.cambiarAgotamiento(-1);
+    this.prepareData();
+
+    const textoAgotamiento = recupera
+      ? `Descanso cómodo: recupera <strong>1 punto de Agotamiento</strong> (${agotamientoAntes} → ${agotamientoAntes - 1}).`
+      : comodo
+        ? "No tiene Agotamiento que recuperar."
+        : agotamientoAntes > 0
+          ? `Descanso incómodo o amenazado: su Agotamiento (${agotamientoAntes}) no se recupera.`
+          : "";
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-campground"></i><p><strong>${this.name}</strong> descansa: recupera su Mano, su Descarte y sus <strong>Cartas Quemadas</strong> y baraja sus mazos. ${textoAgotamiento}</p></div>`
+    });
+  }
+
+  /* ======================================================================== */
+  /*  5b. AGOTAMIENTO (v0.12.0)                                                */
+  /* ======================================================================== */
+
+  /**
+   * Acota un valor de Agotamiento a la escala del sistema (0..AGOTAMIENTO_MAXIMO).
+   * @param {number} valor
+   * @returns {number}
+   */
+  static limitarAgotamiento(valor) {
+    return Math.max(0, Math.min(SISTEMA_CONFIG.AGOTAMIENTO_MAXIMO, Math.floor(Number(valor) || 0)));
+  }
+
+  /**
+   * Suma (o resta) puntos de Agotamiento, acotando a 0..8. Las consecuencias del nuevo
+   * nivel se anuncian y aplican en `_alCambiarAgotamiento` (hooks pre/updateActor).
+   * @param {number} delta - Puntos a sumar (negativo = recuperar).
+   * @returns {Promise<number>} Nuevo nivel de Agotamiento.
+   */
+  async cambiarAgotamiento(delta) {
+    const actual = Number(this.system.cansancio?.value) || 0;
+    const nuevo = SistemaActor.limitarAgotamiento(actual + (Number(delta) || 0));
+    if (nuevo !== actual) await this.update({ "system.cansancio.value": nuevo });
+    return nuevo;
+  }
+
+  /**
+   * Agotamiento 6+: el resultado de todas las tiradas se reduce a la mitad.
+   * @returns {boolean}
+   */
+  _tiradasAMitadPorAgotamiento() {
+    return Boolean(this.system.agotamiento?.efectos?.tiradasMitad);
+  }
+
+  /**
+   * Reacciona a un cambio de nivel de Agotamiento (llamado desde el hook `updateActor`
+   * solo en el cliente que hizo el cambio):
+   * - Al subir: anuncia en el chat las consecuencias nuevas.
+   * - Nivel 3+: recorta la Salud actual a la nueva Salud Máxima.
+   * - Nivel 5+: si hay más de un Trinket en juego, pide elegir cuál conservar y quema el resto.
+   * - Nivel 8: el personaje muere (estado "dead" en sus Tokens y aviso en el chat).
+   * @param {number} anterior - Nivel antes del cambio.
+   * @param {number} nuevo - Nivel después del cambio.
+   * @returns {Promise<void>}
+   */
+  async _alCambiarAgotamiento(anterior, nuevo) {
+    this.prepareData();
+    const estado = estadoAgotamiento(nuevo);
+
+    if (nuevo > anterior) {
+      const nuevas = SISTEMA_CONFIG.AGOTAMIENTO_NIVELES.filter(e => e.nivel > anterior && e.nivel <= nuevo);
+      const lista = nuevas.map(e => `<li><i class="fa-solid ${e.icono}"></i> <strong>Nv. ${e.nivel}:</strong> ${e.texto}</li>`).join("");
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        content: `
+          <div class="cyd-alerta-cansancio">
+            <h4><i class="fa-solid fa-hourglass-half"></i> Agotamiento ${estado.nivel}/${estado.maximo}</h4>
+            <p><strong>${this.name}</strong> sufre nuevas consecuencias (acumulativas):</p>
+            <ul>${lista}</ul>
+          </div>
+        `
+      });
+    }
+
+    // Nivel 3+: la Salud actual no puede superar la nueva Salud Máxima.
+    const saludMax = Number(this.system.salud?.maxTotal) || 1;
+    if ((Number(this.system.salud?.value) || 0) > saludMax) {
+      await this.update({ "system.salud.value": saludMax });
+    }
+
+    if (estado.efectos.unTrinket) await this._reducirTrinketsPorAgotamiento();
+
+    if (estado.muerto && anterior < SISTEMA_CONFIG.AGOTAMIENTO_MAXIMO) {
+      try {
+        await this.toggleStatusEffect("dead", { active: true, overlay: true });
+      } catch (error) {
+        console.warn("[Cartas y Dados] No se pudo aplicar el estado 'dead' por Agotamiento", error);
+      }
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        content: `<div class="cyd-alerta-cansancio"><h4><i class="fa-solid fa-skull"></i> Muerte por Agotamiento</h4><p><strong>${this.name}</strong> alcanza el Agotamiento ${estado.maximo} y muere.</p></div>`
+      });
+    }
+  }
+
+  /**
+   * Agotamiento 5+: deja un único Trinket en juego. Si hay varios, el usuario elige con
+   * un DialogV2 cuál conservar; el resto se queman (`enJuego → quemadas`). Si cierra el
+   * diálogo se conserva el primero.
+   * @returns {Promise<void>}
+   */
+  async _reducirTrinketsPorAgotamiento() {
+    const { enJuego, quemadas } = this.system.pilasDocumentos ?? {};
+    if (!enJuego || !quemadas || enJuego.cards.size <= 1) return;
+
+    const trinkets = enJuego.cards.contents;
+    const elegido = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 440, lista: true }),
+      window: { title: `Agotamiento: ${this.name}`, icon: "fa-solid fa-hourglass-half" },
+      content: `<p>Con Agotamiento 5 o más solo puedes tener <strong>un Trinket activo</strong>. Elige cuál conservas; el resto se queman:</p>`,
+      buttons: trinkets.map((t, i) => ({
+        action: t.id,
+        label: `Conservar ${nombreVisibleCarta(t)} (Nv. ${Number(t.system?.nivel) || 1})`,
+        icon: "fa-solid fa-gem",
+        default: i === 0,
+        callback: () => t.id
+      })),
+      rejectClose: false
+    }) ?? trinkets[0].id;
+
+    const quemados = [];
+    for (const t of trinkets) {
+      if (t.id === elegido) continue;
+      quemados.push(nombreVisibleCarta(t));
+      await this._moverCartaEntrePilas(enJuego, quemadas, t.id);
+    }
     this.prepareData();
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-campground"></i><p><strong>${this.name}</strong> descansa: recupera su Mano, su Descarte y sus <strong>Cartas Quemadas</strong>, baraja sus mazos y elimina su Cansancio.</p></div>`
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-fire"></i><p><strong>${this.name}</strong> no puede mantener tantos Trinkets por el Agotamiento y quema: <strong>${quemados.join(", ")}</strong>.</p></div>`
     });
   }
 
@@ -1025,7 +1178,10 @@ export class SistemaActor extends Actor {
       ?? 1;
 
     const bono = Number(bonoTirada) || 0;
-    const tirada = await tirarDadosSistema({ cantidadDados, tipoDado, bono, rollData: this.getRollData() });
+    const tirada = await tirarDadosSistema({
+      cantidadDados, tipoDado, bono, rollData: this.getRollData(),
+      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento()
+    });
     const resolucion = this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
     const bloqueResolucionHtml = tirada.html + resolucion.publico;
     const htmlMaster = resolucion.master;
@@ -1156,7 +1312,10 @@ export class SistemaActor extends Actor {
 
     // Habilidad con tirada: XdY de Misticismo.
     const bono = bonoTirada;
-    const tirada = await tirarDadosSistema({ cantidadDados, tipoDado, bono, rollData: this.getRollData() });
+    const tirada = await tirarDadosSistema({
+      cantidadDados, tipoDado, bono, rollData: this.getRollData(),
+      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento()
+    });
     const resolucion = this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
     const bloqueResolucionHtml = resolucion.publico;
     const htmlMaster = resolucion.master;
@@ -1211,8 +1370,7 @@ export class SistemaActor extends Actor {
     }
 
     if (cambioCansancio !== 0) {
-      const cansancioActual = Number(this.system.cansancio?.value) || 0;
-      await this.update({ "system.cansancio.value": Math.max(0, cansancioActual + cambioCansancio) });
+      await this.cambiarAgotamiento(cambioCansancio);
     }
 
     if (robarCartas > 0) {
@@ -1261,4 +1419,28 @@ export class SistemaActor extends Actor {
   async usarHabilidadItem(itemId) {
     return this.usarHabilidad(itemId);
   }
+}
+
+/**
+ * Pregunta al usuario qué tipo de descanso se realiza (v0.12.0). Solo un descanso cómodo
+ * en un lugar sin amenazas recupera 1 punto de Agotamiento (máximo 1 por día).
+ * @param {string} quien - Nombre del Actor o "el grupo", para el texto del diálogo.
+ * @returns {Promise<{comodo: boolean}|null>} Opciones para `realizarDescanso`, o null si se cancela.
+ */
+export async function preguntarTipoDescanso(quien) {
+  const respuesta = await foundry.applications.api.DialogV2.wait({
+    ...opcionesDialogoSistema({ width: 460, lista: true }),
+    window: { title: "Descanso", icon: "fa-solid fa-campground" },
+    content: `<p>¿Cómo descansa <strong>${quien}</strong>? Todas las cartas vuelven a sus mazos. Solo un descanso cómodo en un lugar donde no se sienta amenazado recupera <strong>1 punto de Agotamiento</strong> (máximo 1 por día).</p>`,
+    buttons: [
+      { action: "comodo", label: "Descanso cómodo y seguro (−1 Agotamiento)", icon: "fa-solid fa-campground", default: true, callback: () => "comodo" },
+      { action: "incomodo", label: "Descanso sin recuperar Agotamiento", icon: "fa-solid fa-tent", callback: () => "incomodo" },
+      { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => "cancelar" }
+    ],
+    rejectClose: false
+  });
+  // DialogV2.wait devuelve el nombre de la acción si el callback da null/undefined, y null al
+  // cerrar la ventana: solo "comodo" e "incomodo" son respuestas válidas.
+  if (respuesta !== "comodo" && respuesta !== "incomodo") return null;
+  return { comodo: respuesta === "comodo" };
 }

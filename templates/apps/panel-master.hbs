@@ -34,7 +34,7 @@
         <div class="cyd-gm-presets">
           <button type="button" class="cyd-gm-btn-tag" data-action="robarGrupo" data-tooltip="Todo el grupo roba hasta su Mano Máxima"><i class="fa-solid fa-clone"></i> Robar</button>
           <button type="button" class="cyd-gm-btn-tag" data-action="finCombateGrupo" data-tooltip="Fin de Escena/Combate: Barajar Mano, Descarte y Trinkets"><i class="fa-solid fa-rotate"></i> Fin Escena</button>
-          <button type="button" class="cyd-gm-btn-tag" data-action="descansoGrupo" data-tooltip="Descanso Completo del Grupo"><i class="fa-solid fa-campground"></i> Descanso</button>
+          <button type="button" class="cyd-gm-btn-tag" data-action="descansoGrupo" data-tooltip="Descanso del Grupo (cómodo y seguro: −1 Agotamiento)"><i class="fa-solid fa-campground"></i> Descanso</button>
         </div>
       </div>
     </div>
@@ -61,8 +61,8 @@
                 <span class="cyd-gm-nombre">{{pj.nombre}}</span>
               </div>
 
-              {{!-- Control rápido de Cansancio --}}
-              <div class="cyd-gm-cansancio-box" data-tooltip="Cansancio de {{pj.nombre}}">
+              {{!-- Control rápido de Agotamiento --}}
+              <div class="cyd-gm-cansancio-box" data-tooltip="Agotamiento de {{pj.nombre}}">
                 <span class="cyd-gm-mini-click" data-action="ajustarCansancio" data-actor-id="{{pj.id}}" data-delta="-1">−</span>
                 <i class="fa-solid fa-hourglass-half"></i>
                 <strong>{{pj.cansancioActual}}/{{pj.cansancioMax}}</strong>
@@ -134,8 +134,8 @@
                 <span class="cyd-gm-nombre">{{pnj.nombre}}</span>
               </div>
 
-              {{!-- Control rápido de Cansancio --}}
-              <div class="cyd-gm-cansancio-box" data-tooltip="Cansancio de {{pnj.nombre}}">
+              {{!-- Control rápido de Agotamiento --}}
+              <div class="cyd-gm-cansancio-box" data-tooltip="Agotamiento de {{pnj.nombre}}">
                 <span class="cyd-gm-mini-click" data-action="ajustarCansancio" data-actor-id="{{pnj.id}}" data-delta="-1">−</span>
                 <i class="fa-solid fa-hourglass-half"></i>
                 <strong>{{pnj.cansancioActual}}/{{pnj.cansancioMax}}</strong>

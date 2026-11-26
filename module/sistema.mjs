@@ -226,6 +226,18 @@ Hooks.on("getSceneControlButtons", controls => {
  *  - tipo "pnj"        → carpeta "PNJs"
  * Las carpetas se crean si aún no existen.
  */
+/**
+ * Vinculación de Tokens por defecto (v0.12.0): los `personaje` nacen con "Link Actor Data"
+ * activado (`prototypeToken.actorLink: true`) y los `pnj` desactivado, para que cada Token de
+ * criatura sea independiente. Si los datos de creación ya traen `actorLink` (duplicado,
+ * importación o compendio) se respeta ese valor.
+ */
+Hooks.on("preCreateActor", (actor, data) => {
+  if (foundry.utils.getProperty(data, "prototypeToken.actorLink") !== undefined) return;
+  if (actor.type === "personaje") actor.updateSource({ "prototypeToken.actorLink": true });
+  else if (actor.type === "pnj") actor.updateSource({ "prototypeToken.actorLink": false });
+});
+
 Hooks.on("createActor", async (actor) => {
   if (!game.user?.isGM) return;
 
@@ -380,4 +392,32 @@ Hooks.on("updateActor", () => {
   if (PanelMasterApp.instancia?.rendered) {
     PanelMasterApp.instancia.render();
   }
+});
+/* -------------------------------------------------------------------------- */
+/*  AGOTAMIENTO (v0.12.0)                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Antes de actualizar un Actor: si cambia `system.cansancio.value` (Agotamiento), lo acota a
+ * 0..AGOTAMIENTO_MAXIMO y guarda el nivel anterior en `options` para `updateActor`.
+ * Cubre cualquier origen del cambio (ficha, Panel del Master, mazo agotado, automatizaciones).
+ */
+Hooks.on("preUpdateActor", (actor, changes, options) => {
+  const nuevo = foundry.utils.getProperty(changes, "system.cansancio.value");
+  if (nuevo === undefined) return;
+  foundry.utils.setProperty(changes, "system.cansancio.value", SistemaActor.limitarAgotamiento(nuevo));
+  options.cydAgotamientoAnterior = Number(actor.system.cansancio?.value) || 0;
+});
+
+/**
+ * Tras actualizar un Actor: si su Agotamiento cambió, aplica las consecuencias
+ * (`SistemaActor#_alCambiarAgotamiento`) solo en el cliente que hizo el cambio,
+ * para que no se dupliquen mensajes ni diálogos.
+ */
+Hooks.on("updateActor", (actor, changes, options, userId) => {
+  if (userId !== game.user.id || options.cydAgotamientoAnterior === undefined) return;
+  const nuevo = Number(actor.system.cansancio?.value) || 0;
+  if (nuevo === options.cydAgotamientoAnterior) return;
+  actor._alCambiarAgotamiento(options.cydAgotamientoAnterior, nuevo)
+    .catch(error => console.error("[Cartas y Dados] Error aplicando consecuencias de Agotamiento", error));
 });

@@ -25,6 +25,8 @@
  * @property {boolean} esCritico - Al menos un dado base salió máximo.
  * @property {boolean} esPifia - Al menos la mitad de los dados base salieron 1.
  * @property {boolean} esNegativo - El total es menor que 0 (fallo automático).
+ * @property {boolean} mitadPorAgotamiento - Se aplicó la mitad por Agotamiento 6+.
+ * @property {number} totalSinAgotamiento - Total antes de la reducción por Agotamiento.
  * @property {string} formula - Fórmula base legible ("3d6 + 2").
  * @property {string} html - Bloque HTML `.cyd-tirada-detalle` con el desglose para el chat.
  */
@@ -45,9 +47,12 @@ function valoresDados(roll) {
  * @param {string} opciones.tipoDado - Dado ("d4".."d12").
  * @param {number} [opciones.bono=0] - Bonificador plano sumado al resultado apuntado.
  * @param {Object} [opciones.rollData={}] - Datos de tirada del Actor (`getRollData()`).
+ * @param {boolean} [opciones.mitadPorAgotamiento=false] - Agotamiento 6+ (v0.12.0): el resultado
+ *   final se reduce a la mitad redondeando hacia arriba (en valor absoluto, de modo que un
+ *   resultado negativo sigue siendo negativo y fallo automático).
  * @returns {Promise<ResultadoTiradaSistema>}
  */
-export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rollData = {} }) {
+export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rollData = {}, mitadPorAgotamiento = false }) {
   const n = Math.max(1, Math.floor(Number(cantidadDados) || 1));
   const caras = Math.max(2, Number(String(tipoDado ?? "d6").replace(/^d/i, "")) || 6);
   const bonoNum = Number(bono) || 0;
@@ -79,7 +84,10 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
   const sumaPifia = resultadosPifia.reduce((a, b) => a + b, 0);
 
   const apuntado = sumaBase + sumaCritico + bonoNum;
-  const total = apuntado - sumaPifia;
+  const totalSinAgotamiento = apuntado - sumaPifia;
+  const total = mitadPorAgotamiento
+    ? Math.sign(totalSinAgotamiento) * Math.ceil(Math.abs(totalSinAgotamiento) / 2)
+    : totalSinAgotamiento;
   const formula = bonoNum !== 0 ? `${n}d${caras} ${bonoNum > 0 ? "+" : "-"} ${Math.abs(bonoNum)}` : `${n}d${caras}`;
 
   const resultado = {
@@ -91,6 +99,8 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
     esCritico: maximos > 0,
     esPifia,
     esNegativo: total < 0,
+    mitadPorAgotamiento: Boolean(mitadPorAgotamiento),
+    totalSinAgotamiento,
     formula,
     html: ""
   };
@@ -114,6 +124,9 @@ function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, s
   if (t.esPifia) {
     lineas.push(`<p class="cyd-tirada-pifia"><i class="fa-solid fa-skull-crossbones"></i> <strong>PIFIA</strong> · ${minimos} de ${n} dado(s) en 1; resultado apuntado ${apuntado}, se repiten: ${lista(t.resultadosPifia)} <strong>−${sumaPifia}</strong></p>`);
   }
+  if (t.mitadPorAgotamiento) {
+    lineas.push(`<p class="cyd-tirada-agotamiento"><i class="fa-solid fa-hourglass-half"></i> <strong>AGOTAMIENTO</strong> · resultado a la mitad: ${t.totalSinAgotamiento} → <strong>${t.total}</strong></p>`);
+  }
   if (t.esNegativo) {
     lineas.push(`<p class="cyd-tirada-negativa"><i class="fa-solid fa-circle-exclamation"></i> <strong>Resultado negativo (${t.total}):</strong> fallo automático. En una tirada enfrentada, el oponente suma <strong>+${Math.abs(t.total)}</strong> a su tirada.</p>`);
   }
@@ -122,6 +135,7 @@ function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, s
   if (t.esCritico) partes.push(`+ ${sumaCritico}`);
   if (bonoNum !== 0) partes.push(`${bonoNum > 0 ? "+" : "−"} ${Math.abs(bonoNum)}`);
   if (t.esPifia) partes.push(`− ${sumaPifia}`);
+  if (t.mitadPorAgotamiento) partes.push(`(${t.totalSinAgotamiento}) ÷ 2`);
 
   return `
     <div class="cyd-tirada-detalle">

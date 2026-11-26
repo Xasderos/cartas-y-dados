@@ -8,7 +8,8 @@
 import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 
-import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
+import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento } from "../config.mjs";
+import { preguntarTipoDescanso } from "../documents/actor.mjs";
 import { htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -33,6 +34,7 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       title: "Ficha de Criatura / PNJ"
     },
     actions: {
+      fijarAgotamiento: HojaPnjActor.#onFijarAgotamiento,
       usarHabilidad: HojaPnjActor.#onUsarHabilidad,
       crearItemPnj: HojaPnjActor.#onCrearItemPnj,
       editarItem: HojaPnjActor.#onEditarItem,
@@ -109,6 +111,7 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       actor,
       system,
       esPropietario: actor.isOwner,
+      agotamiento: contextoAgotamiento(system.cansancio?.value),
       habilidades,
       objetos,
       tieneMazoJefe,
@@ -181,7 +184,10 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
     const nombreCaract = nombresCaracteristicas[caracteristica] || caracteristica;
 
     // Tirada con Crítico y Pifia (v0.11.0, `module/dados.mjs`).
-    const tirada = await tirarDadosSistema({ cantidadDados: valorBase, tipoDado, rollData: actor.getRollData() });
+    const tirada = await tirarDadosSistema({
+      cantidadDados: valorBase, tipoDado, rollData: actor.getRollData(),
+      mitadPorAgotamiento: actor._tiradasAMitadPorAgotamiento()
+    });
     const contenidoHtml = htmlResolucionDificultad(tirada);
 
     const chatData = {
@@ -227,8 +233,22 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
     this.render();
   }
 
+  /** Descanso: pregunta si es cómodo y seguro (−1 Agotamiento) antes de realizarlo (v0.12.0). */
+  /**
+   * Clic en un segmento de la barra de Agotamiento (v0.12.0): fija ese nivel; si se pulsa
+   * el segmento del nivel actual, baja uno (permite volver a 0).
+   */
+  static async #onFijarAgotamiento(event, target) {
+    const nivel = Number(target.dataset.nivel) || 0;
+    const actual = Number(this.document.system.cansancio?.value) || 0;
+    const nuevo = nivel === actual ? nivel - 1 : nivel;
+    await this.document.cambiarAgotamiento(nuevo - actual);
+  }
+
   static async #onDescansar() {
-    await this.document.realizarDescanso();
+    const opciones = await preguntarTipoDescanso(this.document.name);
+    if (!opciones) return;
+    await this.document.realizarDescanso(opciones);
     this.render();
   }
 

@@ -80,6 +80,28 @@ export const SISTEMA_CONFIG = {
   tamanoBase: "Mediano",
 
   /**
+   * Niveles de Agotamiento (v0.12.0). Se guardan en `system.cansancio.value` (clave
+   * histórica, no cambiar). Son acumulativos: el nivel N sufre todas las consecuencias
+   * de 1..N. Se gana 1 punto al agotar el Mazo y barajar el Descarte; se recupera 1 punto
+   * por descanso cómodo en un lugar seguro (máx. 1 por día). Nivel 8 = muerte.
+   * Cada entrada: `{ nivel, clave, icono, texto }`; `clave` nombra el flag derivado
+   * en `system.agotamiento.efectos`.
+   */
+  AGOTAMIENTO_NIVELES: [
+    { nivel: 1, clave: "manoMitad", icono: "fa-hand", texto: "Tu mano máxima se reduce a la mitad, redondeando hacia arriba." },
+    { nivel: 2, clave: "velocidadMitad", icono: "fa-person-running", texto: "Tu velocidad se reduce a la mitad." },
+    { nivel: 3, clave: "saludMitad", icono: "fa-heart-pulse", texto: "Tu salud máxima se reduce a la mitad, redondeando hacia arriba." },
+    { nivel: 4, clave: "sinReacciones", icono: "fa-ban", texto: "No puedes realizar reacciones." },
+    { nivel: 5, clave: "unTrinket", icono: "fa-gem", texto: "Solo puedes tener un Trinket (abalorio) activo; si tienes más, quema los de tu elección hasta tener uno." },
+    { nivel: 6, clave: "tiradasMitad", icono: "fa-dice-d20", texto: "El resultado de todas tus tiradas se reduce a la mitad, redondeando hacia arriba." },
+    { nivel: 7, clave: "quemarAlUsar", icono: "fa-fire", texto: "Cada vez que uses una carta, quémala en vez de descartarla." },
+    { nivel: 8, clave: "muerte", icono: "fa-skull", texto: "Mueres." }
+  ],
+
+  /** Nivel de Agotamiento que provoca la muerte (y máximo de la escala). */
+  AGOTAMIENTO_MAXIMO: 8,
+
+  /**
    * Razas Base del sistema (v0.10.1).
    * El Asistente de Creación de Personaje ofrece estas razas en su primer paso y crea
    * con la elegida el Item `raza` del Actor (`system.claveRaza` guarda la clave).
@@ -234,6 +256,53 @@ export function describirPackCartas(pack) {
     conteo.set(etiqueta, (conteo.get(etiqueta) ?? 0) + 1);
   }
   return [...conteo].map(([etiqueta, n]) => `${n}× ${etiqueta}`).join(" + ");
+}
+
+/**
+ * Calcula el estado de Agotamiento de un nivel dado (v0.12.0).
+ * @param {number} valor - Puntos de Agotamiento (`system.cansancio.value`).
+ * @returns {{nivel: number, maximo: number, efectos: Object<string, boolean>, activos: Object[], muerto: boolean}}
+ *   `efectos.<clave>` es true si el nivel de esa consecuencia está alcanzado; `activos` lista
+ *   las entradas de `AGOTAMIENTO_NIVELES` en vigor.
+ */
+export function estadoAgotamiento(valor) {
+  const maximo = SISTEMA_CONFIG.AGOTAMIENTO_MAXIMO;
+  const nivel = Math.max(0, Math.min(maximo, Math.floor(Number(valor) || 0)));
+  const efectos = {};
+  const activos = [];
+  for (const entrada of SISTEMA_CONFIG.AGOTAMIENTO_NIVELES) {
+    efectos[entrada.clave] = nivel >= entrada.nivel;
+    if (efectos[entrada.clave]) activos.push(entrada);
+  }
+  return { nivel, maximo, efectos, activos, muerto: efectos.muerte };
+}
+
+/**
+ * Lista de niveles de Agotamiento lista para plantillas, marcando los activos.
+ * @param {number} valor - Puntos de Agotamiento actuales.
+ * @returns {Array<{nivel: number, icono: string, texto: string, activo: boolean}>}
+ */
+export function tablaAgotamiento(valor) {
+  const { nivel } = estadoAgotamiento(valor);
+  return SISTEMA_CONFIG.AGOTAMIENTO_NIVELES.map(e => ({ ...e, activo: nivel >= e.nivel }));
+}
+
+/**
+ * Datos de Agotamiento para las fichas de Actor (v0.12.0).
+ * @param {number} valor - Puntos de Agotamiento actuales (`system.cansancio.value`).
+ * @returns {{nivel: number, maximo: number, muerto: boolean, activos: Object[], segmentos: Object[], tooltipHtml: string}}
+ *   `segmentos` alimenta la barra de la ficha; `activos` son las consecuencias en vigor; `tooltipHtml` es la tabla completa con las activas marcadas.
+ */
+export function contextoAgotamiento(valor) {
+  const { nivel, maximo, muerto } = estadoAgotamiento(valor);
+  const tabla = tablaAgotamiento(nivel);
+  const filas = tabla
+    .map(e => `<p class='${e.activo ? "cyd-agot-activo" : "cyd-agot-inactivo"}'><strong>${e.nivel}.</strong> ${e.texto}</p>`)
+    .join("");
+  const tooltipHtml = `<div class='cyd-tooltip-contenido'><strong>Agotamiento ${nivel}/${maximo}</strong> <em>(acumulativo)</em><hr/>${filas}<hr/><p>+1 al agotar el Mazo y barajar el Descarte. −1 por descanso cómodo y seguro (máx. 1 por día).</p></div>`;
+  // Segmentos de la barra (uno por nivel, 1..maximo); `activo` = nivel alcanzado.
+  const segmentos = tabla.map(e => ({ nivel: e.nivel, texto: e.texto, activo: e.activo, esMuerte: e.nivel === maximo }));
+  return { nivel, maximo, muerto, activos: tabla.filter(e => e.activo), segmentos, tooltipHtml };
 }
 
 export function abreviadoPalo(clavePalo) {

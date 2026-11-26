@@ -163,7 +163,7 @@
       </div>
     </div>
 
-    <div class="cyd-recursos-barra">
+    <div class="cyd-recursos-barra cyd-cols-3">
       <div class="cyd-recurso-caja">
         <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Defensa</span>
         <input type="number" name="system.bonificadores.defensa" value="{{system.bonificadores.defensa}}" />
@@ -175,10 +175,6 @@
       <div class="cyd-recurso-caja">
         <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart-pulse"></i> Salud Máx.</span>
         <input type="number" name="system.bonificadores.saludMax" value="{{system.bonificadores.saludMax}}" />
-      </div>
-      <div class="cyd-recurso-caja">
-        <span class="cyd-recurso-titulo"><i class="fa-solid fa-hourglass-half"></i> Cansancio Máx.</span>
-        <input type="number" name="system.bonificadores.cansancioMax" value="{{system.bonificadores.cansancioMax}}" />
       </div>
     </div>
   </section>
@@ -195,8 +191,8 @@
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart-pulse"></i> Curación</span>
           <input type="number" name="system.automatizacion.curacion" value="{{system.automatizacion.curacion}}" step="1" />
         </div>
-        <div class="cyd-recurso-caja" data-tooltip="Cambio en el Cansancio actual (positivo suma, negativo recupera). Mínimo 0.">
-          <span class="cyd-recurso-titulo"><i class="fa-solid fa-hourglass-half"></i> Cansancio</span>
+        <div class="cyd-recurso-caja" data-tooltip="Cambio en el Agotamiento actual (positivo suma, negativo recupera). Rango 0-8.">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-hourglass-half"></i> Agotamiento</span>
           <input type="number" name="system.automatizacion.cambioCansancio" value="{{system.automatizacion.cambioCansancio}}" step="1" />
         </div>
         <div class="cyd-recurso-caja" data-tooltip="Cartas que se roban del Mazo a la Mano (requiere pilas inicializadas).">

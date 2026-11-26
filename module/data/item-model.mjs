@@ -25,11 +25,11 @@ function esquemaBonificadoresPersonaje() {
       social: new NumberField({ required: true, integer: true, initial: 0 }),
       misticismo: new NumberField({ required: true, integer: true, initial: 0 }),
 
-      // Modificadores a Defensa, Mano Máxima, Salud y Cansancio
+      // Modificadores a Defensa, Mano Máxima y Salud (v0.12.0: sin bono de Cansancio Máx.;
+      // el Agotamiento tiene escala fija 0-8)
       defensa: new NumberField({ required: true, integer: true, initial: 0 }),
       limiteMano: new NumberField({ required: true, integer: true, initial: 0 }),
-      saludMax: new NumberField({ required: true, integer: true, initial: 0 }),
-      cansancioMax: new NumberField({ required: true, integer: true, initial: 0 })
+      saludMax: new NumberField({ required: true, integer: true, initial: 0 })
     }),
     descripcion: new HTMLField({ required: false, blank: true, initial: "" })
   };

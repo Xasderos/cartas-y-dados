@@ -7,7 +7,8 @@
 import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 
-import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento } from "../config.mjs";
+import { preguntarTipoDescanso } from "../documents/actor.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -31,6 +32,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       title: "Hoja de Personaje"
     },
     actions: {
+      fijarAgotamiento: HojaPersonajeActor.#onFijarAgotamiento,
       inicializarPilas: HojaPersonajeActor.#onInicializarPilas,
       robarTurno: HojaPersonajeActor.#onRobarTurno,
       jugarCarta: HojaPersonajeActor.#onJugarCarta,
@@ -141,6 +143,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       actor,
       system,
       esPropietario: actor.isOwner,
+      agotamiento: contextoAgotamiento(system.cansancio?.value),
       pilasInicializadas,
       contadoresPilas,
       cartasEnMano,
@@ -460,8 +463,22 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     this.render();
   }
 
+  /** Descanso: pregunta si es cómodo y seguro (−1 Agotamiento) antes de realizarlo (v0.12.0). */
+  /**
+   * Clic en un segmento de la barra de Agotamiento (v0.12.0): fija ese nivel; si se pulsa
+   * el segmento del nivel actual, baja uno (permite volver a 0).
+   */
+  static async #onFijarAgotamiento(event, target) {
+    const nivel = Number(target.dataset.nivel) || 0;
+    const actual = Number(this.document.system.cansancio?.value) || 0;
+    const nuevo = nivel === actual ? nivel - 1 : nivel;
+    await this.document.cambiarAgotamiento(nuevo - actual);
+  }
+
   static async #onDescansar() {
-    await this.document.realizarDescanso();
+    const opciones = await preguntarTipoDescanso(this.document.name);
+    if (!opciones) return;
+    await this.document.realizarDescanso(opciones);
     this.render();
   }
 

@@ -5,7 +5,7 @@
  * - Añade dados configurables por característica de forma individual para los PNJs.
  */
 
-import { SISTEMA_CONFIG } from "../config.mjs";
+import { SISTEMA_CONFIG, estadoAgotamiento } from "../config.mjs";
 import { leerAjuste } from "../settings.mjs";
 
 const { TypeDataModel } = foundry.abstract;
@@ -46,14 +46,11 @@ export class BaseActorDataModel extends TypeDataModel {
         })
       }),
 
+      // Agotamiento (v0.12.0). Clave histórica `cansancio` (no cambiar: datos guardados y barra
+      // secundaria del Token). `max` se fuerza en prepareDerivedData a AGOTAMIENTO_MAXIMO (8).
       cansancio: new SchemaField({
         value: new NumberField({ required: true, integer: true, initial: 0, min: 0 }),
-        max: new NumberField({
-          required: true,
-          integer: true,
-          initial: () => leerAjuste("cansancioMaxPJ", 6),
-          min: 1
-        })
+        max: new NumberField({ required: true, integer: true, initial: SISTEMA_CONFIG.AGOTAMIENTO_MAXIMO, min: 1 })
       }),
 
       defensa: new NumberField({
@@ -163,7 +160,6 @@ export class BaseActorDataModel extends TypeDataModel {
     let bonoDefensa = 0;
     let bonoManoItems = 0;
     let bonoSaludOtros = 0;
-    let bonoCansancioMax = 0;
 
     for (const item of items) {
       try {
@@ -180,7 +176,6 @@ export class BaseActorDataModel extends TypeDataModel {
         bonoDefensa += b.defensa || 0;
         bonoManoItems += b.limiteMano || 0;
         bonoSaludOtros += b.saludMax || 0;
-        bonoCansancioMax += b.cansancioMax || 0;
       } catch (error) {
         console.warn("[Cartas y Dados] Error calculando bonificadores derivados del ítem", item?.id, error);
       }
@@ -224,11 +219,21 @@ export class BaseActorDataModel extends TypeDataModel {
     this.manoConfig.bonificadorClase = Math.floor((nivelEfectivo - 1) / 3);
     this.manoConfig.bonificadorObjetos = bonoManoItems;
 
+    // Agotamiento (v0.12.0): consecuencias acumulativas por nivel (ver SISTEMA_CONFIG.AGOTAMIENTO_NIVELES).
+    const agotamiento = estadoAgotamiento(this.cansancio.value);
+    this.agotamiento = agotamiento;
+    this.cansancio.max = agotamiento.maximo;
+    this.cansancio.maxTotal = agotamiento.maximo;
+
     const { base, bonificadorClase, bonificadorObjetos, bonificadorAtributos } = this.manoConfig;
-    this.limiteMano = Math.max(
+    this.limiteManoSinAgotamiento = Math.max(
       1,
       base + bonificadorClase + bonificadorObjetos + bonificadorAtributos
     );
+    // Agotamiento 1: mano máxima a la mitad (hacia arriba).
+    this.limiteMano = agotamiento.efectos.manoMitad
+      ? Math.max(1, Math.ceil(this.limiteManoSinAgotamiento / 2))
+      : this.limiteManoSinAgotamiento;
 
     // Movimiento máximo = Base editable (ajuste world "movimientoBase") + (Físico Total * 5) metros.
     // El campo `value` se sincroniza con `max` por compatibilidad con datos antiguos;
@@ -236,33 +241,30 @@ export class BaseActorDataModel extends TypeDataModel {
     const baseMov = Number.isFinite(Number(this.movimiento.base))
       ? Number(this.movimiento.base)
       : SISTEMA_CONFIG.movimientoBase;
-    this.movimiento.max = baseMov + this.caracteristicasTotales.fisico * 5;
+    this.movimiento.maxSinAgotamiento = baseMov + this.caracteristicasTotales.fisico * 5;
+    // Agotamiento 2: velocidad a la mitad (hacia arriba, como el resto de reducciones).
+    this.movimiento.max = agotamiento.efectos.velocidadMitad
+      ? Math.ceil(this.movimiento.maxSinAgotamiento / 2)
+      : this.movimiento.maxSinAgotamiento;
     this.movimiento.value = this.movimiento.max;
 
     // NUEVA REGLA: Salud Máxima = Base (salud.max) + Físico Total + Otros Bonos (Raza/Origen/Clase/Equipo)
     this.salud.bonoFisico = this.caracteristicasTotales.fisico;
     this.salud.bonoOtros = bonoSaludOtros;
-    this.salud.maxTotal = Math.max(
+    this.salud.maxSinAgotamiento = Math.max(
       1,
       this.salud.max + this.salud.bonoFisico + this.salud.bonoOtros
     );
-
-    this.cansancio.maxTotal = Math.max(1, this.cansancio.max + bonoCansancioMax);
+    // Agotamiento 3: salud máxima a la mitad (hacia arriba).
+    this.salud.maxTotal = agotamiento.efectos.saludMitad
+      ? Math.max(1, Math.ceil(this.salud.maxSinAgotamiento / 2))
+      : this.salud.maxSinAgotamiento;
   }
 }
 
 export class PersonajeDataModel extends BaseActorDataModel {
   static defineSchema() {
     const schema = super.defineSchema();
-    schema.cansancio = new SchemaField({
-      value: new NumberField({ required: true, integer: true, initial: 0, min: 0 }),
-      max: new NumberField({
-        required: true,
-        integer: true,
-        initial: () => leerAjuste("cansancioMaxPJ", 6),
-        min: 1
-      })
-    });
     return {
       ...schema,
       nivelClase: new NumberField({ required: true, integer: true, initial: 1, min: 1 })
@@ -277,15 +279,6 @@ export class PersonajeDataModel extends BaseActorDataModel {
 export class PnjDataModel extends BaseActorDataModel {
   static defineSchema() {
     const schema = super.defineSchema();
-    schema.cansancio = new SchemaField({
-      value: new NumberField({ required: true, integer: true, initial: 0, min: 0 }),
-      max: new NumberField({
-        required: true,
-        integer: true,
-        initial: () => leerAjuste("cansancioMaxPNJ", 4),
-        min: 1
-      })
-    });
     return {
       ...schema,
       amenaza: new NumberField({ required: true, integer: true, initial: 1, min: 1 }),

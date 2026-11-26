@@ -416,3 +416,14 @@ button.cyd-btn-aplicar-dano:disabled i {
 .cyd-tirada-negativa i {
   color: var(--cyd-peligro);
 }
+
+/* Reducción a la mitad por Agotamiento 6+ (v0.12.0) */
+.cyd-tirada-agotamiento i {
+  color: var(--color-level-warning, #ee9b3a);
+}
+
+/* Lista de consecuencias de Agotamiento en el chat (v0.12.0) */
+.cyd-alerta-cansancio ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}

@@ -94,27 +94,7 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
     onChange: onUpdateCallback
   });
 
-  // 6. Cansancio Máximo (Jugadores)
-  game.settings.register(SYSTEM_ID, "cansancioMaxPJ", {
-    name: "Cansancio Máximo Base (Jugadores)",
-    hint: "Límite base de puntos de Cansancio para los Personajes Jugadores.",
-    scope: "world",
-    config: true,
-    type: Number,
-    default: 6,
-    onChange: onUpdateCallback
-  });
-
-  // 7. Cansancio Máximo (PNJs / Criaturas)
-  game.settings.register(SYSTEM_ID, "cansancioMaxPNJ", {
-    name: "Cansancio Máximo Base (PNJs / Criaturas)",
-    hint: "Límite base de puntos de Cansancio para los PNJs y criaturas.",
-    scope: "world",
-    config: true,
-    type: Number,
-    default: 4,
-    onChange: onUpdateCallback
-  });
+  // 6-7. (v0.12.0) Eliminados "cansancioMaxPJ"/"cansancioMaxPNJ": el Agotamiento tiene escala fija 0-8.
 
   // 8. Categoría de Tamaño Base
   game.settings.register(SYSTEM_ID, "tamanoBase", {

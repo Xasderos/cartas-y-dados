@@ -147,13 +147,13 @@
     <section class="cyd-contenido-derecha">
 
       {{!-- Recursos vitales ================= --}}
-      <div class="cyd-recursos-barra cyd-recursos-vitales">
-        <div class="cyd-recurso-caja" data-tooltip="Base: {{system.salud.max}} + Físico: {{system.salud.bonoFisico}} + Bonos: {{system.salud.bonoOtros}} = {{system.salud.maxTotal}}">
+      <div class="cyd-recursos-barra cyd-recursos-vitales cyd-cols-3">
+        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.saludMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base: {{system.salud.max}} + Físico: {{system.salud.bonoFisico}} + Bonos: {{system.salud.bonoOtros}}{{#if system.agotamiento.efectos.saludMitad}} = {{system.salud.maxSinAgotamiento}} | Agotamiento: ÷ 2{{/if}} = {{system.salud.maxTotal}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-heart-pulse"></i> Salud</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.salud.value" value="{{system.salud.value}}" />
             <span class="cyd-valor-sep">/</span>
-            <span class="cyd-valor-grande">{{system.salud.maxTotal}}</span>
+            <span class="cyd-valor-grande">{{system.salud.maxTotal}}</span>{{#if system.agotamiento.efectos.saludMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
           </div>
         </div>
 
@@ -173,15 +173,30 @@
           </div>
         </div>
 
-        <div class="cyd-recurso-caja">
-          <span class="cyd-recurso-titulo"><i class="fa-solid fa-hourglass-half"></i> Cansancio</span>
-          <div class="cyd-recurso-inputs">
-            <input type="number" name="system.cansancio.value" value="{{system.cansancio.value}}" />
-            <span class="cyd-valor-sep">/</span>
-            <span class="cyd-valor-grande">{{system.cansancio.maxTotal}}</span>
-          </div>
-        </div>
       </div>
+
+      {{!-- Agotamiento (v0.12.0): barra de 8 segmentos (clic para fijar el nivel) y consecuencias en vigor ================= --}}
+      <section class="cyd-panel cyd-panel-agotamiento{{#if agotamiento.muerto}} cyd-muerto{{/if}}">
+        <div class="cyd-cabecera-seccion">
+          <h3 data-tooltip="{{agotamiento.tooltipHtml}}" data-tooltip-class="cyd-tooltip"><i class="fa-solid fa-hourglass-half"></i> Agotamiento</h3>
+        </div>
+        <div class="cyd-barra-agotamiento{{#if esPropietario}} cyd-editable{{/if}}" role="meter" aria-label="Agotamiento" aria-valuemin="0" aria-valuemax="{{agotamiento.maximo}}" aria-valuenow="{{agotamiento.nivel}}">
+          {{#each agotamiento.segmentos as |seg|}}
+            <span class="cyd-segmento-agotamiento{{#if seg.activo}} cyd-lleno{{/if}}{{#if seg.esMuerte}} cyd-segmento-muerte{{/if}}"
+                  {{#if @root.esPropietario}}data-action="fijarAgotamiento" data-nivel="{{seg.nivel}}" tabindex="0"{{/if}}
+                  data-tooltip="Nivel {{seg.nivel}}: {{seg.texto}}"></span>
+          {{/each}}
+        </div>
+        {{#if agotamiento.nivel}}
+          <ul class="cyd-lista-agotamiento">
+            {{#each agotamiento.activos as |efecto|}}
+              <li><i class="fa-solid {{efecto.icono}}"></i> <strong>{{efecto.nivel}}.</strong> {{efecto.texto}}</li>
+            {{/each}}
+          </ul>
+        {{else}}
+          <p class="cyd-agotamiento-vacio">Sin Agotamiento.</p>
+        {{/if}}
+      </section>
 
       {{!-- ================= 3. MOVIMIENTO Y TAMAÑO ================= --}}
       <section class="cyd-panel cyd-panel-movimiento-tamano">
@@ -189,12 +204,12 @@
           <h3><i class="fa-solid fa-shoe-prints"></i> Movimiento y Tamaño</h3>
         </div>
         <div class="cyd-recursos-barra cyd-cols-2">
-          <div class="cyd-recurso-caja" data-tooltip="Base de Movimiento editable en esta ficha. El Total se calcula automáticamente: Base + (Físico Total × 5) metros">
+          <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.velocidadMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base de Movimiento editable en esta ficha. El Total se calcula automáticamente: Base + (Físico Total × 5) metros{{#if system.agotamiento.efectos.velocidadMitad}} | Agotamiento: {{system.movimiento.maxSinAgotamiento}} ÷ 2{{/if}}">
             <span class="cyd-recurso-titulo"><i class="fa-solid fa-person-running"></i> Movimiento · Base / Total</span>
             <div class="cyd-recurso-inputs">
               <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" />
               <span class="cyd-valor-sep">/</span>
-              <span class="cyd-valor-grande">{{system.movimiento.max}}</span>
+              <span class="cyd-valor-grande">{{system.movimiento.max}}</span>{{#if system.agotamiento.efectos.velocidadMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
               <span class="cyd-unidad">m</span>
             </div>
           </div>
@@ -229,7 +244,7 @@
             <i class="fa-solid fa-layer-group"></i> Mazo <strong>{{contadoresPilas.mazoDisponibles}}/{{contadoresPilas.mazoTotal}}</strong>
           </span>
           <span class="cyd-chip-pila" data-action="abrirPila" data-pila="mano" data-tooltip="Abrir Mano del Jefe">
-            <i class="fa-solid fa-hand"></i> Mano <strong>{{contadoresPilas.manoActual}}/{{system.limiteMano}}</strong>
+            <i class="fa-solid fa-hand"></i> Mano <strong>{{contadoresPilas.manoActual}}/{{system.limiteMano}}</strong>{{#if system.agotamiento.efectos.manoMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
           </span>
           <span class="cyd-chip-pila" data-action="abrirPila" data-pila="descarte" data-tooltip="Abrir Descarte del Jefe">
             <i class="fa-solid fa-box-archive"></i> Descarte <strong>{{contadoresPilas.descarteActual}}</strong>
@@ -244,7 +259,7 @@
 
       <section class="cyd-panel-mano">
         <div class="cyd-cabecera-seccion">
-          <h3><i class="fa-solid fa-hand"></i> Mano del Jefe <span class="cyd-contador">{{contadoresPilas.manoActual}} / {{system.limiteMano}}</span></h3>
+          <h3><i class="fa-solid fa-hand"></i> Mano del Jefe <span class="cyd-contador">{{contadoresPilas.manoActual}} / {{system.limiteMano}}{{#if system.agotamiento.efectos.manoMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}</span></h3>
           <small class="cyd-ayuda"><i class="fa-solid fa-crosshairs"></i> Marca un PJ con <kbd>T</kbd> antes de atacar</small>
         </div>
 
