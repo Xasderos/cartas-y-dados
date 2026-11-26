@@ -24,7 +24,7 @@ import { personalizarBannerPausa } from "./applications/game-pause.mjs";
 import { registrarReajusteEnResize } from "./applications/ventana-dinamica.mjs";
 import { registrarSocketDados } from "./dados.mjs";
 import { registrarAjustesDelSistema } from "./settings.mjs";
-import { limpiarNombreCarta, nombreVisibleCarta } from "./config.mjs";
+import { limpiarNombreCarta, nombreVisibleCarta, tieneRasgoRacial } from "./config.mjs";
 
 const { DocumentSheetConfig } = foundry.applications.apps;
 
@@ -323,6 +323,9 @@ Hooks.on("deleteActor", async (actor) => {
 /* -------------------------------------------------------------------------- */
 
 Hooks.on("renderChatMessageHTML", (message, html) => {
+  anadirBotonEsperaUnMomento(message, html);
+  activarBotonCuracion(html);
+
   const btnDano = html.querySelector(".cyd-btn-aplicar-dano");
   if (!btnDano) return;
   // El daño solo lo ve y aplica el Master (v0.11.0): se quita el botón a cualquier otro usuario.
@@ -354,6 +357,79 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
     btnDano.disabled = true;
     btnDano.innerHTML = `<i class="fa-solid fa-check"></i> ${dano} de Daño Aplicado (Salud: ${nuevaSalud})`;
   });
+});
+
+/**
+ * Humanos · «Espera un momento» (v0.13.0): añade al mensaje de una tirada con
+ * `flags.cartas-y-dados.repeticion` un botón para repetirla, solo para el propietario del
+ * Actor, si el rasgo no se ha usado desde el último descanso y la tirada no se ha repetido.
+ * @param {ChatMessage} message
+ * @param {HTMLElement} html
+ */
+function anadirBotonEsperaUnMomento(message, html) {
+  const datos = message.getFlag("cartas-y-dados", "repeticion");
+  if (!datos || message.getFlag("cartas-y-dados", "repetida")) return;
+  const actor = fromUuidSync(datos.actorUuid);
+  if (!actor?.isOwner || actor.system?.rasgosRaza?.esperaUnMomentoUsado) return;
+  if (!tieneRasgoRacial(actor, "esperaUnMomento")) return;
+
+  const contenedor = html.querySelector(".message-content") ?? html;
+  const boton = document.createElement("button");
+  boton.type = "button";
+  boton.className = "cyd-btn-espera-momento";
+  boton.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Espera un momento (repetir tirada)';
+  boton.dataset.tooltip = "Rasgo racial (Humanos): repite esta tirada y usa el nuevo resultado. 1 vez por descanso.";
+  boton.addEventListener("click", async ev => {
+    ev.preventDefault();
+    boton.disabled = true;
+    await actor.repetirTiradaEsperaUnMomento(message);
+    boton.remove();
+  });
+  contenedor.append(boton);
+}
+
+/**
+ * Sierpes · «Tradición alquímica» (v0.13.0): botón para que el Master aplique la curación
+ * a una criatura que el jugador no puede modificar. Se elimina para el resto de usuarios.
+ * @param {HTMLElement} html
+ */
+function activarBotonCuracion(html) {
+  const boton = html.querySelector(".cyd-btn-aplicar-curacion");
+  if (!boton) return;
+  if (!game.user.isGM) {
+    boton.remove();
+    return;
+  }
+  boton.addEventListener("click", async ev => {
+    ev.preventDefault();
+    const actorObjetivo = await fromUuid(boton.dataset.actorUuid);
+    if (!actorObjetivo) {
+      ui.notifications.warn("No se encontró la criatura objetivo.");
+      return;
+    }
+    const curacion = Number(boton.dataset.curacion) || 0;
+    const antes = Number(actorObjetivo.system.salud?.value) || 0;
+    const maximo = Number(actorObjetivo.system.salud?.maxTotal) || antes;
+    const despues = Math.min(maximo, antes + curacion);
+    await actorObjetivo.update({ "system.salud.value": despues });
+    boton.disabled = true;
+    boton.innerHTML = `<i class="fa-solid fa-check"></i> Curación aplicada (Salud: ${despues})`;
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Rasgos raciales: visión en la oscuridad al asignar la raza (v0.13.0)      */
+/* -------------------------------------------------------------------------- */
+
+Hooks.on("createItem", (item, _opciones, userId) => {
+  if (userId !== game.user.id || item.type !== "raza" || !(item.parent instanceof Actor)) return;
+  item.parent._aplicarVisionRacial?.();
+});
+
+Hooks.on("updateItem", (item, cambios, _opciones, userId) => {
+  if (userId !== game.user.id || item.type !== "raza" || !(item.parent instanceof Actor)) return;
+  if (!("name" in cambios) && cambios.system?.claveRaza === undefined) return;
+  item.parent._aplicarVisionRacial?.();
 });
 
 /* -------------------------------------------------------------------------- */

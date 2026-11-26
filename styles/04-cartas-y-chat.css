@@ -427,3 +427,16 @@ button.cyd-btn-aplicar-dano:disabled i {
   margin: 4px 0 0;
   padding-left: 18px;
 }
+
+/* Rasgos raciales en el chat (v0.13.0): repetir tirada (Humanos) y curación alquímica (Sierpes) */
+button.cyd-btn-espera-momento,
+button.cyd-btn-aplicar-curacion {
+  width: 100%;
+  margin-top: 6px;
+}
+
+button.cyd-btn-espera-momento i,
+button.cyd-btn-aplicar-curacion i {
+  margin-right: 4px;
+  color: var(--cyd-exito, var(--color-level-success, #26b231));
+}

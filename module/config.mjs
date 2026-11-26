@@ -102,18 +102,121 @@ export const SISTEMA_CONFIG = {
   AGOTAMIENTO_MAXIMO: 8,
 
   /**
-   * Razas Base del sistema (v0.10.1).
+   * Razas Base del sistema (v0.10.1; rasgos desde v0.13.0).
    * El Asistente de Creación de Personaje ofrece estas razas en su primer paso y crea
    * con la elegida el Item `raza` del Actor (`system.claveRaza` guarda la clave).
-   * Rasgos, bonificadores y descripción quedan a definir en la ficha del Item
-   * (todos los bonificadores a 0 por ahora).
+   * Cada raza define:
+   * - `nombre`: texto plano.
+   * - `beneficios` / `desventajas`: lista de rasgos `{clave, nombre, icono, texto, auto?}`;
+   *   `auto` (opcional) describe en texto plano lo que el sistema automatiza del rasgo.
+   *   Los rasgos sin `auto` son narrativos: los aplica el Master.
+   * - `bonificadores` (opcional): bonos fijos que `prepareDerivedData` suma por la clave de raza
+   *   (no se guardan en el Item, así también afectan a personajes creados antes).
+   * - `visionOscuridad` (opcional): metros de visión en la oscuridad que se aplican al Token.
+   * Las claves de rasgo con mecánica propia: `esperaUnMomento` (repetir tirada, 1/descanso),
+   * `queMeDaAlgo` (indicador con Salud ≤ mitad), `tradicionAlquimica` (curación = nivel, 1/día),
+   * `sangreFria` (Mano Máx. a la mitad mientras `system.rasgosRaza.expuestoElementos`).
    */
   RAZAS_BASE: {
-    humanos: { nombre: "Humanos" },
-    mairu: { nombre: "Mairu" },
-    mandragora: { nombre: "Mandrágora" },
-    trastolillos: { nombre: "Trastolillos" },
-    sierpes: { nombre: "Sierpes" }
+    humanos: {
+      nombre: "Humanos",
+      beneficios: [
+        {
+          clave: "prolificoProfecias", nombre: "Prolífico en las profecías", icono: "fa-scroll",
+          texto: "Los humanos tienen, la buena o mala suerte, de cumplir profecías y epopeyas: cuando estés entre la vida y la muerte y hayas quemado todas las cartas, aguantas 2 turnos más tras quemar la última carta. Si no eres ayudado en ese tiempo, el personaje muere."
+        },
+        {
+          clave: "esperaUnMomento", nombre: "Espera un momento", icono: "fa-rotate-left",
+          texto: "Tras realizar una tirada y ver el resultado, puedes elegir repetirla y usar el nuevo resultado. Puedes usar esto una vez por descanso.",
+          auto: "Botón «Espera un momento» en tus tiradas del chat; se recarga al descansar."
+        }
+      ],
+      desventajas: [],
+      sinDesventajas: "Los humanos disfrutan de no tener ninguna desventaja inherente."
+    },
+    mairu: {
+      nombre: "Mairu",
+      beneficios: [
+        {
+          clave: "complexionAgil", nombre: "Complexión ágil", icono: "fa-person-running",
+          texto: "Los Mairu poseen cuerpos delgados, ágiles y flexibles. Tu capacidad de salto aumenta 3 metros."
+        },
+        {
+          clave: "cuerpoLigero", nombre: "Cuerpo ligero", icono: "fa-feather",
+          texto: "Para su tamaño, los Mairu pesan menos de lo que aparentan; recibes menos daño por caída."
+        }
+      ],
+      desventajas: [
+        {
+          clave: "figuraMisteriosa", nombre: "Figura misteriosa", icono: "fa-user-secret",
+          texto: "La presencia de un Mairu es imponente y extraña; cuando llegues a una zona poblada, ya sea una villa, una ciudad o un fuerte, el rumor de tu llegada se extenderá rápidamente. Además, tu presencia es incómoda y hace a las demás razas desconfiar de ti."
+        }
+      ]
+    },
+    mandragora: {
+      nombre: "Mandrágora",
+      visionOscuridad: 20,
+      beneficios: [
+        {
+          clave: "visionOscuridad", nombre: "Visión en la oscuridad", icono: "fa-eye",
+          texto: "Los mandrágora poseen visión en la oscuridad hasta 20 metros.",
+          auto: "Se configura en el Token del personaje al elegir la raza."
+        },
+        {
+          clave: "vocesDelYo", nombre: "Voces del Yo", icono: "fa-comments",
+          texto: "Puedes comunicarte sin usar la boca, reproducir sonidos o voces usando los cuernos. Con otros de tu raza, puedes usarlo para entablar conversaciones telepáticas."
+        }
+      ],
+      desventajas: [
+        {
+          clave: "ecosDelPasado", nombre: "Ecos del pasado", icono: "fa-ghost",
+          texto: "Eres propenso a ser contactado por antiguas deidades, probablemente para vengarse de tu raza por expulsarlas, ya sea en sueños, pesadillas o enviando a sus cultistas a por ti."
+        }
+      ]
+    },
+    trastolillos: {
+      nombre: "Trastolillos",
+      beneficios: [
+        {
+          clave: "comunionNaturaleza", nombre: "En comunión con la naturaleza", icono: "fa-leaf",
+          texto: "Tienes facilidad para obtener información en espacios naturales, como los recursos de la zona, los peligros que pueden habitar o si ha ocurrido algo inusual."
+        },
+        {
+          clave: "queMeDaAlgo", nombre: "Que me da algo", icono: "fa-person-running",
+          texto: "En el momento en que te quedes a la mitad de tus puntos de vida o menos, puedes moverte hasta la mitad de tu movimiento sin generar reacciones.",
+          auto: "La ficha indica cuándo está activo (Salud actual ≤ mitad de la Salud Máx.)."
+        }
+      ],
+      desventajas: [
+        {
+          clave: "necesitoUnMapa", nombre: "Necesito un mapa", icono: "fa-map",
+          texto: "Los trastolillos son propensos a perderse: sin las herramientas adecuadas, como mapas, una brújula o indicaciones, se pierden."
+        }
+      ]
+    },
+    sierpes: {
+      nombre: "Sierpes",
+      bonificadores: { defensa: 1 },
+      beneficios: [
+        {
+          clave: "tradicionAlquimica", nombre: "Tradición alquímica", icono: "fa-flask",
+          texto: "Una vez al día las sierpes son capaces de confeccionar un ungüento o poción con los materiales que encuentren cerca, que deberán usar inmediatamente en sí mismas o en una criatura voluntaria. Este curará tantos puntos de vida como el nivel de la sierpe.",
+          auto: "Botón en la ficha: cura tantos puntos como tu nivel a ti o al objetivo marcado; se recarga con un descanso cómodo."
+        },
+        {
+          clave: "armaduraNatural", nombre: "Armadura natural", icono: "fa-shield-halved",
+          texto: "Las sierpes tienen una piel dura reforzada con escamas: obtienen +1 a la defensa base.",
+          auto: "+1 a la Defensa (ya incluido en la Defensa Total)."
+        }
+      ],
+      desventajas: [
+        {
+          clave: "sangreFria", nombre: "Sangre fría", icono: "fa-temperature-half",
+          texto: "El cuerpo de las sierpes es especialmente sensible a los cambios de temperatura. En entornos muy fríos o muy cálidos tienen problemas si no se protegen adecuadamente. Siempre que la sierpe esté sufriendo por la exposición a los elementos, verá su mano máxima reducida a la mitad.",
+          auto: "Interruptor «Expuesta a los elementos» en la ficha: Mano Máx. a la mitad mientras esté activo."
+        }
+      ]
+    }
   },
 
   /**
@@ -303,6 +406,63 @@ export function contextoAgotamiento(valor) {
   // Segmentos de la barra (uno por nivel, 1..maximo); `activo` = nivel alcanzado.
   const segmentos = tabla.map(e => ({ nivel: e.nivel, texto: e.texto, activo: e.activo, esMuerte: e.nivel === maximo }));
   return { nivel, maximo, muerto, activos: tabla.filter(e => e.activo), segmentos, tooltipHtml };
+}
+
+/**
+ * Devuelve la configuración de la raza base de un Actor (v0.13.0) a partir de su Item `raza`
+ * (`system.claveRaza`; respaldo por nombre para razas creadas sin clave).
+ * @param {Actor|null} actor - Actor (PJ o PNJ).
+ * @returns {{clave: string, config: object}|null} null si no tiene raza base reconocida.
+ */
+export function razaBaseDeActor(actor) {
+  return razaBaseDeItem(actor?.items?.find?.(i => i.type === "raza") ?? null);
+}
+
+/**
+ * Devuelve la configuración de raza base de un Item `raza` (v0.13.0): por `system.claveRaza`
+ * o, si falta, por nombre (razas creadas a mano con el nombre de una raza base).
+ * @param {Item|null} itemRaza
+ * @returns {{clave: string, config: object}|null}
+ */
+export function razaBaseDeItem(itemRaza) {
+  if (!itemRaza || itemRaza.type !== "raza") return null;
+  const razas = SISTEMA_CONFIG.RAZAS_BASE;
+  let clave = itemRaza.system?.claveRaza || "";
+  if (!razas[clave]) {
+    const nombre = String(itemRaza.name ?? "").trim().toLowerCase();
+    clave = Object.keys(razas).find(k => razas[k].nombre.toLowerCase() === nombre) ?? "";
+  }
+  return razas[clave] ? { clave, config: razas[clave] } : null;
+}
+
+/**
+ * Indica si un Actor tiene un rasgo racial concreto (v0.13.0).
+ * @param {Actor|null} actor
+ * @param {string} claveRasgo - Clave del rasgo (p. ej. "esperaUnMomento").
+ * @returns {boolean}
+ */
+export function tieneRasgoRacial(actor, claveRasgo) {
+  const raza = razaBaseDeActor(actor);
+  if (!raza) return false;
+  return [...(raza.config.beneficios ?? []), ...(raza.config.desventajas ?? [])].some(r => r.clave === claveRasgo);
+}
+
+/**
+ * Contexto de plantilla de los rasgos raciales de un Actor (v0.13.0), para el panel
+ * «Rasgos Raciales» de la ficha y la ficha del Item de Raza.
+ * @param {string|null} claveRaza - Clave de `SISTEMA_CONFIG.RAZAS_BASE`.
+ * @returns {{clave: string, nombre: string, beneficios: object[], desventajas: object[], sinDesventajas: string}|null}
+ */
+export function contextoRasgosRaza(claveRaza) {
+  const config = claveRaza ? SISTEMA_CONFIG.RAZAS_BASE[claveRaza] : null;
+  if (!config) return null;
+  return {
+    clave: claveRaza,
+    nombre: config.nombre,
+    beneficios: config.beneficios ?? [],
+    desventajas: config.desventajas ?? [],
+    sinDesventajas: config.sinDesventajas ?? ""
+  };
 }
 
 export function abreviadoPalo(clavePalo) {

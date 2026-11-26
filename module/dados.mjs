@@ -28,6 +28,9 @@
  * @property {boolean} mitadPorAgotamiento - Se aplicó la mitad por Agotamiento 6+.
  * @property {number} totalSinAgotamiento - Total antes de la reducción por Agotamiento.
  * @property {string} formula - Fórmula base legible ("3d6 + 2").
+ * @property {number} cantidadDados - Nº de dados lanzados (para repetir la tirada, v0.13.0).
+ * @property {string} tipoDado - Dado lanzado ("d6").
+ * @property {number} bono - Bonificador plano aplicado.
  * @property {string} html - Bloque HTML `.cyd-tirada-detalle` con el desglose para el chat.
  */
 
@@ -102,6 +105,9 @@ export async function tirarDadosSistema({ cantidadDados, tipoDado, bono = 0, rol
     mitadPorAgotamiento: Boolean(mitadPorAgotamiento),
     totalSinAgotamiento,
     formula,
+    cantidadDados: n,
+    tipoDado: `d${caras}`,
+    bono: bonoNum,
     html: ""
   };
   resultado.html = htmlDetalleTirada(resultado, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia });
@@ -158,16 +164,21 @@ const CANAL_SOCKET = "system.cartas-y-dados";
  * @param {Object} datos.speaker - `ChatMessage.getSpeaker(...)`.
  * @param {string} datos.flavor - HTML de cabecera del mensaje.
  * @param {string} [datos.htmlMaster=""] - HTML privado del Master.
+ * @param {Object|null} [datos.repeticion=null] - (v0.13.0) Datos para repetir la tirada con el rasgo
+ *   «Espera un momento» (`SistemaActor#_datosRepeticionTirada`); se guardan en
+ *   `flags.cartas-y-dados.repeticion` y el chat muestra el botón al propietario.
  * @returns {Promise<ChatMessage>}
  */
-export async function publicarTirada(tirada, { speaker, flavor, htmlMaster = "" }) {
-  const mensaje = await ChatMessage.create({
+export async function publicarTirada(tirada, { speaker, flavor, htmlMaster = "", repeticion = null }) {
+  const datosMensaje = {
     speaker,
     flavor,
     content: String(tirada.total),
     rolls: tirada.rolls,
     sound: CONFIG.sounds.dice
-  });
+  };
+  if (repeticion) datosMensaje.flags = { "cartas-y-dados": { repeticion } };
+  const mensaje = await ChatMessage.create(datosMensaje);
   if (htmlMaster) await enviarMensajeSoloMaster({ speaker, content: htmlMaster });
   return mensaje;
 }

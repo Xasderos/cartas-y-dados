@@ -142,7 +142,7 @@
           </div>
         </div>
 
-        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo/Raza: +{{system.bonificadorDefensa}} | Total: {{system.defensaTotal}}">
+        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo/Raza: +{{system.bonificadorDefensa}}{{#if system.bonoDefensaRaza}} (Rasgo racial: +{{system.bonoDefensaRaza}}){{/if}} | Total: {{system.defensaTotal}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Defensa</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" />
@@ -152,12 +152,12 @@
         </div>
 
 
-        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.manoMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base: {{system.manoConfig.base}} | Nivel Clase: +{{system.manoConfig.bonificadorClase}} | Raza/Origen/Equipo: +{{system.manoConfig.bonificadorObjetos}}{{#if system.agotamiento.efectos.manoMitad}} | Agotamiento: {{system.limiteManoSinAgotamiento}} ÷ 2{{/if}}">
+        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.manoMitad}} cyd-afectado-agotamiento{{/if}}{{#if system.manoMitadPorSangreFria}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base: {{system.manoConfig.base}} | Nivel Clase: +{{system.manoConfig.bonificadorClase}} | Raza/Origen/Equipo: +{{system.manoConfig.bonificadorObjetos}}{{#if system.agotamiento.efectos.manoMitad}} | Agotamiento: {{system.limiteManoSinAgotamiento}} ÷ 2{{/if}}{{#if system.manoMitadPorSangreFria}} | Sangre fría: ÷ 2{{/if}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-hand"></i> Mano Máx.</span>
           <div class="cyd-recurso-inputs">
             <span class="cyd-valor-grande">{{#if contadoresPilas}}{{contadoresPilas.manoActual}}{{else}}0{{/if}}</span>
             <span class="cyd-valor-sep">/</span>
-            <span class="cyd-valor-grande">{{system.limiteMano}}</span>{{#if system.agotamiento.efectos.manoMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}
+            <span class="cyd-valor-grande">{{system.limiteMano}}</span>{{#if system.agotamiento.efectos.manoMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}{{#if system.manoMitadPorSangreFria}} <i class="fa-solid fa-temperature-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Sangre fría (expuesta a los elementos)"></i>{{/if}}
           </div>
         </div>
       </div>
@@ -212,6 +212,72 @@
           </div>
         </div>
       </section>
+
+      {{!-- ================= 3b. RASGOS RACIALES (v0.13.0) ================= --}}
+      {{#if rasgosRaza}}
+      <section class="cyd-panel cyd-panel-rasgos-raza">
+        <div class="cyd-cabecera-seccion">
+          <h3><i class="fa-solid fa-dna"></i> Rasgos Raciales · {{rasgosRaza.nombre}}</h3>
+        </div>
+        <div class="cyd-dos-columnas cyd-rasgos-columnas">
+          <div class="cyd-rasgos-grupo">
+            <h4><i class="fa-solid fa-circle-plus"></i> Beneficios</h4>
+            <ul class="cyd-lista-rasgos">
+              {{#each rasgosRaza.beneficios as |rasgo|}}
+                <li class="cyd-rasgo">
+                  <div class="cyd-rasgo-cabecera">
+                    <strong data-tooltip="{{rasgo.texto}}" data-tooltip-class="cyd-tooltip"><i class="fa-solid {{rasgo.icono}}"></i> {{rasgo.nombre}}</strong>
+                    {{#if (eq rasgo.clave "esperaUnMomento")}}
+                      <label class="cyd-rasgo-control" data-tooltip="Se recarga al descansar. Úsalo desde el botón de tus tiradas en el chat.">
+                        <input type="checkbox" name="system.rasgosRaza.esperaUnMomentoUsado" {{checked @root.system.rasgosRaza.esperaUnMomentoUsado}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Usado
+                      </label>
+                    {{/if}}
+                    {{#if (eq rasgo.clave "tradicionAlquimica")}}
+                      {{#if @root.esPropietario}}
+                        <button type="button" class="cyd-btn-mini" data-action="usarAlquimia" {{#if @root.system.rasgosRaza.alquimiaUsada}}disabled{{/if}} data-tooltip="Cura {{@root.system.nivelEfectivo}} de Salud a ti o al objetivo marcado (T)"><i class="fa-solid fa-flask"></i> Preparar</button>
+                      {{/if}}
+                      <label class="cyd-rasgo-control" data-tooltip="Se recarga con un descanso cómodo (1 vez al día).">
+                        <input type="checkbox" name="system.rasgosRaza.alquimiaUsada" {{checked @root.system.rasgosRaza.alquimiaUsada}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Usado hoy
+                      </label>
+                    {{/if}}
+                    {{#if (eq rasgo.clave "queMeDaAlgo")}}
+                      {{#if @root.system.queMeDaAlgoActivo}}
+                        <span class="cyd-rasgo-estado cyd-activo"><i class="fa-solid fa-circle-check"></i> Activo</span>
+                      {{else}}
+                        <span class="cyd-rasgo-estado">Inactivo</span>
+                      {{/if}}
+                    {{/if}}
+                  </div>
+                  <p class="cyd-rasgo-texto">{{rasgo.texto}}</p>
+                  {{#if rasgo.auto}}<p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{rasgo.auto}}</p>{{/if}}
+                </li>
+              {{/each}}
+            </ul>
+          </div>
+          <div class="cyd-rasgos-grupo">
+            <h4><i class="fa-solid fa-circle-minus"></i> Desventajas</h4>
+            <ul class="cyd-lista-rasgos">
+              {{#each rasgosRaza.desventajas as |rasgo|}}
+                <li class="cyd-rasgo">
+                  <div class="cyd-rasgo-cabecera">
+                    <strong data-tooltip="{{rasgo.texto}}" data-tooltip-class="cyd-tooltip"><i class="fa-solid {{rasgo.icono}}"></i> {{rasgo.nombre}}</strong>
+                    {{#if (eq rasgo.clave "sangreFria")}}
+                      <label class="cyd-rasgo-control" data-tooltip="Mientras esté activo, la Mano Máx. se reduce a la mitad.">
+                        <input type="checkbox" name="system.rasgosRaza.expuestoElementos" {{checked @root.system.rasgosRaza.expuestoElementos}} {{#unless @root.esPropietario}}disabled{{/unless}} /> Expuesta a los elementos
+                      </label>
+                    {{/if}}
+                  </div>
+                  <p class="cyd-rasgo-texto">{{rasgo.texto}}</p>
+                  {{#if rasgo.auto}}<p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{rasgo.auto}}</p>{{/if}}
+                </li>
+              {{else}}
+                <li class="cyd-rasgo"><p class="cyd-rasgo-texto">{{rasgosRaza.sinDesventajas}}</p></li>
+              {{/each}}
+            </ul>
+          </div>
+        </div>
+      </section>
+      {{/if}}
 
     {{#unless pilasInicializadas}}
       <div class="cyd-aviso-inicializar">

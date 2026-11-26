@@ -546,3 +546,90 @@ label.cyd-recurso-caja {
   color: var(--color-level-warning, #ee9b3a);
   cursor: help;
 }
+
+/* ======================================================================== */
+/*  RASGOS RACIALES (v0.13.0)                                                */
+/* ======================================================================== */
+
+.cyd-rasgos-columnas {
+  --cyd-cols: 2;
+  --cyd-col-min: 14rem;
+  align-items: start;
+}
+
+.cyd-rasgos-grupo h4 {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--cyd-oro-linea);
+}
+
+.cyd-rasgos-grupo h4 i {
+  color: var(--cyd-azul);
+}
+
+/* Lista con scroll propio: los textos de los rasgos pueden ser largos */
+.cyd-lista-rasgos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.cyd-rasgo {
+  margin: 0 0 6px;
+  min-width: 0;
+}
+
+.cyd-rasgo-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.cyd-rasgo-cabecera strong {
+  overflow-wrap: anywhere;
+}
+
+.cyd-rasgo-cabecera strong i {
+  color: var(--cyd-azul);
+}
+
+.cyd-rasgo-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.cartas-y-dados .window-content .cyd-rasgo-cabecera button.cyd-btn-mini {
+  width: auto;
+}
+
+.cyd-rasgo-estado {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.cyd-rasgo-estado.cyd-activo {
+  opacity: 1;
+  color: var(--cyd-exito);
+}
+
+.cyd-rasgo-texto,
+.cyd-rasgo-auto {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.cyd-rasgo-auto {
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.cyd-rasgo-auto i {
+  color: var(--cyd-azul);
+}

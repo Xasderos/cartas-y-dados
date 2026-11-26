@@ -7,7 +7,7 @@
 import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 
-import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoRasgosRaza } from "../config.mjs";
 import { preguntarTipoDescanso } from "../documents/actor.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -49,7 +49,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       eliminarItem: HojaPersonajeActor.#onEliminarItem,
       alternarEquipado: HojaPersonajeActor.#onAlternarEquipado,
       usarHabilidad: HojaPersonajeActor.#onUsarHabilidad,
-      subirNivel: HojaPersonajeActor.#onSubirNivel
+      subirNivel: HojaPersonajeActor.#onSubirNivel,
+      usarAlquimia: HojaPersonajeActor.#onUsarAlquimia
     }
   };
 
@@ -144,6 +145,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       system,
       esPropietario: actor.isOwner,
       agotamiento: contextoAgotamiento(system.cansancio?.value),
+      rasgosRaza: contextoRasgosRaza(system.razaBase),
       pilasInicializadas,
       contadoresPilas,
       cartasEnMano,
@@ -207,7 +209,14 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       claveRaza = await DialogV2.wait({
         ...opcionesDialogoSistema({ width: 460, lista: true }),
         window: { title: `${actor.name} — Paso 1: Elige tu Raza` },
-        content: "<p>Elige una de las siguientes razas:</p>",
+        // (v0.13.0) Resumen de rasgos de cada raza (el detalle está en la ficha del Item de Raza).
+        content: "<p>Elige una de las siguientes razas:</p>" + `<ul class="cyd-lista-rasgos">${
+          Object.values(razas).map(cfg => {
+            const nombres = lista => (lista ?? []).map(r => r.nombre).join(", ");
+            const desventajas = nombres(cfg.desventajas) || "ninguna";
+            return `<li class="cyd-rasgo"><strong>${cfg.nombre}</strong><p class="cyd-rasgo-texto"><i class="fa-solid fa-circle-plus"></i> ${nombres(cfg.beneficios)} · <i class="fa-solid fa-circle-minus"></i> ${desventajas}</p></li>`;
+          }).join("")
+        }</ul>`,
         buttons: botonesRazas,
         rejectClose: false
       });
@@ -565,6 +574,14 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     if (item && item.type === "objeto") {
       await item.update({ "system.equipado": !item.system.equipado });
     }
+  }
+
+  /**
+   * Sierpes · Tradición alquímica (v0.13.0): prepara el ungüento curativo.
+   * @this {HojaPersonajeActor}
+   */
+  static async #onUsarAlquimia() {
+    await this.document.usarTradicionAlquimica();
   }
 
   static async #onUsarHabilidad(event, target) {

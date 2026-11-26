@@ -5,11 +5,11 @@
  * - Añade dados configurables por característica de forma individual para los PNJs.
  */
 
-import { SISTEMA_CONFIG, estadoAgotamiento } from "../config.mjs";
+import { SISTEMA_CONFIG, estadoAgotamiento, razaBaseDeActor } from "../config.mjs";
 import { leerAjuste } from "../settings.mjs";
 
 const { TypeDataModel } = foundry.abstract;
-const { NumberField, SchemaField, StringField, HTMLField, ForeignDocumentField } = foundry.data.fields;
+const { BooleanField, NumberField, SchemaField, StringField, HTMLField, ForeignDocumentField } = foundry.data.fields;
 
 function crearCampoPila() {
   return new ForeignDocumentField(foundry.documents.BaseCards, {
@@ -139,6 +139,16 @@ export class BaseActorDataModel extends TypeDataModel {
         enJuegoId: crearCampoPila()
       }),
 
+      // Estado de los rasgos raciales con usos limitados o interruptores (v0.13.0).
+      rasgosRaza: new SchemaField({
+        // Humanos · Espera un momento: repetir una tirada (1 por descanso).
+        esperaUnMomentoUsado: new BooleanField({ required: true, initial: false }),
+        // Sierpes · Tradición alquímica: ungüento curativo (1 por día = descanso cómodo).
+        alquimiaUsada: new BooleanField({ required: true, initial: false }),
+        // Sierpes · Sangre fría: sufriendo por la exposición a los elementos (Mano Máx. ÷ 2).
+        expuestoElementos: new BooleanField({ required: true, initial: false })
+      }),
+
       biografia: new HTMLField({ required: false, blank: true, initial: "" })
     };
   }
@@ -180,6 +190,13 @@ export class BaseActorDataModel extends TypeDataModel {
         console.warn("[Cartas y Dados] Error calculando bonificadores derivados del ítem", item?.id, error);
       }
     }
+
+    // Rasgos raciales (v0.13.0): bonos fijos de la raza base (p. ej. Sierpes: +1 Defensa).
+    const razaBase = razaBaseDeActor(this.parent);
+    this.razaBase = razaBase?.clave ?? null;
+    const bonosRaza = razaBase?.config.bonificadores ?? {};
+    this.bonoDefensaRaza = Number(bonosRaza.defensa) || 0;
+    bonoDefensa += this.bonoDefensaRaza;
 
     if (game.cards) {
       this.pilasDocumentos = {
@@ -234,6 +251,10 @@ export class BaseActorDataModel extends TypeDataModel {
     this.limiteMano = agotamiento.efectos.manoMitad
       ? Math.max(1, Math.ceil(this.limiteManoSinAgotamiento / 2))
       : this.limiteManoSinAgotamiento;
+    // Sierpes · Sangre fría (v0.13.0): expuesta a los elementos → Mano Máx. a la mitad
+    // (se acumula con la reducción por Agotamiento).
+    this.manoMitadPorSangreFria = this.razaBase === "sierpes" && Boolean(this.rasgosRaza?.expuestoElementos);
+    if (this.manoMitadPorSangreFria) this.limiteMano = Math.max(1, Math.ceil(this.limiteMano / 2));
 
     // Movimiento máximo = Base editable (ajuste world "movimientoBase") + (Físico Total * 5) metros.
     // El campo `value` se sincroniza con `max` por compatibilidad con datos antiguos;
@@ -259,6 +280,10 @@ export class BaseActorDataModel extends TypeDataModel {
     this.salud.maxTotal = agotamiento.efectos.saludMitad
       ? Math.max(1, Math.ceil(this.salud.maxSinAgotamiento / 2))
       : this.salud.maxSinAgotamiento;
+
+    // Trastolillos · Que me da algo (v0.13.0): activo con la Salud actual a la mitad o menos.
+    this.queMeDaAlgoActivo = this.razaBase === "trastolillos"
+      && Number(this.salud.value) <= Math.floor(this.salud.maxTotal / 2);
   }
 }
 

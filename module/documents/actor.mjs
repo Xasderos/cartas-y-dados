@@ -8,7 +8,7 @@
 
 import {
   SISTEMA_CONFIG, abreviadoPalo, claveClaseDeItem, describirPackCartas, estadoAgotamiento, generarNombreMisticoUnico,
-  nombreVisibleCarta
+  nombreVisibleCarta, razaBaseDeActor, tieneRasgoRacial
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 import { htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
@@ -147,7 +147,12 @@ export class SistemaActor extends Actor {
     // 5. Crear o actualizar el Item de tipo 'raza' (v0.10.1)
     const configRaza = claveRaza ? SISTEMA_CONFIG.RAZAS_BASE?.[claveRaza] : null;
     if (configRaza) {
-      const datosRaza = { name: configRaza.nombre, "system.claveRaza": claveRaza };
+      // (v0.13.0) `rasgoRacial` resume los beneficios (tooltip de la ranura de Raza).
+      const datosRaza = {
+        name: configRaza.nombre,
+        "system.claveRaza": claveRaza,
+        "system.rasgoRacial": (configRaza.beneficios ?? []).map(r => r.nombre).join(", ")
+      };
       const itemRaza = this.items.find(i => i.type === "raza");
       if (itemRaza) {
         await itemRaza.update(datosRaza);
@@ -550,12 +555,17 @@ export class SistemaActor extends Actor {
    * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada - Tirada evaluada.
    * @param {boolean} esAtaque - Si la acción es un ataque.
    * @param {string} [etiquetaDificultad="Dificultad del Master"] - Texto de la dificultad.
+   * @param {Object} [opciones]
+   * @param {Token|TokenDocument|null} [opciones.tokenObjetivo] - Objetivo explícito (v0.13.0, repetición
+   *   de tirada); si no se indica, se usa el objetivo marcado por el usuario (`T`).
    * @returns {{publico: string, master: string}} HTML público y HTML solo para el Master ("" si no aplica).
    */
-  _htmlResolucionTirada(tirada, esAtaque, etiquetaDificultad = "Dificultad del Master") {
+  _htmlResolucionTirada(tirada, esAtaque, etiquetaDificultad = "Dificultad del Master", { tokenObjetivo: objetivoExplicito } = {}) {
     if (!esAtaque) return { publico: htmlResolucionDificultad(tirada, etiquetaDificultad), master: "" };
 
-    const tokenObjetivo = game.user.targets.first() ?? null;
+    const tokenObjetivo = objetivoExplicito !== undefined
+      ? objetivoExplicito
+      : game.user.targets.first() ?? null;
     const actorObjetivo = tokenObjetivo?.actor ?? null;
     if (!actorObjetivo) {
       return {
@@ -739,7 +749,10 @@ export class SistemaActor extends Actor {
       await publicarTirada(tirada, {
         speaker: ChatMessage.getSpeaker({ actor: this }),
         flavor: saborChat,
-        htmlMaster
+        htmlMaster,
+        repeticion: this._datosRepeticionTirada(tirada, {
+          titulo: nombreVisibleCarta(carta), esAtaque: Boolean(carta.system.esAtaque)
+        })
       });
     } else {
       await ChatMessage.create({
@@ -928,6 +941,12 @@ export class SistemaActor extends Actor {
     const agotamientoAntes = Number(this.system.cansancio?.value) || 0;
     const recupera = comodo && agotamientoAntes > 0;
     if (recupera) await this.cambiarAgotamiento(-1);
+
+    // Rasgos raciales (v0.13.0): «Espera un momento» se recarga con cualquier descanso;
+    // «Tradición alquímica» (1 al día) solo con el descanso cómodo (también máx. 1 al día).
+    const recargaRasgos = { "system.rasgosRaza.esperaUnMomentoUsado": false };
+    if (comodo) recargaRasgos["system.rasgosRaza.alquimiaUsada"] = false;
+    await this.update(recargaRasgos);
     this.prepareData();
 
     const textoAgotamiento = recupera
@@ -1148,6 +1167,171 @@ export class SistemaActor extends Actor {
   }
   
   /* ======================================================================== */
+  /*  6b. RASGOS RACIALES (v0.13.0)                                            */
+  /* ======================================================================== */
+
+  /**
+   * Datos necesarios para repetir una tirada con «Espera un momento» (Humanos). Se guardan en
+   * `flags.cartas-y-dados.repeticion` del mensaje (ver `publicarTirada`). Solo se generan si el
+   * Actor tiene el rasgo, para no cargar flags en el resto de mensajes.
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada - Tirada original.
+   * @param {Object} datos
+   * @param {string} datos.titulo - Nombre de la carta, habilidad o acción.
+   * @param {boolean} [datos.esAtaque=false]
+   * @param {string} [datos.etiquetaDificultad="Dificultad del Master"]
+   * @returns {Object|null}
+   */
+  _datosRepeticionTirada(tirada, { titulo, esAtaque = false, etiquetaDificultad = "Dificultad del Master" }) {
+    if (!tieneRasgoRacial(this, "esperaUnMomento")) return null;
+    const objetivo = esAtaque ? game.user.targets.first() ?? null : null;
+    return {
+      actorUuid: this.uuid,
+      titulo: String(titulo ?? "Tirada"),
+      cantidadDados: tirada.cantidadDados,
+      tipoDado: tirada.tipoDado,
+      bono: tirada.bono,
+      esAtaque: Boolean(esAtaque),
+      etiquetaDificultad,
+      objetivoTokenUuid: objetivo?.document?.uuid ?? null,
+      totalAnterior: tirada.total
+    };
+  }
+
+  /**
+   * Humanos · «Espera un momento»: repite una tirada ya publicada y usa el nuevo resultado
+   * (1 vez por descanso). Vuelve a resolver contra el mismo objetivo o contra la Dificultad
+   * actual del Master, publica la nueva tirada y marca el rasgo como usado.
+   * @param {ChatMessage} mensaje - Mensaje con `flags.cartas-y-dados.repeticion`.
+   * @returns {Promise<import("../dados.mjs").ResultadoTiradaSistema|null>}
+   */
+  async repetirTiradaEsperaUnMomento(mensaje) {
+    const datos = mensaje?.getFlag("cartas-y-dados", "repeticion");
+    if (!datos) return null;
+    if (!tieneRasgoRacial(this, "esperaUnMomento")) return null;
+    if (this.system.rasgosRaza?.esperaUnMomentoUsado) {
+      ui.notifications.warn(`${this.name} ya ha usado «Espera un momento» desde su último descanso.`);
+      return null;
+    }
+    if (mensaje.getFlag("cartas-y-dados", "repetida")) {
+      ui.notifications.warn("Esta tirada ya se ha repetido.");
+      return null;
+    }
+
+    // Marcar el uso antes de tirar para evitar dobles clics.
+    await this.update({ "system.rasgosRaza.esperaUnMomentoUsado": true });
+    if (mensaje.isOwner) await mensaje.setFlag("cartas-y-dados", "repetida", true);
+
+    const tirada = await tirarDadosSistema({
+      cantidadDados: datos.cantidadDados, tipoDado: datos.tipoDado, bono: datos.bono,
+      rollData: this.getRollData(), mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento()
+    });
+    const tokenObjetivo = datos.objetivoTokenUuid ? (fromUuidSync(datos.objetivoTokenUuid) ?? null) : null;
+    const resolucion = this._htmlResolucionTirada(tirada, datos.esAtaque, datos.etiquetaDificultad, { tokenObjetivo });
+
+    const saborChat = `
+      <div class="cyd-carta-jugada">
+        <h3><i class="fa-solid fa-rotate-left"></i> Espera un momento · ${datos.titulo}</h3>
+        <p><small>Rasgo racial (Humanos): repite la tirada y usa el nuevo resultado. Resultado anterior: <strong>${datos.totalAnterior}</strong>.</small></p>
+        ${tirada.html}
+        ${resolucion.publico}
+      </div>
+    `;
+    await publicarTirada(tirada, {
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      flavor: saborChat,
+      htmlMaster: resolucion.master
+    });
+    return tirada;
+  }
+
+  /**
+   * Sierpes · «Tradición alquímica»: una vez al día prepara un ungüento que cura tantos
+   * puntos de Salud como su nivel, a sí misma o a la criatura voluntaria marcada como objetivo.
+   * Si el usuario no puede modificar al objetivo, el chat lleva un botón para que el Master
+   * aplique la curación (`.cyd-btn-aplicar-curacion`, ver `sistema.mjs`).
+   * @returns {Promise<boolean>} true si se usó.
+   */
+  async usarTradicionAlquimica() {
+    if (!tieneRasgoRacial(this, "tradicionAlquimica")) return false;
+    if (this.system.rasgosRaza?.alquimiaUsada) {
+      ui.notifications.warn(`${this.name} ya ha preparado su ungüento hoy (se recarga con un descanso cómodo).`);
+      return false;
+    }
+
+    const curacion = Math.max(1, Number(this.system.nivelEfectivo) || 1);
+    const tokenObjetivo = game.user.targets.first() ?? null;
+    const actorObjetivo = tokenObjetivo?.actor ?? null;
+    const botones = [
+      { action: "propio", label: `En ${this.name} (+${curacion} Salud)`, icon: "fa-solid fa-flask", default: true, callback: () => "propio" }
+    ];
+    if (actorObjetivo && actorObjetivo !== this) {
+      botones.push({ action: "objetivo", label: `En ${tokenObjetivo.name} (+${curacion} Salud)`, icon: "fa-solid fa-crosshairs", callback: () => "objetivo" });
+    }
+    botones.push({ action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => "cancelar" });
+
+    const eleccion = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 460, lista: true }),
+      window: { title: "Tradición alquímica", icon: "fa-solid fa-flask" },
+      content: `<p>Con los materiales que encuentra cerca, <strong>${this.name}</strong> prepara un ungüento que cura <strong>${curacion}</strong> punto(s) de Salud (su nivel). Debe usarse de inmediato en sí misma o en una criatura voluntaria (marca su Token con <strong>T</strong>).</p>`,
+      buttons: botones,
+      rejectClose: false
+    });
+    if (eleccion !== "propio" && eleccion !== "objetivo") return false;
+
+    const destino = eleccion === "objetivo" ? actorObjetivo : this;
+    const nombreDestino = eleccion === "objetivo" ? tokenObjetivo.name : this.name;
+    await this.update({ "system.rasgosRaza.alquimiaUsada": true });
+
+    let lineaResultado;
+    if (destino.isOwner) {
+      destino.prepareData();
+      const antes = Number(destino.system.salud?.value) || 0;
+      const maximo = Number(destino.system.salud?.maxTotal) || antes;
+      const despues = Math.min(maximo, antes + curacion);
+      await destino.update({ "system.salud.value": despues });
+      lineaResultado = `<p><i class="fa-solid fa-heart-pulse"></i> <strong>${nombreDestino}</strong> recupera <strong>${despues - antes}</strong> de Salud (${antes} → ${despues}).</p>`;
+    } else {
+      lineaResultado = `
+        <p><i class="fa-solid fa-heart-pulse"></i> Cura <strong>${curacion}</strong> de Salud a <strong>${nombreDestino}</strong> (lo aplica el Master).</p>
+        <button type="button" class="cyd-btn-aplicar-curacion" data-actor-uuid="${destino.uuid}" data-curacion="${curacion}">
+          <i class="fa-solid fa-heart-pulse"></i> Aplicar ${curacion} de Curación a ${nombreDestino}
+        </button>`;
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-flask"></i> Tradición alquímica</h3>
+          <p><small>Rasgo racial (Sierpes), 1 vez al día.</small></p>
+          ${lineaResultado}
+        </div>
+      `
+    });
+    return true;
+  }
+
+  /**
+   * Aplica la visión en la oscuridad de la raza (Mandrágora, 20 m) al Token Prototipo y a los
+   * Tokens vinculados que el usuario pueda modificar. Sin efecto en razas sin `visionOscuridad`.
+   * @returns {Promise<void>}
+   */
+  async _aplicarVisionRacial() {
+    const metros = Number(razaBaseDeActor(this)?.config.visionOscuridad) || 0;
+    if (metros <= 0 || !this.isOwner) return;
+    const modo = CONFIG.Canvas?.visionModes?.darkvision ? "darkvision" : "basic";
+    const sight = { enabled: true, range: metros, visionMode: modo };
+    try {
+      await this.update({ "prototypeToken.sight": sight });
+      for (const token of this.getActiveTokens(true, true)) {
+        if (token.isOwner) await token.update({ sight });
+      }
+    } catch (error) {
+      console.warn("Cartas y Dados | No se pudo aplicar la visión racial al Token:", error);
+    }
+  }
+
+  /* ======================================================================== */
   /*  7. ATAQUES Y ACCIONES DE PNJ / CRIATURA (SIN NECESIDAD DE MAZO)         */
   /* ======================================================================== */
 
@@ -1198,7 +1382,8 @@ export class SistemaActor extends Actor {
     await publicarTirada(tirada, {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       flavor: saborChat,
-      htmlMaster
+      htmlMaster,
+      repeticion: this._datosRepeticionTirada(tirada, { titulo, esAtaque, etiquetaDificultad: "Dificultad" })
     });
 
     return tirada;
@@ -1335,7 +1520,8 @@ export class SistemaActor extends Actor {
     await publicarTirada(tirada, {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       flavor: saborChat,
-      htmlMaster
+      htmlMaster,
+      repeticion: this._datosRepeticionTirada(tirada, { titulo: item.name, esAtaque, etiquetaDificultad: "Dificultad" })
     });
 
     // Quemar la carta usada: mano -> quemadas (motor propio de pilas, sin Cards#pass()).

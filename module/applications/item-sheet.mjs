@@ -6,7 +6,7 @@
 
 import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
-import { SISTEMA_CONFIG, claveClaseDeItem } from "../config.mjs";
+import { SISTEMA_CONFIG, claveClaseDeItem, contextoRasgosRaza, razaBaseDeItem } from "../config.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -48,6 +48,8 @@ export class HojaItemSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Hand
       system: item.system,
       tipoEtiqueta: game.i18n.localize(`TYPES.Item.${item.type}`),
       esRaza: item.type === "raza",
+      // Rasgos de la raza base (v0.13.0), solo lectura; null en razas personalizadas
+      rasgosRaza: contextoRasgosRaza(razaBaseDeItem(item)?.clave ?? null),
       esOrigen: item.type === "origen",
       esClase: item.type === "clase",
       esObjeto: item.type === "objeto",
