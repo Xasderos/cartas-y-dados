@@ -6,7 +6,9 @@
 
 import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
-import { SISTEMA_CONFIG, claveClaseDeItem, contextoRasgosRaza, razaBaseDeItem } from "../config.mjs";
+import {
+  SISTEMA_CONFIG, claveClaseDeItem, contextoProgresionClase, contextoRasgosRaza, razaBaseDeItem
+} from "../config.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -54,6 +56,8 @@ export class HojaItemSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Hand
       esClase: item.type === "clase",
       esObjeto: item.type === "objeto",
       esHabilidad: item.type === "habilidad",
+      // Tabla de elecciones de la Clase base (v0.15.0), solo lectura; null en clases personalizadas
+      progresionClase: item.type === "clase" ? contextoProgresionClase(claveClaseDeItem(item)) : null,
       // Nombre de la Clase Base asociada (v0.10.0), vacío en clases personalizadas
       nombreClaseBase: item.type === "clase"
         ? SISTEMA_CONFIG.CLASES_BASE[claveClaseDeItem(item)]?.nombre ?? ""

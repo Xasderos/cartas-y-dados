@@ -114,6 +114,13 @@ export const SISTEMA_CONFIG = {
    *   la carta está marcada como ataque; si no, Dificultad) o `sinTirada` (efecto fijo).
    * - `reaccion` (opcional): se marca como reacción por defecto.
    * - `adicional` (opcional): puede realizarse además del resto de acciones.
+   * - `abalorio` (opcional, v0.15.0): solo se ofrece si ese abalorio está En Juego
+   *   (`SistemaActor#abaloriosActivos`).
+   * - `reaccionAdicional` (opcional, v0.15.0): reacción que no gasta ni exige la reacción del turno
+   *   (el Agotamiento 4 la sigue bloqueando).
+   * - `mitadAtributos` (opcional, v0.15.0): tira con la mitad de los dados de la característica
+   *   (redondeo hacia arriba), p. ej. el compañero del abalorio Compañero eterno.
+   * - `sinReaccion` (opcional, v0.15.0): no puede realizarse como reacción (salvo excepción).
    * Las Habilidades (MIST) no están aquí: el diálogo las lista desde los Items del Actor.
    */
   ACCIONES: {
@@ -157,6 +164,16 @@ export const SISTEMA_CONFIG = {
     levantar: {
       nombre: "Levantar", icono: "fa-hand-holding-heart", caracteristicas: ["social"], resolucion: "dificultad",
       texto: "Ayudas a un compañero que sufre un estado alterado (levantarlo, socorrerlo...)."
+    },
+    defenderAliado: {
+      nombre: "Defender a un aliado (Escudo)", icono: "fa-shield-halved", caracteristicas: ["consciencia"],
+      resolucion: "enfrentada", reaccion: true, reaccionAdicional: true, abalorio: "escudo",
+      texto: "Abalorio Escudo: como reacción adicional (no gasta tu reacción) defiendes a un aliado que se encuentre dentro de tu rango."
+    },
+    accionCompanero: {
+      nombre: "Acción del compañero", icono: "fa-paw", caracteristicas: ["fisico", "consciencia", "social", "misticismo"],
+      resolucion: "segunCarta", abalorio: "companero", mitadAtributos: true, sinReaccion: true,
+      texto: "Abalorio Compañero eterno: tu compañero realiza una tarea sencilla con esta carta. Tira con la mitad de tus dados (redondeo hacia arriba) y no puede reaccionar."
     },
     libre: {
       nombre: "Otra acción", icono: "fa-comments", caracteristicas: ["fisico", "consciencia", "social", "misticismo"],
@@ -316,12 +333,26 @@ export const SISTEMA_CONFIG = {
    * - `paloPrincipal`: palo que recibe +3 cartas d4 extra y 1 carta d8 (null en Tabula Rasa,
    *   en cuyo caso el Mazo de Acción queda vacío para personalización manual).
    * - `avanzada`: si es true, requiere confirmación explícita (no recomendada a novatos).
-   * - `trinkets`: nombres de Trinkets ofrecidos al crear el personaje.
-   * - `progresion` (v0.10.0): recompensas por nivel alcanzado, `{ <nivelDestino>: { habilidades, packs } }`.
-   *   · `habilidades`: lista de `{ nombre, esAtaque }`; el jugador elige UNA y se crea como
-   *     Item `habilidad` (origen "clase") en el Actor.
-   *   · `packs`: lista de packs de cartas; el jugador elige UNO y sus cartas `{ palo, numero }`
-   *     (numero 1 = d4, 2 = d6...) se añaden al Mazo de Juego con nombre místico.
+   * - `trinkets`: Trinkets (abalorios) ofrecidos al crear el personaje. Cada entrada es un nombre
+   *   (texto) o, desde v0.15.0, un abalorio `{ clave, nombre, icono, texto, auto? }`: `clave` se guarda
+   *   en `flags.cartas-y-dados.abalorio` del Trinket y activa su efecto mientras está En Juego
+   *   (`SistemaActor#abaloriosActivos`); `texto` se copia a `efectoPermanente`. Normalizar con
+   *   `opcionesTrinketsClase()`. `eterno: true` (v0.15.0, Abalorio Eterno): solo puede estar En Juego
+   *   o Quemado (ver `SistemaActor#_destinoAbalorioEterno`).
+   * - `tablaElecciones` (opcional, v0.15.0): resumen por nivel en texto plano `{ nivel, beneficios }`
+   *   (se muestra en la ficha del Item de Clase).
+   * - `progresion` (v0.10.0): recompensas por nivel alcanzado,
+   *   `{ <nivelDestino>: { habilidades?, packs?, especializaciones? } }`. Cada lista es opcional; si
+   *   existe, el jugador elige UNA opción de ella al subir.
+   *   · `habilidades`: `{ nombre, esAtaque, texto?, valorX?, sinAccion? }`; se crea como Item
+   *     `habilidad` (origen "clase"). `texto` → descripción; `valorX` → la tirada MIST fija el valor X
+   *     (sin Dificultad); `sinAccion` → usarla no gasta acción (v0.15.0); `efectoX` (v0.15.0) →
+   *     automatización del valor X sobre el Token objetivo (`curacion` o `promesa`), guardada en
+   *     `flags.cartas-y-dados.efectoX` del Item.
+   *   · `packs`: lista de packs de cartas; sus cartas `{ palo, numero }` (numero 1 = d4, 2 = d6...)
+   *     se añaden al Mazo de Juego con nombre místico.
+   *   · `especializaciones` (v0.15.0): `{ clave, nombre, texto }`; se guarda en
+   *     `system.especializacion` del Item de Clase y se crea como Habilidad pasiva.
    *   Sin entrada para el nivel siguiente → la subida de nivel no está disponible.
    */
   CLASES_BASE: {
@@ -329,17 +360,55 @@ export const SISTEMA_CONFIG = {
       nombre: "Fortis Corpore",
       atributo: "fisico",
       paloPrincipal: "espadas",
-      trinkets: ["Espada", "Escudo", "Daga"],
+      tablaElecciones: [
+        { nivel: 1, beneficios: "Mazo Inicial (Físico) · Elección de abalorio" },
+        { nivel: 2, beneficios: "Elección de habilidad · Elección de cartas" },
+        { nivel: 3, beneficios: "Elección de especialización" }
+      ],
+      trinkets: [
+        {
+          clave: "espada", nombre: "Espada", icono: "fa-khanda",
+          texto: "Puedes usar las cartas de consciencia como si fueran cartas de físico.",
+          auto: "En Juego: el diálogo de acción de una carta CONS ofrece las acciones de FISC y tira con Físico; en el Ataque apuntado combina FISC y CONS (ambas tiran con Físico)."
+        },
+        {
+          clave: "escudo", nombre: "Escudo", icono: "fa-shield-halved",
+          texto: "Como reacción adicional (no gastas tu reacción si usas esta) puedes usar una carta de consciencia para defender a un aliado que se encuentre dentro de tu rango.",
+          auto: "En Juego: acción «Defender a un aliado (Escudo)» para cartas CONS; es una reacción que no gasta tu reacción del turno."
+        },
+        {
+          clave: "daga", nombre: "Daga", icono: "fa-bullseye",
+          texto: "Puedes usar una carta de consciencia con una carta de físico para hacer un ataque apuntado, en vez de usar dos cartas de físico.",
+          auto: "En Juego: el Ataque apuntado admite una carta CONS junto a una FISC (cada una tira con su característica)."
+        }
+      ],
       progresion: {
         2: {
           habilidades: [
-            { nombre: "Potenciación", esAtaque: false },
-            { nombre: "Baluarte", esAtaque: false },
-            { nombre: "Paso de las sombras", esAtaque: false }
+            {
+              nombre: "Potenciación", esAtaque: false, valorX: true,
+              texto: "Durante X turnos, ganas 1 más a la característica de tu elección. (X es el resultado de la tirada de misticismo)"
+            },
+            {
+              nombre: "Baluarte", esAtaque: false, valorX: true,
+              texto: "Mitigas X puntos de daño de cualquier ataque a todos tus aliados que puedas ver. (X es el resultado de la tirada de misticismo)"
+            },
+            {
+              nombre: "Paso de las sombras", esAtaque: false, valorX: true, sinAccion: true,
+              texto: "Te fundes con las sombras del entorno y apareces en las sombras de tu elección a X metros de distancia. Usar esta habilidad no gasta acción. (X es el resultado de la tirada de misticismo)"
+            }
           ],
           packs: [
             [{ palo: "oros", numero: 1 }, { palo: "espadas", numero: 2 }],
             [{ palo: "bastos", numero: 1 }, { palo: "espadas", numero: 2 }]
+          ]
+        },
+        3: {
+          especializaciones: [
+            {
+              clave: "custodio", nombre: "Custodio",
+              texto: "Especialización de Fortis Corpore. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+            }
           ]
         }
       }
@@ -348,17 +417,59 @@ export const SISTEMA_CONFIG = {
       nombre: "Mendacium Charisma",
       atributo: "social",
       paloPrincipal: "oros",
-      trinkets: ["Empatía", "Compañero Eterno", "Amistad"],
+      tablaElecciones: [
+        { nivel: 1, beneficios: "Mazo Inicial (Social) · Elección de abalorio" },
+        { nivel: 2, beneficios: "Elección de habilidad · Elección de cartas" },
+        { nivel: 3, beneficios: "Elección de especialización" }
+      ],
+      trinkets: [
+        {
+          clave: "empatia", nombre: "Empatía", icono: "fa-heart",
+          texto: "Una vez por turno, si un aliado ha quemado una carta, puedes robar una carta de tu mazo.",
+          auto: "En Juego: cuando otro personaje quema una carta, recibes en el chat el botón «Robar carta (Empatía)»; en combate, una vez por turno."
+        },
+        {
+          clave: "companero", nombre: "Compañero eterno", icono: "fa-paw", eterno: true,
+          texto: "Abalorio Eterno (solo puede estar En Juego o Quemado: si fuera a dejar de estar en juego se quema, y si fuera a salir de las Cartas Quemadas vuelve directamente a estar En Juego). Tienes un compañero, animal, espiritual o imaginario, una criatura menor con poderes limitados que puedes ordenar durante tu turno para realizar pequeñas tareas sencillas. A la hora de realizar una acción usará una carta de tu mano, no dispone de reacciones y tiene los atributos iguales a la mitad de los tuyos (redondeando hacia arriba).",
+          auto: "Empieza En Juego. Acción «Acción del compañero» para cualquier carta; tira con la mitad de tus dados (redondeo hacia arriba) y no puede ser una reacción. Eterno: sigue En Juego entre escenas y combates; si se descarta o se quema, va a Quemadas y al descansar vuelve directamente a estar En Juego."
+        },
+        {
+          clave: "amistad", nombre: "Amistad", icono: "fa-handshake",
+          texto: "Cuando juegues el abalorio enlazas tu destino al de un aliado. Si juegas la misma característica que ha jugado este aliado en su última acción (aunque no sea la misma acción) puedes lanzar un dado adicional.",
+          auto: "Al jugarlo eliges al aliado. En Juego: si tu carta es de la misma característica que la última acción de tu aliado, tiras 1 dado más (también en las Habilidades)."
+        }
+      ],
       progresion: {
         2: {
           habilidades: [
-            { nombre: "Sanación", esAtaque: false },
-            { nombre: "Promesa", esAtaque: false },
-            { nombre: "Limpieza", esAtaque: false }
+            {
+              nombre: "Sanación", esAtaque: false, valorX: true, efectoX: "curacion",
+              texto: "Curas X puntos de vida a un objetivo que puedas tocar, tú no puedes ser el objetivo. (X es el resultado de la tirada de misticismo)"
+            },
+            {
+              nombre: "Promesa", esAtaque: false, valorX: true, efectoX: "promesa",
+              texto: "El aliado objetivo mira entre las X primeras cartas de su mazo, elige una carta que quiera, la añade a su mano, luego baraja el mazo. Tú no puedes ser el objetivo. (X es el resultado de la tirada de misticismo)"
+            },
+            {
+              nombre: "Limpieza", esAtaque: false, valorX: true,
+              texto: "Eliminas X estados alterados entre los aliados que elijas que puedas ver, tú no puedes hacerte objetivo a ti mismo. (X es el resultado de la tirada de misticismo)"
+            }
           ],
           packs: [
             [{ palo: "espadas", numero: 1 }, { palo: "oros", numero: 2 }],
             [{ palo: "bastos", numero: 1 }, { palo: "oros", numero: 2 }]
+          ]
+        },
+        3: {
+          especializaciones: [
+            {
+              clave: "matasanos", nombre: "Matasanos",
+              texto: "Especialización de Mendacium Charisma. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+            },
+            {
+              clave: "invocador", nombre: "Invocador",
+              texto: "Especialización de Mendacium Charisma. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+            }
           ]
         }
       }
@@ -448,6 +559,88 @@ export function describirPackCartas(pack) {
     conteo.set(etiqueta, (conteo.get(etiqueta) ?? 0) + 1);
   }
   return [...conteo].map(([etiqueta, n]) => `${n}× ${etiqueta}`).join(" + ");
+}
+
+/**
+ * Normaliza los Trinkets iniciales de una clase (v0.15.0): cada entrada puede ser un nombre o un
+ * abalorio `{ clave, nombre, icono, texto, auto }`.
+ * @param {object|null} configClase - Entrada de `SISTEMA_CONFIG.CLASES_BASE`.
+ * @returns {Array<{clave: string|null, nombre: string, icono: string, texto: string, auto: string}>}
+ */
+export function opcionesTrinketsClase(configClase) {
+  return (configClase?.trinkets ?? []).map(t => typeof t === "string"
+    ? { clave: null, nombre: t, icono: "fa-gem", texto: "", auto: "" }
+    : { clave: t.clave ?? null, nombre: t.nombre, icono: t.icono ?? "fa-gem", texto: t.texto ?? "", auto: t.auto ?? "",
+        eterno: Boolean(t.eterno) });
+}
+
+/**
+ * ¿Es la carta un Abalorio Eterno (v0.15.0)? Solo puede estar En Juego o en Cartas Quemadas.
+ * Se reconoce por la clave de abalorio (`abalorioDeTrinket`) entre los abalorios con `eterno: true`
+ * de cualquier clase base.
+ * @param {Card} carta
+ * @param {string|null} [claveClase=null] - Clase base del dueño (respaldo por nombre).
+ * @returns {boolean}
+ */
+export function esAbalorioEterno(carta, claveClase = null) {
+  const clave = abalorioDeTrinket(carta, claveClase);
+  if (!clave) return false;
+  return Object.values(SISTEMA_CONFIG.CLASES_BASE)
+    .some(cfg => opcionesTrinketsClase(cfg).some(o => o.clave === clave && o.eterno));
+}
+
+/**
+ * Contexto de solo lectura con la tabla de elecciones de una Clase base (v0.15.0), para la ficha
+ * del Item de Clase: resumen por nivel y opciones de cada elección (abalorios, habilidades, packs y
+ * especializaciones).
+ * @param {string|null} claveClase - Clave de `SISTEMA_CONFIG.CLASES_BASE`.
+ * @returns {{nombre: string, tabla: Array<{nivel: number, beneficios: string}>,
+ *   grupos: Array<{titulo: string, icono: string, nivel: number, opciones: object[]}>}|null}
+ */
+export function contextoProgresionClase(claveClase) {
+  const cfg = claveClase ? SISTEMA_CONFIG.CLASES_BASE[claveClase] : null;
+  if (!cfg) return null;
+  const grupos = [];
+  const abalorios = opcionesTrinketsClase(cfg);
+  if (abalorios.length) grupos.push({ titulo: "Elección de abalorio", icono: "fa-gem", nivel: 1, opciones: abalorios });
+  for (const [nivel, recompensas] of Object.entries(cfg.progresion ?? {})) {
+    if (recompensas.habilidades?.length) {
+      grupos.push({
+        titulo: "Elección de habilidad", icono: "fa-wand-magic-sparkles", nivel: Number(nivel),
+        opciones: recompensas.habilidades.map(h => ({ nombre: h.nombre, texto: h.texto ?? "" }))
+      });
+    }
+    if (recompensas.packs?.length) {
+      grupos.push({
+        titulo: "Elección de cartas", icono: "fa-layer-group", nivel: Number(nivel),
+        opciones: recompensas.packs.map((p, i) => ({ nombre: `Pack ${i + 1}`, texto: describirPackCartas(p) }))
+      });
+    }
+    if (recompensas.especializaciones?.length) {
+      grupos.push({
+        titulo: "Elección de especialización", icono: "fa-award", nivel: Number(nivel),
+        opciones: recompensas.especializaciones.map(e => ({ nombre: e.nombre, texto: e.texto ?? "" }))
+      });
+    }
+  }
+  return { nombre: cfg.nombre, tabla: cfg.tablaElecciones ?? [], grupos };
+}
+
+/**
+ * Clave de abalorio de un Trinket (v0.15.0): `flags.cartas-y-dados.abalorio`; para Trinkets creados
+ * antes de v0.15.0, por nombre entre los abalorios de la clase indicada.
+ * @param {Card} carta - Carta `trinket`.
+ * @param {string|null} [claveClase=null] - Clase base del dueño (respaldo por nombre).
+ * @returns {string|null}
+ */
+export function abalorioDeTrinket(carta, claveClase = null) {
+  if (carta?.type !== "trinket") return null;
+  const guardado = carta.getFlag?.("cartas-y-dados", "abalorio");
+  if (guardado) return guardado;
+  const nombre = String(carta.name ?? "").trim().toLowerCase();
+  const opcion = opcionesTrinketsClase(SISTEMA_CONFIG.CLASES_BASE[claveClase])
+    .find(o => o.clave && o.nombre.toLowerCase() === nombre);
+  return opcion?.clave ?? null;
 }
 
 /**
@@ -682,12 +875,16 @@ export function nombreVisibleCarta(carta) {
 /**
  * Acciones del catálogo (`SISTEMA_CONFIG.ACCIONES`) disponibles para una característica (v0.14.0).
  * @param {string} claveCaracteristica - `fisico`, `consciencia`, `social` o `misticismo`.
+ * @param {Object} [opciones]
+ * @param {Set<string>|null} [opciones.abalorios=null] - (v0.15.0) Abalorios En Juego del Actor.
  * @returns {Array<{clave: string, nombre: string, icono: string, texto: string, resolucion: string,
  *   reaccion: boolean, adicional: boolean}>} La acción `libre` siempre va al final.
  */
-export function accionesDeCaracteristica(claveCaracteristica) {
+export function accionesDeCaracteristica(claveCaracteristica, { abalorios = null } = {}) {
   return Object.entries(SISTEMA_CONFIG.ACCIONES)
     .filter(([, a]) => a.caracteristicas.includes(claveCaracteristica))
+    // (v0.15.0) Las acciones de un abalorio solo aparecen si está En Juego.
+    .filter(([, a]) => !a.abalorio || Boolean(abalorios?.has(a.abalorio)))
     .map(([clave, a]) => ({ clave, ...a, reaccion: Boolean(a.reaccion), adicional: Boolean(a.adicional) }))
     .sort((a, b) => (a.clave === "libre") - (b.clave === "libre"));
 }

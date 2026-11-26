@@ -7,8 +7,8 @@
  */
 
 import {
-  SISTEMA_CONFIG, abreviadoPalo, claveClaseDeItem, describirPackCartas, estadoAgotamiento, generarNombreMisticoUnico,
-  nombreVisibleCarta, razaBaseDeActor, tieneRasgoRacial
+  SISTEMA_CONFIG, abalorioDeTrinket, abreviadoPalo, claveClaseDeItem, describirPackCartas, esAbalorioEterno, estadoAgotamiento,
+  generarNombreMisticoUnico, nombreVisibleCarta, opcionesTrinketsClase, razaBaseDeActor, tieneRasgoRacial
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 import { combinarTiradas, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
@@ -124,15 +124,25 @@ export class SistemaActor extends Actor {
     }
 
     // 3. Crear el Trinket inicial (Nivel 1, sin palo ni dado) si el Mazo de Trinkets está vacío
-    const trinketInicial = nombreTrinket || configClase.trinkets?.[0] || "Vasija vacía";
+    // (v0.15.0) Si el Trinket es un abalorio de la clase, se guarda su clave (efecto automatizado
+    // mientras esté En Juego) y su texto como efecto permanente.
+    const opcionesTrinket = opcionesTrinketsClase(configClase);
+    const trinketInicial = nombreTrinket || opcionesTrinket[0]?.nombre || "Vasija vacía";
+    const abalorio = opcionesTrinket.find(o => o.nombre === trinketInicial) ?? null;
     if (trinkets.cards.size === 0) {
       const payloadTrinket = this._normalizarPayloadCarta({
         name: trinketInicial,
         type: "trinket",
-        system: { nivel: 1, realizaTirada: false, esAtaque: false, bonoDefensaEnJuego: 0 }
+        system: {
+          nivel: 1, realizaTirada: false, esAtaque: false, bonoDefensaEnJuego: 0,
+          efectoPermanente: abalorio?.texto ? `<p>${abalorio.texto}</p>` : ""
+        },
+        ...(abalorio?.clave ? { flags: { "cartas-y-dados": { abalorio: abalorio.clave } } } : {})
       });
       await trinkets.createEmbeddedDocuments("Card", [payloadTrinket]);
     }
+    // (v0.15.0) Un Abalorio Eterno (Compañero eterno) empieza directamente En Juego.
+    await this._asegurarAbaloriosEternos();
 
     // 4. Crear o actualizar el Item de tipo 'clase' (registro de progresión, v0.10.0)
     const datosClase = { name: configClase.nombre, "system.claveClase": claveClase };
@@ -174,7 +184,7 @@ export class SistemaActor extends Actor {
    * Devuelve las opciones de la siguiente subida de nivel según
    * `SISTEMA_CONFIG.CLASES_BASE.<clave>.progresion[nivelDestino]`.
    * @returns {{itemClase: Item, claveClase: string, configClase: object, nivelActual: number,
-   *   nivelDestino: number, habilidades: object[], packs: object[][]}|null}
+   *   nivelDestino: number, habilidades: object[], packs: object[][], especializaciones: object[]}|null}
    *   null si el Actor no tiene Clase base reconocida o no hay progresión definida para el siguiente nivel.
    */
   obtenerOpcionesSubidaNivel() {
@@ -189,90 +199,140 @@ export class SistemaActor extends Actor {
     return {
       itemClase, claveClase, configClase, nivelActual, nivelDestino,
       habilidades: recompensas.habilidades ?? [],
-      packs: recompensas.packs ?? []
+      packs: recompensas.packs ?? [],
+      especializaciones: recompensas.especializaciones ?? []
     };
   }
 
   /**
-   * Sube el personaje un nivel de Clase aplicando las recompensas elegidas (v0.10.0):
-   * 1. Crea el Item `habilidad` elegido (origen "clase", activable, MIST; efecto a definir en su ficha).
+   * Sube el personaje un nivel de Clase aplicando las recompensas elegidas (v0.10.0; v0.15.0 cada
+   * recompensa es opcional según `progresion[nivelDestino]`):
+   * 1. Crea el Item `habilidad` elegido (origen "clase", activable, MIST) con la descripción de la
+   *    clase y sus marcas `valorX`/`sinAccion`.
    * 2. Añade las cartas del pack elegido al Mazo de Juego con nombres místicos únicos y baraja.
-   * 3. Sube `system.nivel` del Item de Clase y registra la elección en `system.historialNiveles`.
-   * 4. Anuncia la subida en el chat.
+   * 3. (v0.15.0) Especialización: se guarda en `system.especializacion` y se crea como Habilidad pasiva.
+   * 4. Sube `system.nivel` del Item de Clase y registra la elección en `system.historialNiveles`.
+   * 5. Anuncia la subida en el chat.
    * La confirmación del jugador se pide en la ficha (`HojaPersonajeActor#abrirSubidaNivel`).
-   * @param {{indiceHabilidad: number, indicePack: number}} eleccion - Índices dentro de las opciones.
+   * @param {{indiceHabilidad?: number, indicePack?: number, indiceEspecializacion?: number}} eleccion
+   *   Índices dentro de las opciones (solo se exigen los de las listas que el nivel ofrece).
    * @returns {Promise<boolean>} true si se aplicó la subida.
    */
-  async subirDeNivel({ indiceHabilidad, indicePack }) {
+  async subirDeNivel({ indiceHabilidad, indicePack, indiceEspecializacion } = {}) {
     const opciones = this.obtenerOpcionesSubidaNivel();
     if (!opciones) {
       ui.notifications.warn(`${this.name} no tiene una subida de nivel disponible.`);
       return false;
     }
-    const habilidad = opciones.habilidades[indiceHabilidad];
-    const pack = opciones.packs[indicePack];
-    if (!habilidad || !pack) {
-      ui.notifications.warn("Debes elegir una habilidad y un pack de cartas.");
+    const habilidad = opciones.habilidades.length ? opciones.habilidades[indiceHabilidad] ?? null : null;
+    const pack = opciones.packs.length ? opciones.packs[indicePack] ?? null : null;
+    const especializacion = opciones.especializaciones.length
+      ? opciones.especializaciones[indiceEspecializacion] ?? null : null;
+    if ((opciones.habilidades.length && !habilidad) || (opciones.packs.length && !pack)
+        || (opciones.especializaciones.length && !especializacion)) {
+      ui.notifications.warn("Debes elegir una opción de cada recompensa del nivel.");
       return false;
     }
-
-    // Las cartas nuevas van al Mazo: las pilas deben existir
-    if (!this.system.pilasDocumentos?.mazo) await this.inicializarPilasDeJugador();
-    const { mazo } = this.system.pilasDocumentos;
-    if (!mazo) return false;
 
     const { itemClase, configClase, nivelDestino } = opciones;
 
     // 1. Habilidad de clase
-    await this.createEmbeddedDocuments("Item", [{
-      name: habilidad.nombre,
-      type: "habilidad",
-      system: {
-        origenHabilidad: "clase",
-        esActivable: true,
-        requiereTirada: true,
-        esAtaque: Boolean(habilidad.esAtaque),
-        caracteristica: "misticismo",
-        descripcion: `<p>Habilidad de ${configClase.nombre} obtenida al alcanzar el Nivel ${nivelDestino}.</p>`
-      },
-      flags: { "cartas-y-dados": { habilidadDeClase: opciones.claveClase, nivelObtenida: nivelDestino } }
-    }]);
+    if (habilidad) {
+      const descripcion = habilidad.texto
+        ? `<p>${habilidad.texto}</p>`
+        : `<p>Habilidad de ${configClase.nombre} obtenida al alcanzar el Nivel ${nivelDestino}.</p>`;
+      await this.createEmbeddedDocuments("Item", [{
+        name: habilidad.nombre,
+        type: "habilidad",
+        system: {
+          origenHabilidad: "clase",
+          esActivable: true,
+          requiereTirada: true,
+          esAtaque: Boolean(habilidad.esAtaque),
+          valorX: Boolean(habilidad.valorX),
+          sinAccion: Boolean(habilidad.sinAccion),
+          caracteristica: "misticismo",
+          descripcion
+        },
+        flags: { "cartas-y-dados": {
+          habilidadDeClase: opciones.claveClase, nivelObtenida: nivelDestino,
+          // (v0.15.0) Automatización del valor X (Sanación, Promesa...): ver `_htmlValorX`.
+          ...(habilidad.efectoX ? { efectoX: habilidad.efectoX } : {})
+        } }
+      }]);
+    }
 
     // 2. Cartas del pack: nombres místicos únicos frente a todas las cartas del personaje
-    const nombresUsados = new Set();
-    for (const pila of Object.values(this.system.pilasDocumentos ?? {})) {
-      for (const carta of pila?.cards ?? []) nombresUsados.add(carta.name);
+    const descripcionPack = pack ? describirPackCartas(pack) : "";
+    if (pack) {
+      // Las cartas nuevas van al Mazo: las pilas deben existir
+      if (!this.system.pilasDocumentos?.mazo) await this.inicializarPilasDeJugador();
+      const { mazo } = this.system.pilasDocumentos;
+      if (!mazo) return false;
+      const nombresUsados = new Set();
+      for (const pila of Object.values(this.system.pilasDocumentos ?? {})) {
+        for (const carta of pila?.cards ?? []) nombresUsados.add(carta.name);
+      }
+      const payloadCartas = pack.map(({ palo, numero }) => {
+        const nombre = generarNombreMisticoUnico(nombresUsados);
+        nombresUsados.add(nombre);
+        return this._normalizarPayloadCarta({ name: nombre, type: "accion", system: { palo, numero } });
+      });
+      await mazo.createEmbeddedDocuments("Card", payloadCartas);
+      await mazo.shuffle({ chatNotification: false });
     }
-    const payloadCartas = pack.map(({ palo, numero }) => {
-      const nombre = generarNombreMisticoUnico(nombresUsados);
-      nombresUsados.add(nombre);
-      return this._normalizarPayloadCarta({ name: nombre, type: "accion", system: { palo, numero } });
-    });
-    await mazo.createEmbeddedDocuments("Card", payloadCartas);
-    await mazo.shuffle({ chatNotification: false });
 
-    // 3. Nivel e historial en el Item de Clase
-    const descripcionPack = describirPackCartas(pack);
-    await itemClase.update({
+    // 3. Especialización (v0.15.0): registro en la Clase + Habilidad pasiva con su texto
+    if (especializacion) {
+      await this.createEmbeddedDocuments("Item", [{
+        name: especializacion.nombre,
+        type: "habilidad",
+        system: {
+          origenHabilidad: "clase",
+          esActivable: false,
+          requiereTirada: false,
+          esAtaque: false,
+          caracteristica: "misticismo",
+          descripcion: `<p>${especializacion.texto ?? `Especialización de ${configClase.nombre}.`}</p>`
+        },
+        flags: { "cartas-y-dados": {
+          habilidadDeClase: opciones.claveClase, nivelObtenida: nivelDestino, especializacion: especializacion.clave
+        } }
+      }]);
+    }
+
+    // 4. Nivel e historial en el Item de Clase
+    const datosClase = {
       "system.claveClase": opciones.claveClase,
       "system.nivel": nivelDestino,
       "system.historialNiveles": [
         ...(itemClase.system.historialNiveles ?? []),
-        { nivel: nivelDestino, habilidad: habilidad.nombre, cartas: descripcionPack }
+        {
+          nivel: nivelDestino,
+          habilidad: habilidad?.nombre ?? "",
+          cartas: descripcionPack,
+          especializacion: especializacion?.nombre ?? ""
+        }
       ]
-    });
+    };
+    if (especializacion) datosClase["system.especializacion"] = especializacion.nombre;
+    await itemClase.update(datosClase);
 
     this.prepareData();
 
-    // 4. Aviso en el chat
+    // 5. Aviso en el chat
+    const lineas = [
+      habilidad ? `<p><i class="fa-solid fa-wand-magic-sparkles"></i> Nueva habilidad: <strong>${habilidad.nombre}</strong></p>` : "",
+      pack ? `<p><i class="fa-solid fa-layer-group"></i> Cartas añadidas al Mazo: ${descripcionPack}</p>` : "",
+      especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${especializacion.nombre}</strong></p>` : ""
+    ].join("");
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: `
         <div class="cyd-carta-jugada">
           <h3><i class="fa-solid fa-angles-up"></i> ${this.name} sube a Nivel ${nivelDestino}</h3>
           <p><strong>${configClase.nombre}</strong></p>
-          <p><i class="fa-solid fa-wand-magic-sparkles"></i> Nueva habilidad: <strong>${habilidad.nombre}</strong></p>
-          <p><i class="fa-solid fa-layer-group"></i> Cartas añadidas al Mazo: ${descripcionPack}</p>
+          ${lineas}
         </div>`
     });
     ui.notifications.info(`${this.name} ha subido a Nivel ${nivelDestino}.`);
@@ -343,6 +403,9 @@ export class SistemaActor extends Actor {
     if (!pilaOrigen || !pilaDestino) return null;
     const carta = pilaOrigen.cards.get(cartaId);
     if (!carta) return null;
+    // (v0.15.0) Abalorio Eterno: solo puede estar En Juego o Quemado.
+    pilaDestino = this._destinoAbalorioEterno(carta, pilaOrigen, pilaDestino);
+    if (pilaDestino === pilaOrigen) return carta;
 
     const datosCopia = carta.toObject();
     delete datosCopia._id;
@@ -374,8 +437,15 @@ export class SistemaActor extends Actor {
 
     const idsMazoReactivados = new Set();
     const idsTrinketsReactivados = new Set();
+    // (v0.15.0) Los Abalorios Eternos no vuelven al Mazo de Trinkets: si están En Juego se quedan
+    // (fin de escena/combate y descanso) y desde Quemadas (u otra pila) vuelven a estar En Juego.
+    const eternos = [];
 
     for (const carta of pilaOrigen.cards) {
+      if (this._esAbalorioEterno(carta)) {
+        eternos.push(carta.id);
+        continue;
+      }
       const esTrinket = carta.type === "trinket";
       const mazoDestino = esTrinket ? trinkets : mazo;
       if (!mazoDestino) continue;
@@ -425,7 +495,65 @@ export class SistemaActor extends Actor {
     if (idsABorrarDePila.length > 0) {
       await pilaOrigen.deleteEmbeddedDocuments("Card", idsABorrarDePila);
     }
+    // Si ya están En Juego se quedan (siguen en juego entre escenas y combates y al descansar).
+    if (pilaOrigen.id !== this.system.pilas?.enJuegoId) {
+      for (const id of eternos) await this._moverCartaEntrePilas(pilaOrigen, trinkets ?? pilaOrigen, id);
+    }
 
+    this.prepareData();
+  }
+
+  /**
+   * ¿Es la carta un Abalorio Eterno de este Actor? (v0.15.0, ver `esAbalorioEterno`).
+   * @param {Card} carta
+   * @returns {boolean}
+   */
+  _esAbalorioEterno(carta) {
+    if (carta?.type !== "trinket") return false;
+    return esAbalorioEterno(carta, claveClaseDeItem(this.items.find(i => i.type === "clase")));
+  }
+
+  /**
+   * Destino real de un movimiento para un Abalorio Eterno (v0.15.0): solo puede estar En Juego o en
+   * Cartas Quemadas. Si va a dejar de estar En Juego, se quema; si va a salir de Quemadas (o está en
+   * cualquier otra pila), pasa directamente a En Juego. Cualquier otra carta conserva su destino.
+   * @param {Card} carta
+   * @param {Cards} pilaOrigen
+   * @param {Cards} pilaDestino - Destino pedido.
+   * @returns {Cards} Destino a usar.
+   */
+  _destinoAbalorioEterno(carta, pilaOrigen, pilaDestino) {
+    if (!this._esAbalorioEterno(carta)) return pilaDestino;
+    const { enJuego, quemadas } = this.system.pilasDocumentos ?? {};
+    if (!enJuego || !quemadas) return pilaDestino;
+    if (pilaDestino.id === enJuego.id || pilaDestino.id === quemadas.id) return pilaDestino;
+    if (pilaOrigen.id === enJuego.id) return quemadas;
+    return enJuego;
+  }
+
+  /**
+   * Coloca En Juego los Abalorios Eternos que estén fuera de su sitio (v0.15.0): disponibles en el
+   * Mazo de Trinkets (personaje recién creado o anterior a esta regla) o en la Mano o el Descarte.
+   * No hace nada si ya hay una copia En Juego o Quemada.
+   * @returns {Promise<void>}
+   */
+  async _asegurarAbaloriosEternos() {
+    if (!this.isOwner) return;
+    const { trinkets, mano, descarte, enJuego, quemadas } = this.system.pilasDocumentos ?? {};
+    if (!trinkets || !enJuego || !quemadas) return;
+    const colocados = new Set([...enJuego.cards, ...quemadas.cards]
+      .filter(c => this._esAbalorioEterno(c))
+      .map(c => c.getFlag("cartas-y-dados", "sourceCardId") ?? c.id));
+
+    for (const pila of [mano, descarte]) {
+      for (const carta of [...(pila?.cards ?? [])]) {
+        if (!this._esAbalorioEterno(carta)) continue;
+        colocados.add(carta.getFlag("cartas-y-dados", "sourceCardId") ?? carta.id);
+        await this._moverCartaEntrePilas(pila, enJuego, carta.id);
+      }
+    }
+    const pendientes = trinkets.cards.filter(c => !c.drawn && !colocados.has(c.id) && this._esAbalorioEterno(c));
+    if (pendientes.length) await this._extraerCartasDeMazo(trinkets, enJuego, pendientes.map(c => c.id));
     this.prepareData();
   }
 
@@ -645,11 +773,16 @@ export class SistemaActor extends Actor {
    * @param {string|null} [opciones.cartaPotenciarId=null] - Carta MIST con la que se Potencia.
    * @param {boolean} [opciones.reaccion=false] - La acción es una reacción.
    * @param {string} [opciones.resolucion="auto"] - Clave de `SISTEMA_CONFIG.RESOLUCIONES_ACCION`.
+   * @param {boolean} [opciones.comoFisico=false] - (v0.15.0, abalorio Espada) La carta CONS se usa como
+   *   carta de Físico: tira con Físico.
+   * (v0.15.0) Abalorios En Juego: con Espada o Daga el Ataque apuntado admite combinar FISC y CONS
+   * (con Espada ambas tiran con Físico; con Daga cada una con su característica). Las acciones con
+   * `reaccionAdicional` (Escudo) no gastan ni exigen la reacción del turno.
    * @returns {Promise<import("../dados.mjs").ResultadoTiradaSistema|null>} Tirada o null.
    */
   async jugarCarta(cartaId, {
     quemar, modo = "usar", accion = null, cartaApuntadoId = null, puntoDebil = false,
-    cartaPotenciarId = null, reaccion = false, resolucion = "auto"
+    cartaPotenciarId = null, reaccion = false, resolucion = "auto", comoFisico = false
   } = {}) {
     const { mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mano || !enJuego || !descarte || !quemadas) return null;
@@ -667,15 +800,37 @@ export class SistemaActor extends Actor {
     const quemarExplicito = typeof quemar === "boolean";
     const efectosAgotamiento = this.system.agotamiento?.efectos ?? {};
     const configAccion = accion ? SISTEMA_CONFIG.ACCIONES[accion] ?? null : null;
-    const claveCaract = carta.system.caracteristicaAsociada;
+    const abalorios = this.abaloriosActivos();
+    // (v0.15.0) Abalorio Espada: una carta CONS puede usarse como carta de Físico.
+    const usaEspada = Boolean(comoFisico) && carta.system.palo === "bastos";
+    if (usaEspada && !abalorios.has("espada")
+        && !(await this._confirmarExcepcion("Abalorio Espada no activo", ["El Trinket «Espada» no está En Juego: no puedes usar cartas CONS como FISC."]))) {
+      return null;
+    }
+    let claveCaract = usaEspada ? "fisico" : carta.system.caracteristicaAsociada;
+    if (configAccion?.abalorio && !abalorios.has(configAccion.abalorio)
+        && !(await this._confirmarExcepcion("Abalorio no activo", [`«${configAccion.nombre}» requiere el abalorio En Juego.`]))) {
+      return null;
+    }
 
     // --- Validar las cartas adicionales ---------------------------------------------
     const cartaApuntado = cartaApuntadoId ? mano.cards.get(cartaApuntadoId) ?? null : null;
+    // (v0.15.0) Ataque apuntado mixto FISC + CONS con el abalorio Espada o Daga.
+    const paloEfectivo = usaEspada ? "espadas" : carta.system.palo;
+    const apuntadoMixto = Boolean(cartaApuntado) && cartaApuntado.system.palo !== paloEfectivo
+      && new Set([paloEfectivo, cartaApuntado.system.palo, "espadas", "bastos"]).size === 2;
+    const abalorioMixto = abalorios.has("espada") ? "espada" : abalorios.has("daga") ? "daga" : null;
     if (cartaApuntadoId && (!cartaApuntado || cartaApuntado.id === carta.id || cartaApuntado.type !== "accion"
-        || cartaApuntado.system.palo !== carta.system.palo)) {
-      ui.notifications.warn("El Ataque apuntado necesita una segunda carta del mismo palo en tu mano.");
+        || (cartaApuntado.system.palo !== paloEfectivo && !(apuntadoMixto && (abalorioMixto || usaEspada))))) {
+      ui.notifications.warn("El Ataque apuntado necesita una segunda carta del mismo palo en tu mano (FISC + CONS con el abalorio Espada o Daga).");
       return null;
     }
+    // Con Espada las cartas CONS del Ataque apuntado tiran con Físico; con Daga, cada una con la suya.
+    const apuntadoConEspada = apuntadoMixto && (usaEspada || abalorioMixto === "espada");
+    if (apuntadoConEspada) claveCaract = "fisico";
+    const caractApuntado = cartaApuntado
+      ? (apuntadoConEspada ? "fisico" : cartaApuntado.system.caracteristicaAsociada)
+      : null;
     const cartaPotenciar = cartaPotenciarId ? mano.cards.get(cartaPotenciarId) ?? null : null;
     if (cartaPotenciarId && (!cartaPotenciar || [carta.id, cartaApuntado?.id].includes(cartaPotenciar.id)
         || cartaPotenciar.type !== "accion" || cartaPotenciar.system.palo !== "copas")) {
@@ -685,8 +840,14 @@ export class SistemaActor extends Actor {
 
     // --- Reacción ------------------------------------------------------------------------
     let reaccionPorExcepcion = false;
+    const reaccionAdicional = Boolean(reaccion && configAccion?.reaccionAdicional);
+    // (v0.15.0) Acciones que no admiten reacción (el compañero de Compañero eterno no reacciona).
+    if (reaccion && configAccion?.sinReaccion
+        && !(await this._confirmarExcepcion("Sin reacciones", [`«${configAccion.nombre}» no puede realizarse como reacción.`]))) {
+      return null;
+    }
     if (reaccion) {
-      const permiso = await this._autorizarReaccion();
+      const permiso = await this._autorizarReaccion({ adicional: reaccionAdicional });
       if (!permiso) return null;
       reaccionPorExcepcion = permiso === "excepcion";
     }
@@ -706,10 +867,18 @@ export class SistemaActor extends Actor {
     let htmlMaster = "";
     const hayPartes = Boolean(cartaApuntado || cartaPotenciar);
 
+    // (v0.15.0) Abalorio Amistad: +1 dado a la carta principal si coincide con la característica de
+    // la última acción del aliado enlazado (no en las acciones del compañero).
+    const amistad = configAccion?.mitadAtributos ? null : this._bonoDadoAmistad(claveCaract, abalorios);
+
     if (tipoResolucion !== "sinTirada") {
       const mitadPorAgotamiento = this._tiradasAMitadPorAgotamiento();
-      const tirarCarta = (c, caract) => tirarDadosSistema({
-        cantidadDados: this._dadosDeCaracteristica(caract),
+      /** Dados de una característica; con `mitadAtributos` (compañero), la mitad redondeando hacia arriba. */
+      const dadosDe = caract => configAccion?.mitadAtributos
+        ? Math.max(1, Math.ceil(this._dadosDeCaracteristica(caract) / 2))
+        : this._dadosDeCaracteristica(caract);
+      const tirarCarta = (c, caract, extra = 0) => tirarDadosSistema({
+        cantidadDados: dadosDe(caract) + extra,
         tipoDado: c.system.tipoDado ?? "d6",
         bono: Number(c.system.automatizacion?.bonoTirada) || 0,
         rollData: this.getRollData(),
@@ -718,9 +887,9 @@ export class SistemaActor extends Actor {
         speaker: ChatMessage.getSpeaker({ actor: this }),
         titulo: `${configAccion ? `${configAccion.nombre} · ` : ""}${nombreVisibleCarta(c)}`
       });
-      const partes = [{ tirada: await tirarCarta(carta, claveCaract), etiqueta: nombreVisibleCarta(carta) }];
+      const partes = [{ tirada: await tirarCarta(carta, claveCaract, amistad ? 1 : 0), etiqueta: nombreVisibleCarta(carta) }];
       if (cartaApuntado) {
-        partes.push({ tirada: await tirarCarta(cartaApuntado, claveCaract), etiqueta: `${nombreVisibleCarta(cartaApuntado)} (apuntado)` });
+        partes.push({ tirada: await tirarCarta(cartaApuntado, caractApuntado), etiqueta: `${nombreVisibleCarta(cartaApuntado)} (apuntado)` });
       }
       if (cartaPotenciar) {
         partes.push({ tirada: await tirarCarta(cartaPotenciar, "misticismo"), etiqueta: `${nombreVisibleCarta(cartaPotenciar)} (Potenciar)` });
@@ -760,13 +929,19 @@ export class SistemaActor extends Actor {
     // --- Automatización de la carta principal -------------------------------------------------
     const resumenEfectosAuto = await this._aplicarAutomatizacionCarta(carta);
 
-    if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
+    if (reaccion && !reaccionAdicional && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
+    // (v0.15.0) Última característica jugada (abalorio Amistad de los aliados); el compañero no cuenta.
+    if (!configAccion?.mitadAtributos) await this._registrarUltimaCaracteristica(claveCaract);
     await this._marcarAccionMiniTurno();
     this.prepareData();
 
     // --- Chat ----------------------------------------------------------------------------------
     const etiquetas = [];
-    if (reaccion) etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-bolt"></i> Reacción${reaccionPorExcepcion ? " (excepción)" : ""}</span>`);
+    if (reaccion) etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-bolt"></i> Reacción${reaccionAdicional ? " adicional (no gasta la reacción)" : ""}${reaccionPorExcepcion ? " (excepción)" : ""}</span>`);
+    if (usaEspada) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-khanda"></i> Espada: CONS como FISC</span>');
+    if (apuntadoMixto) etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-gem"></i> ${apuntadoConEspada ? "Espada" : "Daga"}: apuntado FISC + CONS</span>`);
+    if (configAccion?.mitadAtributos) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-paw"></i> Compañero: mitad de dados</span>');
+    if (amistad && tipoResolucion !== "sinTirada") etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-handshake"></i> Amistad con ${foundry.utils.escapeHTML(amistad.aliado)}: +1 dado</span>`);
     if (configAccion?.adicional) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-plus"></i> Acción adicional</span>');
     if (cartaApuntado) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-bullseye"></i> Ataque apuntado (÷ 2)</span>');
     if (cartaPotenciar) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-moon"></i> Potenciada</span>');
@@ -835,6 +1010,15 @@ export class SistemaActor extends Actor {
 
     await this._moverCartaEntrePilas(mano, seQuema ? quemadas : enJuego, carta.id);
     const resumenEfectosAuto = await this._aplicarAutomatizacionCarta(carta);
+
+    // (v0.15.0) Abalorio Amistad: al jugarlo se enlaza el destino con un aliado.
+    const claveClase = claveClaseDeItem(this.items.find(i => i.type === "clase"));
+    if (!seQuema && abalorioDeTrinket(carta, claveClase) === "amistad") {
+      const aliado = await this._elegirAliadoAmistad();
+      if (aliado) {
+        resumenEfectosAuto.push(`<i class="fa-solid fa-handshake"></i> Destino enlazado con <strong>${foundry.utils.escapeHTML(aliado.name)}</strong>`);
+      }
+    }
 
     const bonoDefTrinket = Number(carta.system.bonoDefensaEnJuego) || 0;
     if (bonoDefTrinket !== 0 && !seQuema) {
@@ -1002,14 +1186,17 @@ export class SistemaActor extends Actor {
   /**
    * Comprueba si el Actor puede reaccionar: no con Agotamiento 4+ ni, en combate, si ya usó
    * su reacción antes de volver a su turno. Si no puede, ofrece hacerlo como excepción.
+   * @param {Object} [opciones]
+   * @param {boolean} [opciones.adicional=false] - (v0.15.0) Reacción adicional: ignora la reacción usada.
    * @returns {Promise<"ok"|"excepcion"|null>} null si se cancela.
    */
-  async _autorizarReaccion() {
+  async _autorizarReaccion({ adicional = false } = {}) {
     const motivos = [];
     if (this.system.agotamiento?.efectos?.sinReacciones) {
       motivos.push(`Tiene Agotamiento ${this.system.agotamiento.nivel}: no puede realizar reacciones.`);
     }
-    if (this.estaEnCombate() && this.getFlag("cartas-y-dados", "reaccionUsada")) {
+    // (v0.15.0) Una reacción adicional (abalorio Escudo) no depende de la reacción del turno.
+    if (!adicional && this.estaEnCombate() && this.getFlag("cartas-y-dados", "reaccionUsada")) {
       motivos.push("Ya ha usado su reacción: las reacciones se limitan a una hasta que vuelva a ser su turno.");
     }
     if (!motivos.length) return "ok";
@@ -1039,13 +1226,178 @@ export class SistemaActor extends Actor {
   }
 
   /**
+   * Abalorios de clase activos (v0.15.0): claves (`espada`, `escudo`, `daga`...) de los Trinkets En
+   * Juego marcados con `flags.cartas-y-dados.abalorio` (o, si son anteriores a v0.15.0, reconocidos
+   * por nombre entre los abalorios de la clase del Actor).
+   * @returns {Set<string>}
+   */
+  abaloriosActivos() {
+    const enJuego = this.system.pilasDocumentos?.enJuego;
+    if (!enJuego) return new Set();
+    const claveClase = claveClaseDeItem(this.items.find(i => i.type === "clase"));
+    return new Set(enJuego.cards.contents.map(c => abalorioDeTrinket(c, claveClase)).filter(Boolean));
+  }
+
+  /**
+   * Aliados posibles para los abalorios de Mendacium Charisma (v0.15.0): el resto de Actores
+   * `personaje` del Mundo.
+   * @returns {Actor[]}
+   */
+  aliadosPosibles() {
+    return game.actors.filter(a => a.type === "personaje" && a.id !== this.id);
+  }
+
+  /**
+   * Abalorio Amistad (v0.15.0): pide el aliado con el que se enlaza el destino y lo guarda en
+   * `flags.cartas-y-dados.amistad` (`{aliadoUuid, aliadoNombre}`).
+   * @returns {Promise<Actor|null>} Aliado elegido o null si no hay o se cancela.
+   */
+  async _elegirAliadoAmistad() {
+    const aliados = this.aliadosPosibles();
+    if (!aliados.length) {
+      ui.notifications.warn("Amistad: no hay otros personajes con los que enlazar el destino.");
+      return null;
+    }
+    const escapar = foundry.utils.escapeHTML;
+    const actual = this.getFlag("cartas-y-dados", "amistad")?.aliadoUuid ?? null;
+    const opciones = aliados.map(a => `<option value="${a.uuid}" ${a.uuid === actual ? "selected" : ""}>${escapar(a.name)}</option>`).join("");
+    const uuid = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 420 }),
+      window: { title: "Amistad", icon: "fa-solid fa-handshake" },
+      content: `
+        <p>Enlazas tu destino al de un aliado. Si juegas la misma característica que este aliado jugó en su última acción, tiras <strong>1 dado adicional</strong>.</p>
+        <div class="form-group"><label>Aliado</label><select name="aliado">${opciones}</select></div>`,
+      buttons: [
+        { action: "enlazar", label: "Enlazar destino", icon: "fa-solid fa-handshake", default: true,
+          callback: (_e, button) => button.form.elements.aliado.value },
+        { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => null }
+      ],
+      rejectClose: false
+    });
+    const aliado = uuid ? aliados.find(a => a.uuid === uuid) ?? null : null;
+    if (!aliado) return null;
+    await this.setFlag("cartas-y-dados", "amistad", { aliadoUuid: aliado.uuid, aliadoNombre: aliado.name });
+    return aliado;
+  }
+
+  /**
+   * Abalorio Amistad (v0.15.0): ¿la característica jugada coincide con la última acción del aliado?
+   * @param {string} claveCaract - Característica con la que se tira.
+   * @param {Set<string>} [abalorios] - Abalorios En Juego (se calculan si no se pasan).
+   * @returns {{aliado: string}|null} Nombre del aliado si se gana el dado adicional.
+   */
+  _bonoDadoAmistad(claveCaract, abalorios = this.abaloriosActivos()) {
+    if (!claveCaract || !abalorios.has("amistad")) return null;
+    const enlace = this.getFlag("cartas-y-dados", "amistad");
+    const aliado = enlace?.aliadoUuid ? fromUuidSync(enlace.aliadoUuid) : null;
+    if (!aliado || aliado.getFlag("cartas-y-dados", "ultimaCaracteristica") !== claveCaract) return null;
+    return { aliado: aliado.name };
+  }
+
+  /**
+   * Guarda la característica de la última acción del Actor (v0.15.0, abalorio Amistad).
+   * @param {string} claveCaract
+   * @returns {Promise<void>}
+   */
+  async _registrarUltimaCaracteristica(claveCaract) {
+    if (this.type !== "personaje" || !claveCaract || !this.isOwner) return;
+    if (this.getFlag("cartas-y-dados", "ultimaCaracteristica") === claveCaract) return;
+    await this.setFlag("cartas-y-dados", "ultimaCaracteristica", claveCaract);
+  }
+
+  /**
+   * Abalorio Empatía (v0.15.0): roba una carta del Mazo porque un aliado ha quemado una carta.
+   * En combate, una vez por turno (`flags.cartas-y-dados.empatiaUsada`, se restablece al inicio de su
+   * turno); las excepciones se confirman.
+   * @param {string} [nombreAliado=""] - Quién quemó la carta (para el chat).
+   * @returns {Promise<boolean>} true si robó.
+   */
+  async usarEmpatia(nombreAliado = "") {
+    const motivos = [];
+    if (!this.abaloriosActivos().has("empatia")) motivos.push("El abalorio «Empatía» no está En Juego.");
+    if (this.estaEnCombate() && this.getFlag("cartas-y-dados", "empatiaUsada")) {
+      motivos.push("Ya ha usado Empatía este turno (una vez por turno).");
+    }
+    if (motivos.length && !(await this._confirmarExcepcion("Empatía", motivos))) return false;
+
+    const { mano } = this.system.pilasDocumentos ?? {};
+    if (!mano) {
+      ui.notifications.warn("Inicializa las pilas de cartas antes de robar.");
+      return false;
+    }
+    const antes = mano.cards.size;
+    await this.robarCantidadCartas(1);
+    if (mano.cards.size <= antes) return false;
+    if (this.estaEnCombate()) await this.setFlag("cartas-y-dados", "empatiaUsada", true);
+    this.prepareData();
+
+    const deQuien = nombreAliado ? ` porque <strong>${foundry.utils.escapeHTML(nombreAliado)}</strong> ha quemado una carta` : "";
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-heart"></i><p><strong>${this.name}</strong> roba una carta${deQuien} (Empatía).</p></div>`
+    });
+    return true;
+  }
+
+  /**
+   * Habilidad Promesa (v0.15.0): el Actor mira las X primeras cartas de su Mazo, elige una, la
+   * añade a su mano y baraja el Mazo. Lo lanza el botón del chat de la habilidad (propietario).
+   * @param {number} x - Valor X de la tirada de Misticismo.
+   * @param {string} [nombreOrigen=""] - Quién usó Promesa.
+   * @returns {Promise<boolean>} true si añadió una carta.
+   */
+  async elegirCartaPromesa(x, nombreOrigen = "") {
+    const { mazo, mano } = this.system.pilasDocumentos ?? {};
+    if (!mazo || !mano) {
+      ui.notifications.warn(`${this.name} no tiene las pilas de cartas inicializadas.`);
+      return false;
+    }
+    const primeras = mazo.availableCards.slice(0, Math.max(0, Number(x) || 0));
+    if (!primeras.length) {
+      ui.notifications.warn(`No quedan cartas en el Mazo de ${this.name}.`);
+      return false;
+    }
+    const escapar = foundry.utils.escapeHTML;
+    const opciones = primeras.map((c, i) => `
+      <label class="cyd-opcion-radio">
+        <input type="radio" name="carta" value="${c.id}" ${i === 0 ? "checked" : ""} />
+        <span>${escapar(nombreVisibleCarta(c))} <small>(${abreviadoPalo(c.system.palo)} · ${c.system.tipoDado ?? ""})</small></span>
+      </label>`).join("");
+    const cartaId = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 440, lista: true }),
+      window: { title: "Promesa", icon: "fa-solid fa-hand-holding-hand" },
+      content: `<p>Miras las <strong>${primeras.length}</strong> primeras cartas de tu Mazo: elige una para tu mano. Después se baraja el Mazo.</p>${opciones}`,
+      buttons: [
+        { action: "elegir", label: "Añadir a la mano", icon: "fa-solid fa-hand", default: true,
+          callback: (_e, button) => button.form.elements.carta?.value ?? null },
+        { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => null }
+      ],
+      rejectClose: false
+    });
+    if (!cartaId) return false;
+
+    const [creada] = await this._extraerCartasDeMazo(mazo, mano, [cartaId]);
+    await mazo.shuffle({ chatNotification: false });
+    this.prepareData();
+    if (!creada) return false;
+    const deQuien = nombreOrigen ? ` gracias a la Promesa de <strong>${escapar(nombreOrigen)}</strong>` : "";
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-hand-holding-hand"></i><p><strong>${this.name}</strong> mira ${primeras.length} carta(s) de su Mazo${deQuien}, añade una a su mano y baraja el Mazo.</p></div>`
+    });
+    return true;
+  }
+
+  /**
    * Vuelve a dejar disponible la reacción (inicio del turno del Actor, fin de combate,
    * descanso o a mano desde la ficha).
    * @returns {Promise<void>}
    */
   async restablecerReaccion() {
-    if (this.isOwner && this.getFlag("cartas-y-dados", "reaccionUsada")) {
-      await this.unsetFlag("cartas-y-dados", "reaccionUsada");
+    if (!this.isOwner) return;
+    // (v0.15.0) También el uso por turno del abalorio Empatía.
+    for (const clave of ["reaccionUsada", "empatiaUsada"]) {
+      if (this.getFlag("cartas-y-dados", clave)) await this.unsetFlag("cartas-y-dados", clave);
     }
   }
 
@@ -1309,6 +1661,9 @@ export class SistemaActor extends Actor {
     const trinket = enJuego.cards.get(trinketEnJuegoId);
     if (!trinket) return;
 
+    // (v0.15.0) Un Abalorio Eterno que deja de estar en juego siempre se quema.
+    const eterno = this._esAbalorioEterno(trinket);
+    if (eterno) quemar = true;
     const destino = quemar ? quemadas : descarte;
     const textoAccion = quemar ? "quema" : "descarta";
     const iconoAccion = quemar ? '<i class="fa-solid fa-fire"></i>' : '<i class="fa-solid fa-box-archive"></i>';
@@ -1317,7 +1672,7 @@ export class SistemaActor extends Actor {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<div class="cyd-chat-aviso">${iconoAccion}<p><strong>${this.name}</strong> ${textoAccion} su Trinket activo <strong>${nombreVisibleCarta(trinket)}</strong>.</p></div>`
+      content: `<div class="cyd-chat-aviso">${iconoAccion}<p><strong>${this.name}</strong> ${textoAccion} su Trinket activo <strong>${nombreVisibleCarta(trinket)}</strong>${eterno ? " (Abalorio Eterno: al dejar de estar en juego se quema)" : ""}.</p></div>`
     });
   }
 
@@ -1340,6 +1695,8 @@ export class SistemaActor extends Actor {
     await mazo.shuffle({ chatNotification: false });
     if (trinkets) await trinkets.shuffle({ chatNotification: false });
 
+    // (v0.15.0) Un Abalorio Eterno sigue En Juego (`_devolverCartasASuMazoOriginal`); por si estaba fuera de sitio.
+    await this._asegurarAbaloriosEternos();
     // (v0.14.0) Termina la escena: reacción disponible y sin acción fuera de combate en curso.
     await this._limpiarEstadoAcciones();
     this.prepareData();
@@ -1380,6 +1737,8 @@ export class SistemaActor extends Actor {
     const recargaRasgos = { "system.rasgosRaza.esperaUnMomentoUsado": false };
     if (comodo) recargaRasgos["system.rasgosRaza.alquimiaUsada"] = false;
     await this.update(recargaRasgos);
+    // (v0.15.0) Un Abalorio Eterno que sale de Quemadas vuelve directamente a estar En Juego.
+    await this._asegurarAbaloriosEternos();
     await this._limpiarEstadoAcciones();
     this.prepareData();
 
@@ -1403,7 +1762,7 @@ export class SistemaActor extends Actor {
    */
   async _limpiarEstadoAcciones() {
     if (!this.isOwner) return;
-    for (const clave of ["reaccionUsada", "miniTurno"]) {
+    for (const clave of ["reaccionUsada", "miniTurno", "empatiaUsada"]) {
       if (this.getFlag("cartas-y-dados", clave)) await this.unsetFlag("cartas-y-dados", clave);
     }
   }
@@ -1625,11 +1984,14 @@ export class SistemaActor extends Actor {
    * @param {string} datos.titulo - Nombre de la carta, habilidad o acción.
    * @param {boolean} [datos.esAtaque=false]
    * @param {string} [datos.etiquetaDificultad="Dificultad del Master"]
+   * @param {boolean} [datos.valorX=false] - (v0.15.0) La tirada fija el valor X de una habilidad.
    * @returns {Object|null}
    */
-  _datosRepeticionTirada(tirada, { titulo, esAtaque = false, etiquetaDificultad = "Dificultad del Master" }) {
+  _datosRepeticionTirada(tirada, {
+    titulo, esAtaque = false, etiquetaDificultad = "Dificultad del Master", valorX = false, efectoX = null, tokenObjetivo = null
+  }) {
     if (!tieneRasgoRacial(this, "esperaUnMomento")) return null;
-    const objetivo = esAtaque ? game.user.targets.first() ?? null : null;
+    const objetivo = esAtaque ? game.user.targets.first() ?? null : tokenObjetivo;
     return {
       actorUuid: this.uuid,
       titulo: String(titulo ?? "Tirada"),
@@ -1639,6 +2001,9 @@ export class SistemaActor extends Actor {
       esAtaque: Boolean(esAtaque),
       etiquetaDificultad,
       objetivoTokenUuid: objetivo?.document?.uuid ?? null,
+      // (v0.15.0) La repetición vuelve a mostrar el valor X en vez de compararse con la Dificultad.
+      valorX: Boolean(valorX),
+      efectoX: efectoX ?? null,
       totalAnterior: tirada.total
     };
   }
@@ -1673,7 +2038,9 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `Espera un momento · ${datos.titulo}`
     });
     const tokenObjetivo = datos.objetivoTokenUuid ? (fromUuidSync(datos.objetivoTokenUuid) ?? null) : null;
-    const resolucion = this._htmlResolucionTirada(tirada, datos.esAtaque, datos.etiquetaDificultad, { tokenObjetivo });
+    const resolucion = datos.valorX
+      ? { publico: this._htmlValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo }), master: "" }
+      : this._htmlResolucionTirada(tirada, datos.esAtaque, datos.etiquetaDificultad, { tokenObjetivo });
 
     const saborChat = `
       <div class="cyd-carta-jugada">
@@ -1946,26 +2313,44 @@ export class SistemaActor extends Actor {
 
       if (cartaElegida) await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
       if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
-      await this._marcarAccionMiniTurno();
+      await this._registrarUltimaCaracteristica("misticismo"); // (v0.15.0) abalorio Amistad
+    await this._marcarAccionMiniTurno();
       this.prepareData();
       if (this.sheet?.rendered) this.sheet.render();
       return null;
     }
 
-    // Habilidad con tirada: XdY de Misticismo.
+    // Habilidad con tirada: XdY de Misticismo (v0.15.0: +1 dado con el abalorio Amistad).
     const bono = bonoTirada;
+    const amistad = this._bonoDadoAmistad("misticismo");
     const tirada = await tirarDadosSistema({
-      cantidadDados, tipoDado, bono, rollData: this.getRollData(),
+      cantidadDados: cantidadDados + (amistad ? 1 : 0), tipoDado, bono, rollData: this.getRollData(),
       mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
       speaker: ChatMessage.getSpeaker({ actor: this }), titulo: item.name
     });
-    const resolucion = this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
+    // (v0.15.0) `valorX`: el resultado de la tirada fija el valor X del efecto (sin Dificultad ni
+    // objetivo); un resultado negativo es fallo automático.
+    const usaValorX = Boolean(item.system.valorX) && !esAtaque;
+    // (v0.15.0) Efecto automatizado del valor X sobre el Token objetivo (Sanación, Promesa).
+    const efectoX = usaValorX ? item.getFlag("cartas-y-dados", "efectoX") ?? null : null;
+    const tokenObjetivoX = efectoX ? game.user.targets.first() ?? null : null;
+    const resolucion = usaValorX
+      ? { publico: this._htmlValorX(tirada, { efectoX, tokenObjetivo: tokenObjetivoX }), master: "" }
+      : this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
     const bloqueResolucionHtml = resolucion.publico;
     const htmlMaster = resolucion.master;
+    const etiquetasHabilidad = [
+      item.system.sinAccion ? '<span class="cyd-tag-accion"><i class="fa-solid fa-plus"></i> No gasta acción</span>' : "",
+      amistad ? `<span class="cyd-tag-accion"><i class="fa-solid fa-handshake"></i> Amistad con ${foundry.utils.escapeHTML(amistad.aliado)}: +1 dado</span>` : ""
+    ].filter(Boolean);
+    const etiquetaSinAccion = etiquetasHabilidad.length
+      ? `<p class="cyd-tags-accion-fila">${etiquetasHabilidad.join(" ")}</p>`
+      : "";
 
     const saborChat = `
       <div class="cyd-carta-jugada">
         <h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3>
+        ${etiquetaSinAccion}
         ${lineaCartaUsada}
         <p><strong>Tirada:</strong> Misticismo × ${tipoDado}</p>
         ${tirada.html}
@@ -1979,7 +2364,9 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       flavor: saborChat,
       htmlMaster,
-      repeticion: this._datosRepeticionTirada(tirada, { titulo: item.name, esAtaque, etiquetaDificultad: "Dificultad" })
+      repeticion: this._datosRepeticionTirada(tirada, {
+        titulo: item.name, esAtaque, etiquetaDificultad: "Dificultad", valorX: usaValorX, efectoX, tokenObjetivo: tokenObjetivoX
+      })
     });
 
     // Quemar la carta usada: mano -> quemadas (motor propio de pilas, sin Cards#pass()).
@@ -1989,10 +2376,57 @@ export class SistemaActor extends Actor {
     await this._aplicarAutomatizacionHabilidad(item);
 
     if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
+    await this._registrarUltimaCaracteristica("misticismo"); // (v0.15.0) abalorio Amistad
     await this._marcarAccionMiniTurno();
     this.prepareData();
     if (this.sheet?.rendered) this.sheet.render();
     return tirada;
+  }
+
+  /**
+   * Bloque de chat del valor X de una habilidad (v0.15.0): X es el total de la tirada de Misticismo;
+   * un total negativo (o 0) no produce efecto.
+   * (v0.15.0) Con `efectoX` añade la automatización sobre el Token objetivo, que no puede ser el
+   * propio Actor: `curacion` (Sanación) → botón del Master para curar X (`.cyd-btn-aplicar-curacion`);
+   * `promesa` (Promesa) → botón para que el dueño del objetivo elija entre sus X primeras cartas
+   * (`.cyd-btn-promesa`, ver `sistema.mjs`).
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
+   * @param {Object} [opciones]
+   * @param {string|null} [opciones.efectoX=null] - `curacion` o `promesa`.
+   * @param {Token|TokenDocument|null} [opciones.tokenObjetivo=null] - Objetivo marcado al usarla.
+   * @returns {string} HTML público.
+   */
+  _htmlValorX(tirada, { efectoX = null, tokenObjetivo = null } = {}) {
+    const valor = Math.max(0, Number(tirada.total) || 0);
+    const exito = !tirada.esNegativo && valor > 0;
+    let htmlEfecto = "";
+    if (exito && efectoX) {
+      const escapar = foundry.utils.escapeHTML;
+      const actorObjetivo = tokenObjetivo?.actor ?? null;
+      if (!actorObjetivo || actorObjetivo.id === this.id) {
+        htmlEfecto = `<p class="hint"><i class="fa-solid fa-crosshairs"></i> Marca con <strong>T</strong> el Token del objetivo (no puedes ser tú) antes de usar la habilidad para automatizar su efecto.</p>`;
+      } else if (efectoX === "curacion") {
+        const nombre = escapar(tokenObjetivo.name ?? actorObjetivo.name);
+        htmlEfecto = `
+          <p><i class="fa-solid fa-heart-pulse"></i> Cura <strong>${valor}</strong> de Salud a <strong>${nombre}</strong> (lo aplica el Master).</p>
+          <button type="button" class="cyd-btn-aplicar-curacion" data-actor-uuid="${actorObjetivo.uuid}" data-curacion="${valor}">
+            <i class="fa-solid fa-heart-pulse"></i> Aplicar ${valor} de Curación a ${nombre}
+          </button>`;
+      } else if (efectoX === "promesa") {
+        const nombre = escapar(tokenObjetivo.name ?? actorObjetivo.name);
+        htmlEfecto = `
+          <p><i class="fa-solid fa-hand-holding-hand"></i> <strong>${nombre}</strong> mira las ${valor} primeras cartas de su Mazo y elige una.</p>
+          <button type="button" class="cyd-btn-promesa" data-actor-uuid="${actorObjetivo.uuid}" data-x="${valor}" data-origen="${escapar(this.name)}">
+            <i class="fa-solid fa-hand-holding-hand"></i> Elegir carta (Promesa)
+          </button>`;
+      }
+    }
+    return `
+      <div class="cyd-resolucion-caja ${exito ? "cyd-exito" : "cyd-fallo"}">
+        <p><i class="fa-solid fa-moon"></i> <strong>X = ${valor}</strong>${exito ? "" : ` · <span class="cyd-resultado-fallo">${tirada.esNegativo ? "FALLO AUTOMÁTICO" : "SIN EFECTO"}</span>`}</p>
+        ${htmlEfecto}
+      </div>
+    `;
   }
 
   /**

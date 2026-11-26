@@ -97,13 +97,16 @@
       <div class="cyd-cabecera-seccion">
         <h3><i class="fa-solid fa-angles-up"></i> Progresión{{#if nombreClaseBase}} · {{nombreClaseBase}}{{/if}}</h3>
       </div>
+      {{#if system.especializacion}}
+        <p class="cyd-especializacion-clase"><i class="fa-solid fa-award"></i> Especialización: <strong>{{system.especializacion}}</strong></p>
+      {{/if}}
       {{#if system.historialNiveles.length}}
         <div class="cyd-lista-items">
           {{#each system.historialNiveles as |entrada|}}
             <div class="cyd-fila-item">
               <div class="cyd-fila-item-info">
-                <strong>Nv. {{entrada.nivel}} · {{entrada.habilidad}}</strong>
-                <small>{{entrada.cartas}}</small>
+                <strong>Nv. {{entrada.nivel}}{{#if entrada.habilidad}} · {{entrada.habilidad}}{{/if}}{{#if entrada.especializacion}} · {{entrada.especializacion}}{{/if}}</strong>
+                {{#if entrada.cartas}}<small>{{entrada.cartas}}</small>{{/if}}
               </div>
             </div>
           {{/each}}
@@ -111,6 +114,35 @@
       {{else}}
         <p class="cyd-texto-vacio">Sin subidas de nivel registradas. Usa el botón <i class="fa-solid fa-angles-up"></i> de la ranura de Clase en la ficha del personaje.</p>
       {{/if}}
+    </section>
+  {{/if}}
+
+  {{!-- Tabla de elecciones de la Clase base (v0.15.0, solo lectura: SISTEMA_CONFIG.CLASES_BASE) --}}
+  {{#if progresionClase}}
+    <section class="cyd-panel-controles cyd-panel-rasgos-raza">
+      <div class="cyd-cabecera-seccion">
+        <h3><i class="fa-solid fa-table-list"></i> Tabla de elecciones · {{progresionClase.nombre}}</h3>
+      </div>
+      <p class="cyd-rasgo-texto">En las elecciones eliges solo una opción por nivel y obtienes todos los beneficios de cada nivel.</p>
+      {{#if progresionClase.tabla.length}}
+        <ul class="cyd-lista-rasgos">
+          {{#each progresionClase.tabla as |fila|}}
+            <li class="cyd-rasgo"><div class="cyd-rasgo-cabecera"><strong>Nv. {{fila.nivel}}</strong></div><p class="cyd-rasgo-texto">{{fila.beneficios}}</p></li>
+          {{/each}}
+        </ul>
+      {{/if}}
+      {{#each progresionClase.grupos as |grupo|}}
+        <h4><i class="fa-solid {{grupo.icono}}"></i> {{grupo.titulo}} <small>(Nv. {{grupo.nivel}})</small></h4>
+        <ul class="cyd-lista-rasgos">
+          {{#each grupo.opciones as |opcion|}}
+            <li class="cyd-rasgo">
+              <div class="cyd-rasgo-cabecera"><strong>{{#if opcion.icono}}<i class="fa-solid {{opcion.icono}}"></i> {{/if}}{{opcion.nombre}}</strong></div>
+              {{#if opcion.texto}}<p class="cyd-rasgo-texto">{{opcion.texto}}</p>{{/if}}
+              {{#if opcion.auto}}<p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{opcion.auto}}</p>{{/if}}
+            </li>
+          {{/each}}
+        </ul>
+      {{/each}}
     </section>
   {{/if}}
 
@@ -149,6 +181,16 @@
         <label class="cyd-recurso-caja cyd-check">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-crosshairs"></i> Es Ataque</span>
           <input type="checkbox" name="system.esAtaque" {{checked system.esAtaque}} />
+        </label>
+      </div>
+      <div class="cyd-recursos-barra cyd-cols-2">
+        <label class="cyd-recurso-caja cyd-check" data-tooltip="El resultado de la tirada de Misticismo es el valor X del efecto (no se compara con la Dificultad).">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-moon"></i> Tirada = valor X</span>
+          <input type="checkbox" name="system.valorX" {{checked system.valorX}} />
+        </label>
+        <label class="cyd-recurso-caja cyd-check" data-tooltip="Usar la habilidad no gasta acción (se indica en el chat).">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-plus"></i> No gasta acción</span>
+          <input type="checkbox" name="system.sinAccion" {{checked system.sinAccion}} />
         </label>
       </div>
       <div class="cyd-recursos-barra cyd-cols-2">

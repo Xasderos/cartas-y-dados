@@ -8,7 +8,7 @@ import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 import { abrirDialogoAccion } from "./dialogo-accion.mjs";
 
-import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud, contextoRasgosRaza } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud, contextoRasgosRaza, opcionesTrinketsClase } from "../config.mjs";
 import { preguntarTipoDescanso } from "../documents/actor.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -301,10 +301,12 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     const configClase = clases[claveClase];
 
     /* ---------------- PASO 2: SELECCIÓN DE TRINKET ---------------- */
-    const opcionesTrinket = configClase.trinkets.map((nombre, indice) => `
+    // (v0.15.0) Los abalorios de clase muestran su efecto bajo el nombre.
+    const escapar = foundry.utils.escapeHTML;
+    const opcionesTrinket = opcionesTrinketsClase(configClase).map((opcion, indice) => `
       <label class="cyd-opcion-radio">
-        <input type="radio" name="cydTrinketElegido" value="${nombre}" ${indice === 0 ? "checked" : ""} />
-        ${nombre}
+        <input type="radio" name="cydTrinketElegido" value="${escapar(opcion.nombre)}" ${indice === 0 ? "checked" : ""} />
+        <span>${opcion.icono ? `<i class="fa-solid ${opcion.icono}"></i> ` : ""}<strong>${escapar(opcion.nombre)}</strong>${opcion.texto ? `<br><small>${escapar(opcion.texto)}</small>` : ""}</span>
       </label>`).join("");
 
     const trinketElegido = await DialogV2.prompt({
@@ -313,6 +315,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       content: `
         <p><strong>${configClase.nombre}</strong> — Trinkets iniciales disponibles (Nivel 1):</p>
         ${opcionesTrinket}
+        ${opcionesTrinketsClase(configClase).some(o => o.clave) ? '<p class="hint">El efecto del abalorio se aplica mientras su Trinket está En Juego.</p>' : ""}
       `,
       ok: {
         label: "Confirmar y Generar Mazo",
@@ -331,7 +334,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
   /**
    * Diálogo de Subida de Nivel (v0.10.0), solo `DialogV2`:
    * - Paso 1 (`DialogV2.prompt`): radios `cydHabilidadNivel` (una habilidad) y `cydPackNivel`
-   *   (un pack de cartas) de `progresion[nivelDestino]` de la clase.
+   *   (un pack de cartas) y, desde v0.15.0, `cydEspecializacionNivel`, solo para las listas que
+   *   ofrezca `progresion[nivelDestino]` de la clase (con el texto de reglas de cada opción).
    * - Paso 2 (`DialogV2.confirm`): resumen de la elección; la subida no se puede deshacer.
    * Cancelar en cualquier paso sale sin cambios. Aplica con `SistemaActor#subirDeNivel`.
    */
@@ -342,14 +346,17 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       ui.notifications.warn("No hay una subida de nivel disponible para esta Clase.");
       return;
     }
-    const { configClase, nivelActual, nivelDestino, habilidades, packs } = opciones;
+    const { configClase, nivelActual, nivelDestino, habilidades, packs, especializaciones } = opciones;
     const escapar = foundry.utils.escapeHTML;
 
-    const radiosHabilidades = habilidades.map((h, i) => `
+    /** Radio con nombre y, si lo hay, texto de reglas debajo (v0.15.0). */
+    const radio = (nombreCampo, i, nombre, texto) => `
       <label class="cyd-opcion-radio">
-        <input type="radio" name="cydHabilidadNivel" value="${i}" ${i === 0 ? "checked" : ""} />
-        ${escapar(h.nombre)}
-      </label>`).join("");
+        <input type="radio" name="${nombreCampo}" value="${i}" ${i === 0 ? "checked" : ""} />
+        <span><strong>${escapar(nombre)}</strong>${texto ? `<br><small>${escapar(texto)}</small>` : ""}</span>
+      </label>`;
+    const radiosHabilidades = habilidades.map((h, i) => radio("cydHabilidadNivel", i, h.nombre, h.texto)).join("");
+    const radiosEspecializaciones = especializaciones.map((e, i) => radio("cydEspecializacionNivel", i, e.nombre, e.texto)).join("");
     const radiosPacks = packs.map((p, i) => `
       <label class="cyd-opcion-radio">
         <input type="radio" name="cydPackNivel" value="${i}" ${i === 0 ? "checked" : ""} />
@@ -361,30 +368,37 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       window: { title: `${actor.name} — Subida a Nivel ${nivelDestino}` },
       content: `
         <p><strong>${escapar(configClase.nombre)}</strong> · Nivel ${nivelActual} → ${nivelDestino}</p>
-        <fieldset><legend><i class="fa-solid fa-wand-magic-sparkles"></i> Elige una habilidad</legend>${radiosHabilidades}</fieldset>
-        <fieldset><legend><i class="fa-solid fa-layer-group"></i> Elige un pack de cartas</legend>${radiosPacks}</fieldset>
+        ${habilidades.length ? `<fieldset><legend><i class="fa-solid fa-wand-magic-sparkles"></i> Elige una habilidad</legend>${radiosHabilidades}</fieldset>` : ""}
+        ${packs.length ? `<fieldset><legend><i class="fa-solid fa-layer-group"></i> Elige un pack de cartas</legend>${radiosPacks}</fieldset>` : ""}
+        ${especializaciones.length ? `<fieldset><legend><i class="fa-solid fa-award"></i> Elige una especialización</legend>${radiosEspecializaciones}</fieldset>` : ""}
       `,
       ok: {
         label: "Continuar",
         icon: "fa-solid fa-angles-up",
-        callback: (event, button) => ({
-          indiceHabilidad: Number(button.form.elements.cydHabilidadNivel.value),
-          indicePack: Number(button.form.elements.cydPackNivel.value)
-        })
+        callback: (event, button) => {
+          const f = button.form.elements;
+          return {
+            indiceHabilidad: Number(f.cydHabilidadNivel?.value ?? 0),
+            indicePack: Number(f.cydPackNivel?.value ?? 0),
+            indiceEspecializacion: Number(f.cydEspecializacionNivel?.value ?? 0)
+          };
+        }
       },
       rejectClose: false
     });
     if (!eleccion) return;
 
-    const habilidad = habilidades[eleccion.indiceHabilidad];
-    const pack = packs[eleccion.indicePack];
+    const habilidad = habilidades[eleccion.indiceHabilidad] ?? null;
+    const pack = packs[eleccion.indicePack] ?? null;
+    const especializacion = especializaciones[eleccion.indiceEspecializacion] ?? null;
     const confirmado = await DialogV2.confirm({
       ...opcionesDialogoSistema(),
       window: { title: "Confirmar Subida de Nivel" },
       content: `
         <p>${escapar(actor.name)} subirá a <strong>Nivel ${nivelDestino}</strong> y obtendrá:</p>
-        <p><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidad: <strong>${escapar(habilidad.nombre)}</strong></p>
-        <p><i class="fa-solid fa-layer-group"></i> Cartas: ${escapar(describirPackCartas(pack))}</p>
+        ${habilidad ? `<p><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidad: <strong>${escapar(habilidad.nombre)}</strong></p>` : ""}
+        ${pack ? `<p><i class="fa-solid fa-layer-group"></i> Cartas: ${escapar(describirPackCartas(pack))}</p>` : ""}
+        ${especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${escapar(especializacion.nombre)}</strong></p>` : ""}
         <p>Esta elección no se puede deshacer. ¿Continuar?</p>
       `,
       yes: { label: "Subir de Nivel", icon: "fa-solid fa-angles-up" },

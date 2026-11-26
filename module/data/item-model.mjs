@@ -66,7 +66,8 @@ export class OrigenDataModel extends TypeDataModel {
  * (v0.10.0) El Item de Clase es el registro de progresión del personaje:
  * - `claveClase`: clave de `SISTEMA_CONFIG.CLASES_BASE` (vacía en clases personalizadas).
  * - `nivel`: nivel actual (lo sube `SistemaActor#subirDeNivel`).
- * - `historialNiveles`: una entrada por subida con la habilidad y el pack elegidos.
+ * - `historialNiveles`: una entrada por subida con la habilidad, el pack y (v0.15.0) la especialización elegidos.
+ * - `especializacion` (v0.15.0): nombre de la especialización elegida (vacío hasta elegirla).
  * Los `bonificadores` se conservan por compatibilidad, pero las clases base no aportan ninguno.
  */
 export class ClaseDataModel extends TypeDataModel {
@@ -77,8 +78,10 @@ export class ClaseDataModel extends TypeDataModel {
       historialNiveles: new ArrayField(new SchemaField({
         nivel: new NumberField({ required: true, integer: true, min: 2 }),
         habilidad: new StringField({ required: true, blank: true, initial: "" }),
-        cartas: new StringField({ required: true, blank: true, initial: "" })
+        cartas: new StringField({ required: true, blank: true, initial: "" }),
+        especializacion: new StringField({ required: false, blank: true, initial: "" })
       })),
+      especializacion: new StringField({ required: false, blank: true, initial: "" }),
       nivel: new NumberField({ required: true, integer: true, initial: 1, min: 1, max: 20 }),
       paloAfin: new StringField({
         required: true,
@@ -132,6 +135,10 @@ export class HabilidadDataModel extends TypeDataModel {
         choices: ["d4", "d6", "d8", "d10", "d12"]
       }),
       bonoTirada: new NumberField({ required: true, integer: true, initial: 0 }),
+      // (v0.15.0) La tirada fija el valor X del efecto (sin Dificultad ni objetivo).
+      valorX: new BooleanField({ required: true, initial: false }),
+      // (v0.15.0) Usar la habilidad no gasta acción (se indica en el chat).
+      sinAccion: new BooleanField({ required: true, initial: false }),
 
       // Automatización aplicada al activar la habilidad (solo los campos configurados tienen efecto)
       automatizacion: new SchemaField({

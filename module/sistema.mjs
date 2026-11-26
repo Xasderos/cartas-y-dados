@@ -176,6 +176,19 @@ Hooks.once("ready", async () => {
     console.warn("Cartas y Dados | Error sanando nombres de cartas existentes:", err);
   }
 
+  // (v0.15.0) Abalorio Eterno: los personajes anteriores a la regla lo tienen en el Mazo de Trinkets
+  // o en la Mano; el Master lo coloca En Juego (solo puede estar En Juego o Quemado).
+  if (game.user.isGM) {
+    for (const actor of game.actors?.filter(a => a.type === "personaje") ?? []) {
+      try {
+        actor.prepareData();
+        await actor._asegurarAbaloriosEternos?.();
+      } catch (err) {
+        console.warn(`Cartas y Dados | Error colocando el Abalorio Eterno de ${actor.name}:`, err);
+      }
+    }
+  }
+
 
   // REFRESCO DE SEGURIDAD AL REABRIR EL MUNDO (Bug 1):
   // game.cards y game.actors ya están hidratados. Recalcular los datos derivados
@@ -331,6 +344,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   activarBotonesTiradaPendiente(message, html);
   anadirBotonEsperaUnMomento(message, html);
   activarBotonCuracion(html);
+  activarBotonesMendacium(message, html);
 
   const btnDano = html.querySelector(".cyd-btn-aplicar-dano");
   if (!btnDano) return;
@@ -421,6 +435,89 @@ function activarBotonCuracion(html) {
     boton.disabled = true;
     boton.innerHTML = `<i class="fa-solid fa-check"></i> Curación aplicada (Salud: ${despues})`;
   });
+}
+
+/**
+ * Mendacium Charisma (v0.15.0): botones «Robar carta (Empatía)» y «Elegir carta (Promesa)».
+ * Solo los ve y usa el propietario del Actor indicado en `data-actor-uuid`; cada mensaje se
+ * usa una sola vez por Actor (`flags.cartas-y-dados.ultimaEmpatia` / `ultimaPromesa`).
+ * @param {ChatMessage} message
+ * @param {HTMLElement} html
+ */
+function activarBotonesMendacium(message, html) {
+  const botones = [
+    { selector: ".cyd-btn-empatia", flag: "ultimaEmpatia",
+      usar: (actor, b) => actor.usarEmpatia(b.dataset.origen ?? "") },
+    { selector: ".cyd-btn-promesa", flag: "ultimaPromesa",
+      usar: (actor, b) => actor.elegirCartaPromesa(Number(b.dataset.x) || 0, b.dataset.origen ?? "") }
+  ];
+  for (const { selector, flag, usar } of botones) {
+    for (const boton of html.querySelectorAll(selector)) {
+      const actor = fromUuidSync(boton.dataset.actorUuid);
+      if (!actor?.isOwner) {
+        boton.remove();
+        continue;
+      }
+      if (actor.getFlag("cartas-y-dados", flag) === message.id) {
+        boton.disabled = true;
+        continue;
+      }
+      boton.addEventListener("click", async ev => {
+        ev.preventDefault();
+        boton.disabled = true;
+        const hecho = await usar(actor, boton);
+        if (hecho) await actor.setFlag("cartas-y-dados", flag, message.id);
+        else boton.disabled = false;
+      });
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Abalorio Empatía: aviso cuando un personaje quema una carta (v0.15.0)     */
+/* -------------------------------------------------------------------------- */
+
+/** Temporizadores por Actor que quema: varias cartas quemadas a la vez generan un solo aviso. */
+const temporizadoresEmpatia = new Map();
+
+/**
+ * Cuando el usuario actual crea una carta en la pila de Quemadas de un personaje, avisa (susurro a
+ * sus dueños y al Master) a los demás personajes con el abalorio Empatía En Juego, con un botón
+ * para robar una carta.
+ */
+Hooks.on("createCard", (carta, _opciones, userId) => {
+  if (userId !== game.user.id) return;
+  const pila = carta.parent;
+  if (!(pila instanceof Cards)) return;
+  const quemador = game.actors.find(a => a.type === "personaje" && a.system.pilas?.quemadasId === pila.id);
+  if (!quemador) return;
+  clearTimeout(temporizadoresEmpatia.get(quemador.id));
+  temporizadoresEmpatia.set(quemador.id, setTimeout(() => {
+    temporizadoresEmpatia.delete(quemador.id);
+    avisarEmpatia(quemador);
+  }, 250));
+});
+
+/**
+ * Publica el aviso de Empatía para cada aliado de `quemador` con el abalorio En Juego.
+ * @param {Actor} quemador - Personaje que ha quemado una o varias cartas.
+ * @returns {Promise<void>}
+ */
+async function avisarEmpatia(quemador) {
+  const escapar = foundry.utils.escapeHTML;
+  const empaticos = quemador.aliadosPosibles?.().filter(a => a.abaloriosActivos?.().has("empatia")) ?? [];
+  for (const aliado of empaticos) {
+    const destinatarios = game.users.filter(u => u.isGM || aliado.testUserPermission(u, "OWNER")).map(u => u.id);
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: aliado }),
+      whisper: destinatarios,
+      content: `
+        <div class="cyd-chat-aviso"><i class="fa-solid fa-heart"></i><p><strong>${escapar(quemador.name)}</strong> ha quemado una carta: <strong>${escapar(aliado.name)}</strong> puede robar una carta (Empatía, una vez por turno).</p></div>
+        <button type="button" class="cyd-btn-empatia" data-actor-uuid="${aliado.uuid}" data-origen="${escapar(quemador.name)}">
+          <i class="fa-solid fa-heart"></i> Robar carta (Empatía)
+        </button>`
+    });
+  }
 }
 
 /* -------------------------------------------------------------------------- */

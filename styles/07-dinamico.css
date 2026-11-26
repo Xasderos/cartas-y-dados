@@ -184,3 +184,11 @@
     transition: none !important;
   }
 }
+
+/* (v0.15.0) Opciones de radio con texto de reglas debajo (abalorios, habilidades, especializaciones) */
+.cyd-dialogo .cyd-opcion-radio:has(small) {
+  align-items: flex-start;
+}
+.cyd-dialogo .cyd-opcion-radio small {
+  color: var(--cyd-texto-suave);
+}
