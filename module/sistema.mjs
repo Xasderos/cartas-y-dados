@@ -22,6 +22,7 @@ import { PanelMasterApp } from "./applications/gm-panel.mjs";
 import { HojaPnjActor } from "./applications/npc-sheet.mjs";
 import { personalizarBannerPausa } from "./applications/game-pause.mjs";
 import { registrarReajusteEnResize } from "./applications/ventana-dinamica.mjs";
+import { registrarSocketDados } from "./dados.mjs";
 import { registrarAjustesDelSistema } from "./settings.mjs";
 import { limpiarNombreCarta, nombreVisibleCarta } from "./config.mjs";
 
@@ -161,6 +162,8 @@ async function sanearNombresCartasExistentes() {
 Hooks.once("ready", async () => {
   // Ventanas dinámicas (v0.9.6): reajusta las ventanas del sistema al cambiar el tamaño del navegador.
   registrarReajusteEnResize();
+  // Crítico/Pifia y privacidad de ataques (v0.11.0): mensajes solo Master pedidos por jugadores.
+  registrarSocketDados();
 
   try {
     await sanearNombresCartasExistentes();
@@ -310,6 +313,11 @@ Hooks.on("deleteActor", async (actor) => {
 Hooks.on("renderChatMessageHTML", (message, html) => {
   const btnDano = html.querySelector(".cyd-btn-aplicar-dano");
   if (!btnDano) return;
+  // El daño solo lo ve y aplica el Master (v0.11.0): se quita el botón a cualquier otro usuario.
+  if (!game.user.isGM) {
+    btnDano.remove();
+    return;
+  }
 
   btnDano.addEventListener("click", async ev => {
     ev.preventDefault();
@@ -322,8 +330,8 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
       return;
     }
 
-    if (!actorObjetivo.isOwner) {
-      ui.notifications.warn("Solo el Master o el propietario de la criatura puede aplicar el daño.");
+    if (!game.user.isGM) {
+      ui.notifications.warn("Solo el Master puede aplicar el daño.");
       return;
     }
 

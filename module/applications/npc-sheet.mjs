@@ -9,6 +9,7 @@ import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 
 import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
+import { htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -179,44 +180,24 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
     };
     const nombreCaract = nombresCaracteristicas[caracteristica] || caracteristica;
 
-    const formula = `${valorBase}${tipoDado}`;
-    const roll = new Roll(formula, actor.getRollData());
-    await roll.evaluate();
-
-    let contenidoHtml = "";
-    const dificultadMaster = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
-
-    if (dificultadMaster > 0) {
-      const exito = roll.total >= dificultadMaster;
-      const textoExito = exito ? '<span class="cyd-resultado-exito">ÉXITO</span>' : '<span class="cyd-resultado-fallo">FALLO</span>';
-      contenidoHtml = `
-        <div class="cyd-resolucion-caja">
-          <p><i class="fa-solid fa-bullseye"></i> <strong>Dificultad del Master (${dificultadMaster}):</strong> ${textoExito} (Total: ${roll.total})</p>
-        </div>
-      `;
-    } else {
-      contenidoHtml = `
-        <div class="cyd-resolucion-caja">
-          <p><i class="fa-solid fa-dice-d20"></i> <strong>Resultado:</strong> ${roll.total}</p>
-        </div>
-      `;
-    }
+    // Tirada con Crítico y Pifia (v0.11.0, `module/dados.mjs`).
+    const tirada = await tirarDadosSistema({ cantidadDados: valorBase, tipoDado, rollData: actor.getRollData() });
+    const contenidoHtml = htmlResolucionDificultad(tirada);
 
     const chatData = {
       user: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor }),
-      flavor: `${actor.name} lanza ${nombreCaract} — ${valorBase}${tipoDado} (${caracteristicaTotal} dados totales)`,
-      content: `
+      flavor: `
         <div class="cyd-chat-tirada-pnj">
           <h4><i class="fa-solid fa-dice-d20"></i> Tirada de Atributo: ${nombreCaract}</h4>
-          <p><strong>Fórmula:</strong> ${formula} = <strong>${roll.total}</strong></p>
+          <p><small>${actor.name} lanza ${valorBase}${tipoDado} (${caracteristicaTotal} dados totales)</small></p>
+          ${tirada.html}
           ${contenidoHtml}
         </div>
-      `,
-      rolls: [roll]
+      `
     };
 
-    await ChatMessage.create(chatData);
+    await publicarTirada(tirada, chatData);
   }
 
   /* ======================================================================== */

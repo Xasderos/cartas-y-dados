@@ -397,3 +397,22 @@ button.cyd-btn-aplicar-dano i {
 button.cyd-btn-aplicar-dano:disabled i {
   color: var(--cyd-exito);
 }
+
+/* Desglose de tirada con Crítico y Pifia (v0.11.0, module/dados.mjs) */
+.cyd-tirada-detalle {
+  margin: 4px 0;
+  font-size: 0.85rem;
+}
+
+.cyd-tirada-detalle p {
+  margin: 2px 0;
+}
+
+.cyd-tirada-critico i {
+  color: var(--cyd-oro);
+}
+
+.cyd-tirada-pifia i,
+.cyd-tirada-negativa i {
+  color: var(--cyd-peligro);
+}

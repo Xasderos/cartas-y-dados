@@ -4,11 +4,12 @@
 
 A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal card decks with dice rolls. No external modules required.
 
-**Current version:** 0.10.1 (beta)
+**Current version:** 0.11.0 (beta)
 
 ## How it plays
 - **Card + Dice (`XdY`):** a card's **suit** picks the Characteristic that sets how many dice you roll: Espadas → Physical (FISC), Bastos → Awareness (CONS), Oros → Social (SOC), Copas → Mysticism (MIST). Its **number (1–5)** sets the die: d4, d6, d8, d10, d12.
-- **Resolution:** attacks roll against the target's Defense (the difference is damage, applied from chat); other actions roll against the GM's Difficulty.
+- **Criticals & Fumbles:** every die that rolls its maximum is rerolled once and added. If at least half the dice show 1, those dice are rerolled and subtracted; a negative result is an automatic failure (in opposed rolls the opponent adds its absolute value).
+- **Resolution:** attacks roll against the target's Defense (the difference is damage); only the GM sees the Defense and damage and can apply it from chat; other actions roll against the GM's Difficulty.
 - **Six piles per character:** Deck, Hand, Discard, Burned, Trinkets and In Play. Trinkets are named, levelled cards that give ongoing bonuses without rolling.
 - **Fatigue:** running out of cards reshuffles your discard and adds Fatigue. Ending a scene recovers most cards; resting recovers everything and clears Fatigue.
 - **Skills** burn a Mysticism card from your hand (NPCs without a deck use their own die instead).

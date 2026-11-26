@@ -10,6 +10,7 @@ import {
   SISTEMA_CONFIG, abreviadoPalo, claveClaseDeItem, describirPackCartas, generarNombreMisticoUnico, nombreVisibleCarta
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
+import { htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 
 export class SistemaActor extends Actor {
 
@@ -537,6 +538,78 @@ export class SistemaActor extends Actor {
     return `<p><i class="fa-solid fa-diamond"></i> <strong>${abreviadoPalo(carta.system.palo)}</strong> · Dado <strong>${carta.system.tipoDado}</strong></p>`;
   }
 
+  /**
+   * Bloques HTML de resolución de una tirada del sistema (v0.11.0: Crítico/Pifia y privacidad):
+   * - Ataque con objetivo (`T`): daño = max(0, total - Defensa Total); un total negativo
+   *   (Pifia) es fallo automático. El mensaje público solo indica el objetivo y si impacta;
+   *   la Defensa, el daño y el botón para aplicarlo van en `master` (susurro solo al Master,
+   *   ver `publicarTirada` → `enviarMensajeSoloMaster`).
+   * - Ataque sin objetivo: muestra el resultado y recuerda marcar objetivo.
+   * - Resto: contra la Dificultad del Master (`htmlResolucionDificultad`).
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada - Tirada evaluada.
+   * @param {boolean} esAtaque - Si la acción es un ataque.
+   * @param {string} [etiquetaDificultad="Dificultad del Master"] - Texto de la dificultad.
+   * @returns {{publico: string, master: string}} HTML público y HTML solo para el Master ("" si no aplica).
+   */
+  _htmlResolucionTirada(tirada, esAtaque, etiquetaDificultad = "Dificultad del Master") {
+    if (!esAtaque) return { publico: htmlResolucionDificultad(tirada, etiquetaDificultad), master: "" };
+
+    const tokenObjetivo = game.user.targets.first() ?? null;
+    const actorObjetivo = tokenObjetivo?.actor ?? null;
+    if (!actorObjetivo) {
+      return {
+        publico: `
+          <div class="cyd-resolucion-caja">
+            <p><i class="fa-solid fa-crosshairs"></i> <strong>Resultado de Ataque: ${tirada.total}</strong></p>
+            <p><small><i class="fa-solid fa-circle-info"></i> Pulsa <strong>T</strong> sobre un enemigo antes de tirar para restar su Defensa.</small></p>
+          </div>
+        `,
+        master: ""
+      };
+    }
+
+    // Asegurar que la Defensa del objetivo tenga calculados sus propios Trinkets en juego
+    actorObjetivo.prepareData();
+    const defensaObjetivo = actorObjetivo.system.defensaTotal ?? actorObjetivo.system.defensa ?? 0;
+    const danoCalculado = tirada.esNegativo ? 0 : Math.max(0, tirada.total - defensaObjetivo);
+    const impacta = danoCalculado > 0;
+
+    // Público: sin Defensa ni daño.
+    const resultadoPublico = impacta
+      ? '<i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span>'
+      : tirada.esNegativo
+        ? '<i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">FALLO AUTOMÁTICO</span>'
+        : '<i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span>';
+    const publico = `
+      <div class="cyd-resolucion-caja ${impacta ? "cyd-exito" : "cyd-fallo"}">
+        <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · ${resultadoPublico}</p>
+        <p><small><i class="fa-solid fa-eye-slash"></i> La Defensa y el daño solo los ve el Master.</small></p>
+      </div>
+    `;
+
+    // Solo Master: Defensa, daño y botón para aplicarlo.
+    const detalle = impacta
+      ? `<p><i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span> · <strong>Daño ${danoCalculado}</strong> <small>(${tirada.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
+          <button type="button" class="cyd-btn-aplicar-dano"
+                  data-actor-uuid="${actorObjetivo.uuid}"
+                  data-dano="${danoCalculado}">
+            <i class="fa-solid fa-droplet"></i> Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
+          </button>`
+      : tirada.esNegativo
+        ? `<p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">FALLO AUTOMÁTICO</span> · <strong>0 Daño:</strong> resultado negativo (${tirada.total}) por Pifia.</p>`
+        : `<p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${tirada.total}) no superó la Defensa (${defensaObjetivo}).</p>`;
+    const master = `
+      <div class="cyd-carta-jugada">
+        <h3><i class="fa-solid fa-eye-slash"></i> Resolución de ataque <small>(solo Master)</small></h3>
+        <div class="cyd-resolucion-caja ${impacta ? "cyd-exito" : "cyd-fallo"}">
+          <p><i class="fa-solid fa-crosshairs"></i> <strong>${this.name}</strong> → <strong>${tokenObjetivo.name}</strong> · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
+          ${detalle}
+        </div>
+      </div>
+    `;
+    return { publico, master };
+  }
+
   async jugarCarta(cartaId, { quemar = false, modo = "usar" } = {}) {
     const { mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mano || !enJuego || !descarte || !quemadas) return null;
@@ -553,8 +626,11 @@ export class SistemaActor extends Actor {
     const auto = carta.system.automatizacion ?? {};
     const bonoTirada = Number(auto.bonoTirada) || 0;
 
-    let roll = null;
+    /** @type {import("../dados.mjs").ResultadoTiradaSistema|null} */
+    let tirada = null;
     let bloqueResolucionHtml = "";
+    /** HTML de resolución solo para el Master (Defensa y daño del objetivo). */
+    let htmlMaster = "";
 
     // Los Trinkets NO calculan ni lanzan dados XdY (v0.8.4): se mueven directamente
     // a la pila `enJuego` ejecutando su automatización e indicando su Nivel en el chat.
@@ -566,61 +642,10 @@ export class SistemaActor extends Actor {
         ?? this.system.caracteristicas[claveCaract]
         ?? 1;
       const tipoDado = carta.system.tipoDado ?? "d6";
-      const formula = bonoTirada !== 0
-        ? `${cantidadDados}${tipoDado} + ${bonoTirada}`
-        : `${cantidadDados}${tipoDado}`;
-
-      roll = new Roll(formula, this.getRollData());
-      await roll.evaluate();
-
-      const tokenObjetivo = game.user.targets.first() ?? null;
-      const actorObjetivo = tokenObjetivo?.actor ?? null;
-
-      if (carta.system.esAtaque && actorObjetivo) {
-        // Asegurar que la Defensa del objetivo tenga calculados sus propios Trinkets en juego
-        actorObjetivo.prepareData();
-        const defensaObjetivo = actorObjetivo.system.defensaTotal ?? actorObjetivo.system.defensa ?? 0;
-        const danoCalculado = Math.max(0, roll.total - defensaObjetivo);
-
-        if (danoCalculado > 0) {
-          bloqueResolucionHtml = `
-            <div class="cyd-resolucion-caja cyd-exito">
-              <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
-              <p><i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span> · <strong>Daño ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
-              <button type="button" class="cyd-btn-aplicar-dano"
-                      data-actor-uuid="${actorObjetivo.uuid}"
-                      data-dano="${danoCalculado}">
-                <i class="fa-solid fa-droplet"></i> Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
-              </button>
-            </div>
-          `;
-        } else {
-          bloqueResolucionHtml = `
-            <div class="cyd-resolucion-caja cyd-fallo">
-              <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
-              <p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
-            </div>
-          `;
-        }
-      } else if (carta.system.esAtaque && !actorObjetivo) {
-        bloqueResolucionHtml = `
-          <div class="cyd-resolucion-caja">
-            <p><i class="fa-solid fa-crosshairs"></i> <strong>Resultado de Ataque: ${roll.total}</strong></p>
-            <p><small><i class="fa-solid fa-circle-info"></i> Pulsa <strong>T</strong> sobre un enemigo antes de jugar la carta para restar su Defensa.</small></p>
-          </div>
-        `;
-      } else {
-        const dificultadMaster = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
-        if (dificultadMaster > 0) {
-          const exito = roll.total >= dificultadMaster;
-          const textoExito = exito ? '<span class="cyd-resultado-exito">ÉXITO</span>' : '<span class="cyd-resultado-fallo">FALLO</span>';
-          bloqueResolucionHtml = `
-            <div class="cyd-resolucion-caja">
-              <p><i class="fa-solid fa-bullseye"></i> <strong>Dificultad del Master (${dificultadMaster}):</strong> ${textoExito} (Total: ${roll.total})</p>
-            </div>
-          `;
-        }
-      }
+      tirada = await tirarDadosSistema({ cantidadDados, tipoDado, bono: bonoTirada, rollData: this.getRollData() });
+      const resolucion = this._htmlResolucionTirada(tirada, Boolean(carta.system.esAtaque));
+      bloqueResolucionHtml = tirada.html + resolucion.publico;
+      htmlMaster = resolucion.master;
     }
 
     // Determinar pila destino: Quemadas, En Juego (si es Trinket) o Descarte
@@ -693,10 +718,11 @@ export class SistemaActor extends Actor {
       </div>
     `;
 
-    if (roll) {
-      await roll.toMessage({
+    if (tirada) {
+      await publicarTirada(tirada, {
         speaker: ChatMessage.getSpeaker({ actor: this }),
-        flavor: saborChat
+        flavor: saborChat,
+        htmlMaster
       });
     } else {
       await ChatMessage.create({
@@ -705,7 +731,7 @@ export class SistemaActor extends Actor {
       });
     }
 
-    return roll;
+    return tirada;
   }
 
   /* ======================================================================== */
@@ -999,53 +1025,10 @@ export class SistemaActor extends Actor {
       ?? 1;
 
     const bono = Number(bonoTirada) || 0;
-    const formula = bono !== 0
-      ? `${cantidadDados}${tipoDado} + ${bono}`
-      : `${cantidadDados}${tipoDado}`;
-
-    const roll = new Roll(formula, this.getRollData());
-    await roll.evaluate();
-
-    let bloqueResolucionHtml = "";
-    const tokenObjetivo = game.user.targets.first() ?? null;
-    const actorObjetivo = tokenObjetivo?.actor ?? null;
-
-    if (esAtaque && actorObjetivo) {
-      actorObjetivo.prepareData();
-      const defensaObjetivo = actorObjetivo.system.defensaTotal ?? actorObjetivo.system.defensa ?? 0;
-      const danoCalculado = Math.max(0, roll.total - defensaObjetivo);
-
-      if (danoCalculado > 0) {
-        bloqueResolucionHtml = `
-          <div class="cyd-resolucion-caja cyd-exito">
-            <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
-            <p><i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span> · <strong>Daño ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
-            <button type="button" class="cyd-btn-aplicar-dano"
-                    data-actor-uuid="${actorObjetivo.uuid}"
-                    data-dano="${danoCalculado}">
-              <i class="fa-solid fa-droplet"></i> Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
-            </button>
-          </div>
-        `;
-      } else {
-        bloqueResolucionHtml = `
-          <div class="cyd-resolucion-caja cyd-fallo">
-            <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
-            <p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
-          </div>
-        `;
-      }
-    } else if (!esAtaque) {
-      const dificultadMaster = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
-      if (dificultadMaster > 0) {
-        const exito = roll.total >= dificultadMaster;
-        bloqueResolucionHtml = `
-          <div class="cyd-resolucion-caja">
-            <p><i class="fa-solid fa-bullseye"></i> <strong>Dificultad (${dificultadMaster}):</strong> ${exito ? '<span class="cyd-resultado-exito">ÉXITO</span>' : '<span class="cyd-resultado-fallo">FALLO</span>'} (Total: ${roll.total})</p>
-          </div>
-        `;
-      }
-    }
+    const tirada = await tirarDadosSistema({ cantidadDados, tipoDado, bono, rollData: this.getRollData() });
+    const resolucion = this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
+    const bloqueResolucionHtml = tirada.html + resolucion.publico;
+    const htmlMaster = resolucion.master;
 
     const saborChat = `
       <div class="cyd-carta-jugada">
@@ -1056,12 +1039,13 @@ export class SistemaActor extends Actor {
       </div>
     `;
 
-    await roll.toMessage({
+    await publicarTirada(tirada, {
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      flavor: saborChat
+      flavor: saborChat,
+      htmlMaster
     });
 
-    return roll;
+    return tirada;
   }
 
   /**
@@ -1074,7 +1058,7 @@ export class SistemaActor extends Actor {
    * Si `requiereTirada === false` se aplica el efecto directamente sin lanzar dados;
    * en caso contrario se lanzan `caracteristicasTotales.misticismo` dados.
    * @param {string} itemId - ID del Item dentro de `this.items`.
-   * @returns {Roll|null}
+   * @returns {Promise<import("../dados.mjs").ResultadoTiradaSistema|null>} Tirada (con Crítico/Pifia) o null.
    */
   async usarHabilidad(itemId) {
     const item = this.items.get(itemId);
@@ -1172,65 +1156,27 @@ export class SistemaActor extends Actor {
 
     // Habilidad con tirada: XdY de Misticismo.
     const bono = bonoTirada;
-    const formula = bono !== 0 ? `${cantidadDados}${tipoDado} + ${bono}` : `${cantidadDados}${tipoDado}`;
-    const roll = new Roll(formula, this.getRollData());
-    await roll.evaluate();
-
-    let bloqueResolucionHtml = "";
-    const tokenObjetivo = game.user.targets.first() ?? null;
-    const actorObjetivo = tokenObjetivo?.actor ?? null;
-
-    if (esAtaque && actorObjetivo) {
-      actorObjetivo.prepareData();
-      const defensaObjetivo = actorObjetivo.system.defensaTotal ?? actorObjetivo.system.defensa ?? 0;
-      const danoCalculado = Math.max(0, roll.total - defensaObjetivo);
-
-      if (danoCalculado > 0) {
-        bloqueResolucionHtml = `
-          <div class="cyd-resolucion-caja cyd-exito">
-            <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
-            <p><i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span> · <strong>Daño ${danoCalculado}</strong> <small>(${roll.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
-            <button type="button" class="cyd-btn-aplicar-dano"
-                    data-actor-uuid="${actorObjetivo.uuid}"
-                    data-dano="${danoCalculado}">
-              <i class="fa-solid fa-droplet"></i> Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
-            </button>
-          </div>
-        `;
-      } else {
-        bloqueResolucionHtml = `
-          <div class="cyd-resolucion-caja cyd-fallo">
-            <p><i class="fa-solid fa-crosshairs"></i> <strong>Objetivo:</strong> ${tokenObjetivo.name} · <i class="fa-solid fa-shield-halved"></i> Defensa ${defensaObjetivo}</p>
-            <p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${roll.total}) no superó la Defensa (${defensaObjetivo}).</p>
-          </div>
-        `;
-      }
-    } else if (!esAtaque) {
-      const dificultadMaster = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
-      if (dificultadMaster > 0) {
-        const exito = roll.total >= dificultadMaster;
-        bloqueResolucionHtml = `
-          <div class="cyd-resolucion-caja">
-            <p><i class="fa-solid fa-bullseye"></i> <strong>Dificultad (${dificultadMaster}):</strong> ${exito ? '<span class="cyd-resultado-exito">ÉXITO</span>' : '<span class="cyd-resultado-fallo">FALLO</span>'} (Total: ${roll.total})</p>
-          </div>
-        `;
-      }
-    }
+    const tirada = await tirarDadosSistema({ cantidadDados, tipoDado, bono, rollData: this.getRollData() });
+    const resolucion = this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
+    const bloqueResolucionHtml = resolucion.publico;
+    const htmlMaster = resolucion.master;
 
     const saborChat = `
       <div class="cyd-carta-jugada">
         <h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3>
         ${lineaCartaUsada}
-        <p><strong>Tirada:</strong> ${cantidadDados}${tipoDado}${bono > 0 ? ` + ${bono}` : ""} = <strong>${roll.total}</strong> (Misticismo × ${tipoDado})</p>
+        <p><strong>Tirada:</strong> Misticismo × ${tipoDado}</p>
+        ${tirada.html}
         ${bloqueResolucionHtml}
         ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
         ${lineaQuemada}
       </div>
     `;
 
-    await roll.toMessage({
+    await publicarTirada(tirada, {
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      flavor: saborChat
+      flavor: saborChat,
+      htmlMaster
     });
 
     // Quemar la carta usada: mano -> quemadas (motor propio de pilas, sin Cards#pass()).
@@ -1241,7 +1187,7 @@ export class SistemaActor extends Actor {
 
     this.prepareData();
     if (this.sheet?.rendered) this.sheet.render();
-    return roll;
+    return tirada;
   }
 
   /**
@@ -1310,7 +1256,7 @@ export class SistemaActor extends Actor {
    * @deprecated Usar `usarHabilidad(itemId)`. Se mantiene para retrocompatibilidad
    * con cualquier llamador externo que aún invoque el nombre anterior.
    * @param {string} itemId - ID del Item dentro de `this.items`.
-   * @returns {Roll|null}
+   * @returns {Promise<import("../dados.mjs").ResultadoTiradaSistema|null>} Tirada (con Crítico/Pifia) o null.
    */
   async usarHabilidadItem(itemId) {
     return this.usarHabilidad(itemId);
