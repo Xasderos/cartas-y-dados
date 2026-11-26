@@ -1,0 +1,165 @@
+/**
+ * @file 07-dinamico.css
+ * @description Ventanas dinámicas (v0.9.6). Filosofía del sistema: toda ficha, panel
+ * y diálogo se adapta al tamaño de su ventana y de la pantalla, sin desbordes
+ * horizontales y con scroll en cualquier zona cuyo contenido pueda crecer.
+ *
+ * - El tamaño inicial de cada ventana se recorta al viewport en JS
+ *   (`module/applications/ventana-dinamica.mjs`).
+ * - El reparto interno usa container queries sobre `.cyd-hoja-contenedor`
+ *   (`container: cyd-hoja / inline-size`, declarado en 01-variables-y-base.css),
+ *   así responde al ancho de LA VENTANA, no al de la pantalla.
+ * - Las rejillas de recursos/acciones usan la rejilla adaptable de 02-componentes.css.
+ */
+
+/* ======================================================================== */
+/*  VENTANAS DEL SISTEMA                                                    */
+/* ======================================================================== */
+
+/* Tamaño mínimo coherente con TAMANO_MINIMO_VENTANA (ventana-dinamica.mjs) */
+.application.cartas-y-dados:not(.cyd-dialogo) {
+  min-width: 340px;
+  min-height: 300px;
+}
+
+/*
+ * Respaldo: si la ventana es más baja que cabecera + mínimo del cuerpo, el propio
+ * .window-content hace scroll en vez de cortar el contenido. En uso normal no
+ * aparece porque .cyd-cuerpo-hoja (o .cyd-gm-zona-listas) absorbe el scroll.
+ */
+.application.cartas-y-dados > .window-content {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ======================================================================== */
+/*  FICHA ESTRECHA (< 640px): una sola columna                              */
+/* ======================================================================== */
+
+@container cyd-hoja (max-width: 640px) {
+  .cyd-layout-dos-columnas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Las Características pasan a una rejilla horizontal sobre el contenido */
+  .cyd-sidebar-atributos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+    gap: 6px;
+  }
+
+  .cyd-sidebar-atributos > :not(.cyd-atributo-tarjeta) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ======================================================================== */
+/*  FICHA MUY ESTRECHA (< 440px)                                            */
+/* ======================================================================== */
+
+@container cyd-hoja (max-width: 440px) {
+  .cyd-cabecera {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cyd-retrato,
+  .sheet.item .cyd-retrato,
+  .sheet.card .cyd-retrato {
+    --cyd-retrato-tam: 64px;
+  }
+
+  .cartas-y-dados .window-content input.cyd-nombre-actor {
+    font-size: 1.3rem;
+  }
+
+  /* El separador de las pilas fuerza los botones "+ Carta/Trinket" a otra línea */
+  .cyd-resumen-pilas .cyd-separador {
+    flex-basis: 100%;
+  }
+
+  .cyd-gm-separador-vertical {
+    display: none;
+  }
+}
+
+/* ======================================================================== */
+/*  DIÁLOGOS DEL SISTEMA (DialogV2 con `opcionesDialogoSistema()`)          */
+/* ======================================================================== */
+
+.application.cyd-dialogo {
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+}
+
+.application.cyd-dialogo .window-content {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.cyd-dialogo .form-group + .form-group {
+  margin-top: 10px;
+}
+
+/* Opción de radio (Trinket inicial del Asistente de Clase) */
+.cyd-dialogo .cyd-opcion-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  cursor: pointer;
+}
+
+/* Diálogos con muchas opciones: un botón por fila, texto alineado y legible */
+.cyd-dialogo-lista .form-footer {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.cyd-dialogo-lista .form-footer button {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  white-space: normal;
+  text-align: left;
+}
+
+/* ======================================================================== */
+/*  TOOLTIPS (data-tooltip-class="cyd-tooltip")                             */
+/* ======================================================================== */
+
+.cyd-tooltip {
+  max-width: min(320px, 90vw);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.cyd-tooltip-contenido {
+  text-align: left;
+}
+
+.cyd-tooltip-contenido p {
+  margin: 2px 0;
+}
+
+.cyd-tooltip-contenido hr {
+  margin: 4px 0;
+}
+
+/* ======================================================================== */
+/*  ACCESIBILIDAD                                                           */
+/* ======================================================================== */
+
+/* Foco visible en los elementos clicables que no son botones nativos */
+.cartas-y-dados [data-action]:not(button):focus-visible {
+  outline: 1px solid var(--cyd-oro);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartas-y-dados *,
+  .cartas-y-dados *::before,
+  .cartas-y-dados *::after {
+    transition: none !important;
+  }
+}

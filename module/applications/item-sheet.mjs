@@ -4,10 +4,13 @@
  * Objetos y Habilidades en Foundry VTT v14.
  */
 
+import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
+import { RetratoFichaMixin } from "./retrato-ficha.mjs";
+
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-export class HojaItemSistema extends HandlebarsApplicationMixin(ItemSheetV2) {
+export class HojaItemSistema extends VentanaDinamicaMixin(RetratoFichaMixin(HandlebarsApplicationMixin(ItemSheetV2))) {
 
   /** @override */
   static DEFAULT_OPTIONS = {

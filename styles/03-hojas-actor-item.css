@@ -10,13 +10,12 @@
 
 /* Barra de acciones de turno (Robar, Trinket, Fin Combate, Descansar) */
 .cyd-acciones-turno {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  --cyd-cols: 4;
+  --cyd-col-min: 135px;
 }
 
 .cyd-acciones-turno.cyd-cols-3 {
-  grid-template-columns: repeat(3, 1fr);
+  --cyd-cols: 3;
 }
 
 .cartas-y-dados .window-content .cyd-acciones-turno button {
@@ -39,10 +38,10 @@
   padding-right: 2px;
 }
 
-.sheet.item .cyd-avatar,
-.sheet.card .cyd-avatar {
-  width: 52px !important;
-  height: 52px !important;
+/* Items y Cartas: retrato algo menor que en las fichas de Actor */
+.sheet.item .cyd-retrato,
+.sheet.card .cyd-retrato {
+  --cyd-retrato-tam: 80px;
 }
 
 .cartas-y-dados.sheet.item .window-content input.cyd-nombre-actor,
@@ -52,9 +51,8 @@
 
 /* Rejilla de bonificadores de características en el editor de Items */
 .cyd-caracteristicas-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  --cyd-cols: 4;
+  --cyd-col-min: 130px;
 }
 
 .cyd-caract-tarjeta {
@@ -99,6 +97,9 @@
 /* ======================================================================== */
 /*  REFUERZO DE LAYOUT (Bug 1, v0.8.5): .cyd-cuerpo-hoja nunca colapsa      */
 /*  a 0px de altura al (re)abrir el mundo. Se carga después de 01-*.css     */
+/*  v0.9.6: mínimos reducidos (contenedor 0, cuerpo 200px) para que la      */
+/*  ficha quepa en pantallas pequeñas; si aun así no cabe, .window-content  */
+/*  hace scroll como respaldo (07-dinamico.css).                            */
 /* ======================================================================== */
 .window-content .cyd-hoja-contenedor,
 .sheet.actor .cyd-hoja-contenedor,
@@ -106,7 +107,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 500px;
+  min-height: 0;
 }
 
 .window-content .cyd-hoja-contenedor > main,
@@ -123,6 +124,6 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  min-height: 300px;
+  min-height: 200px;
   overflow-y: auto;
 }

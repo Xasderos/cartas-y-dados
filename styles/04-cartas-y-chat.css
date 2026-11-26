@@ -61,6 +61,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+  max-height: 9.5rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .cyd-pildora-trinket {
@@ -75,6 +78,20 @@
   border: 1px solid var(--cyd-borde-suave);
   border-radius: 13px;
   cursor: help;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Nombres largos de Trinket: se recortan; el nombre completo está en el tooltip */
+.cyd-pildora-nombre {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cyd-pildora-trinket > :not(.cyd-pildora-nombre) {
+  flex-shrink: 0;
 }
 
 .cyd-pildora-trinket .cyd-estado-icono {
@@ -114,7 +131,7 @@
 
 .cyd-grid-cartas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
   gap: 8px;
 }
 
@@ -201,11 +218,15 @@
   color: var(--cyd-peligro);
 }
 
+/* El efecto de la carta tiene scroll propio: nunca se corta el texto */
 .cyd-carta-efecto {
   flex: 1;
   min-height: 40px;
-  padding: 4px 0;
-  overflow: hidden;
+  max-height: 7.5em;
+  padding: 4px 2px 4px 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overflow-wrap: anywhere;
   font-size: 0.8rem;
   line-height: 1.35;
   color: var(--cyd-texto-suave);
@@ -252,6 +273,7 @@
   margin: 2px 0;
   font-size: var(--font-size-13, 0.85rem);
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .cyd-carta-jugada p,
@@ -265,6 +287,7 @@
 .cyd-chat-tirada-pnj h4,
 .cyd-alerta-cansancio h4 {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 7px;
   margin: 0 0 5px;

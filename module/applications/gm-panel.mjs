@@ -5,12 +5,14 @@
  * con una sección para Personajes Jugadores y otra para PNJ (Mazo de Jefe opcional).
  */
 
+import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica.mjs";
+
 import { poblarCompendiosDelSistema } from "../compendios-base.mjs";
 import { PRESETS_DIFICULTAD_POR_DEFECTO } from "../settings.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
-export class PanelMasterApp extends HandlebarsApplicationMixin(ApplicationV2) {
+export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMixin(ApplicationV2)) {
 
   static instancia = null;
 
@@ -179,6 +181,7 @@ export class PanelMasterApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!Number.isInteger(indice) || indice < 0 || indice >= presets.length) return;
 
     const nuevoValor = await DialogV2.prompt({
+      ...opcionesDialogoSistema({ width: 320 }),
       window: { title: `Editar Dificultad Rápida ${indice + 1}`, icon: "fa-solid fa-bullseye" },
       content: `<div class="form-group"><label>Valor de dificultad:</label><input type="number" name="valorPreset" value="${presets[indice]}" min="0" step="1" autofocus /></div>`,
       ok: {

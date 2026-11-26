@@ -7,7 +7,17 @@
 
   {{!-- ================= 1. CABECERA Y TRASFONDO (RAZA, ORIGEN, CLASE) ================= --}}
   <header class="cyd-cabecera">
-    <img class="cyd-avatar" src="{{actor.img}}" data-edit="img" title="{{actor.name}}" />
+    <div class="cyd-retrato">
+      <img class="cyd-avatar" src="{{actor.img}}" alt="{{actor.name}}" data-action="verImagen" data-tooltip="Ver imagen a tamaño completo" />
+      <div class="cyd-retrato-botones">
+        {{#if retrato.puedeEditar}}
+          <button type="button" class="cyd-btn-retrato" data-action="editarImagen" data-tooltip="Editar imagen" aria-label="Editar imagen"><i class="fa-solid fa-pen-to-square"></i></button>
+        {{/if}}
+        {{#if retrato.tieneToken}}
+          <button type="button" class="cyd-btn-retrato" data-action="configurarToken" data-tooltip="Configurar Token" aria-label="Configurar Token"><i class="fa-solid fa-circle-user"></i></button>
+        {{/if}}
+      </div>
+    </div>
 
     <div class="cyd-cabecera-principal">
       <div class="cyd-fila-titulo">
@@ -251,9 +261,9 @@
           {{#if trinketsEnJuego.length}}
             <div class="cyd-lista-pildoras">
               {{#each trinketsEnJuego as |trinket|}}
-                <div class="cyd-pildora-trinket cyd-estado-enJuego" data-tooltip="{{trinket.tooltipHtml}}">
+                <div class="cyd-pildora-trinket cyd-estado-enJuego" data-tooltip="{{trinket.tooltipHtml}}" data-tooltip-class="cyd-tooltip">
                   <i class="fa-solid fa-circle cyd-estado-icono"></i>
-                  <span>{{trinket.nombre}}</span>
+                  <span class="cyd-pildora-nombre">{{trinket.nombre}}</span>
                   <span class="cyd-nivel">Nv. {{trinket.nivel}}</span>
                   {{#if ../esPropietario}}
                     <button type="button" class="cyd-btn-mini cyd-btn-icono" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="false" data-tooltip="Enviar al Descarte"><i class="fa-solid fa-box-archive"></i></button>
@@ -272,9 +282,9 @@
           {{#if todosLosTrinkets.length}}
             <div class="cyd-lista-pildoras">
               {{#each todosLosTrinkets as |trinket|}}
-                <div class="cyd-pildora-trinket cyd-estado-{{trinket.estado}}" data-tooltip="{{trinket.tooltipHtml}}">
+                <div class="cyd-pildora-trinket cyd-estado-{{trinket.estado}}" data-tooltip="{{trinket.tooltipHtml}}" data-tooltip-class="cyd-tooltip">
                   <i class="fa-solid {{#if (eq trinket.estado "quemado")}}fa-fire{{else if (eq trinket.estado "descartado")}}fa-box-archive{{else if (eq trinket.estado "enMano")}}fa-hand{{else if (eq trinket.estado "enJuego")}}fa-circle{{else}}fa-circle-notch{{/if}} cyd-estado-icono"></i>
-                  <strong>{{trinket.nombre}}</strong>
+                  <strong class="cyd-pildora-nombre">{{trinket.nombre}}</strong>
                   <span class="cyd-nivel">Nv. {{trinket.nivel}}</span>
                   {{#if (and ../esPropietario trinket.estaDisponible)}}
                     <button type="button" class="cyd-btn-mini" data-action="robarTrinket" data-trinket-id="{{trinket.idOriginal}}" data-tooltip="Llevar a la Mano (descartando una carta)"><i class="fa-solid fa-hand"></i></button>
@@ -301,7 +311,7 @@
               {{#each cartasEnMano as |carta|}}
                 <article class="cyd-carta-item {{#if carta.esTrinket}}cyd-carta-trinket{{else}}cyd-palo-{{carta.palo}}{{/if}}">
                   <header class="cyd-carta-cabecera">
-                    <span class="cyd-carta-titulo">{{carta.nombre}}</span>
+                    <span class="cyd-carta-titulo" data-tooltip="{{carta.nombre}}">{{carta.nombre}}</span>
                     {{#if carta.esTrinket}}
                       <span class="cyd-carta-dado cyd-tag-nivel">Nv. {{carta.nivel}}</span>
                     {{else}}
@@ -354,7 +364,7 @@
           {{#if objetos.length}}
             <div class="cyd-lista-items">
               {{#each objetos as |obj|}}
-                <div class="cyd-fila-item {{#if obj.system.equipado}}cyd-item-equipado{{/if}}" data-tooltip="{{obj.system.descripcion}}">
+                <div class="cyd-fila-item {{#if obj.system.equipado}}cyd-item-equipado{{/if}}" data-tooltip="{{obj.system.descripcion}}" data-tooltip-class="cyd-tooltip">
                   <div class="cyd-fila-item-info">
                     <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-btn-equipar {{#if obj.system.equipado}}cyd-activo{{/if}}" data-action="alternarEquipado" data-item-id="{{obj.id}}" data-tooltip="{{#if obj.system.equipado}}Desequipar{{else}}Equipar{{/if}}">
                       <i class="{{#if obj.system.equipado}}fa-solid fa-shield-halved{{else}}fa-regular fa-circle{{/if}}"></i>
@@ -390,7 +400,7 @@
           {{#if habilidades.length}}
             <div class="cyd-lista-items">
               {{#each habilidades as |hab|}}
-                <div class="cyd-fila-item" data-tooltip="{{hab.system.descripcion}}">
+                <div class="cyd-fila-item" data-tooltip="{{hab.system.descripcion}}" data-tooltip-class="cyd-tooltip">
                   <div class="cyd-fila-item-info">
                     <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{hab.id}}">{{hab.name}}</strong>
                     {{#if hab.system.origenHabilidad}}<small>{{hab.system.origenHabilidad}}</small>{{/if}}

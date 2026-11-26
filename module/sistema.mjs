@@ -21,6 +21,7 @@ import { HojaCartaSistema } from "./applications/card-sheet.mjs";
 import { PanelMasterApp } from "./applications/gm-panel.mjs";
 import { HojaPnjActor } from "./applications/npc-sheet.mjs";
 import { personalizarBannerPausa } from "./applications/game-pause.mjs";
+import { registrarReajusteEnResize } from "./applications/ventana-dinamica.mjs";
 import { registrarAjustesDelSistema } from "./settings.mjs";
 import { limpiarNombreCarta, nombreVisibleCarta } from "./config.mjs";
 
@@ -158,6 +159,9 @@ async function sanearNombresCartasExistentes() {
 }
 
 Hooks.once("ready", async () => {
+  // Ventanas dinámicas (v0.9.6): reajusta las ventanas del sistema al cambiar el tamaño del navegador.
+  registrarReajusteEnResize();
+
   try {
     await sanearNombresCartasExistentes();
   } catch (err) {

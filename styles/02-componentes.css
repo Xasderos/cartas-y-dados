@@ -6,6 +6,30 @@
  */
 
 /* ======================================================================== */
+/*  REJILLA ADAPTABLE (v0.9.6)                                              */
+/*  Muestra como máximo `--cyd-cols` columnas; cuando cada una bajaría de   */
+/*  `--cyd-col-min`, los elementos pasan a la fila siguiente. Nunca         */
+/*  desborda en horizontal. Cada componente solo redefine las variables.    */
+/* ======================================================================== */
+
+/* :where() = especificidad 0, así cada componente redefine las variables sin pelear */
+:where(.cyd-recursos-barra,
+.cyd-trasfondo-barra,
+.cyd-acciones-turno,
+.cyd-dos-columnas,
+.cyd-caracteristicas-grid) {
+  --cyd-cols: 4;
+  --cyd-col-min: 110px;
+  --cyd-gap: 6px;
+  display: grid;
+  gap: var(--cyd-gap);
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(var(--cyd-col-min), calc((100% - (var(--cyd-cols) - 1) * var(--cyd-gap)) / var(--cyd-cols)))), 1fr)
+  );
+}
+
+/* ======================================================================== */
 /*  PANELES                                                                 */
 /* ======================================================================== */
 
@@ -29,6 +53,7 @@
 /* Cabecera de sección: como las de Foundry, con un filete dorado tenue */
 .cyd-cabecera-seccion {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
@@ -88,22 +113,18 @@
 /*  CAJAS DE RECURSOS (Salud, Defensa, Cansancio, Mano, Movimiento...)      */
 /* ======================================================================== */
 
-.cyd-recursos-barra {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-
 .cyd-recursos-barra.cyd-cols-2 {
-  grid-template-columns: repeat(2, 1fr) !important;
+  --cyd-cols: 2;
+  --cyd-col-min: 150px;
 }
 
 .cyd-recursos-barra.cyd-cols-3 {
-  grid-template-columns: repeat(3, 1fr) !important;
+  --cyd-cols: 3;
 }
 
 .cyd-recursos-barra.cyd-cols-5 {
-  grid-template-columns: repeat(5, 1fr) !important;
+  --cyd-cols: 5;
+  --cyd-col-min: 100px;
 }
 
 .cyd-recurso-caja {
@@ -124,24 +145,26 @@
   background: var(--cyd-tinte);
 }
 
+/* El título hace wrap en lugar de cortarse: la etiqueta siempre se lee entera */
 .cyd-recurso-titulo {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: 0.75rem;
+  line-height: 1.25;
   color: var(--cyd-texto-tenue);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .cyd-recurso-titulo i {
+  margin-top: 1px;
   color: var(--cyd-azul);
   font-size: 0.75rem;
 }
 
 .cyd-recurso-inputs {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 5px;
   color: var(--cyd-texto-suave);
@@ -185,6 +208,10 @@ label.cyd-recurso-caja {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+}
+
+.cyd-recurso-caja.cyd-check > input {
+  flex-shrink: 0;
 }
 
 /* ======================================================================== */
@@ -339,9 +366,13 @@ label.cyd-recurso-caja {
 /*  LISTAS DE ITEMS (Equipo y Habilidades)                                  */
 /* ======================================================================== */
 
+/* Listas largas: scroll propio para no estirar la ficha sin fin */
 .cyd-lista-items {
   display: flex;
   flex-direction: column;
+  max-height: 18rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .cyd-fila-item {
@@ -370,17 +401,17 @@ label.cyd-recurso-caja {
 
 .cyd-fila-item-info {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   flex: 1;
   min-width: 0;
   font-size: 0.85rem;
 }
 
 .cyd-fila-item-info .cyd-link-item {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .cyd-fila-item-info small,

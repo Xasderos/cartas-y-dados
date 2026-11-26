@@ -3,11 +3,14 @@
  * @description Editor visual ApplicationV2 para documentos Card ('accion' y 'trinket') en Foundry VTT v14.
  */
 
+import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
+import { RetratoFichaMixin } from "./retrato-ficha.mjs";
+
 const { DocumentSheetV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 import { limpiarNombreCarta, nombreVisibleCarta } from "../config.mjs";
 
-export class HojaCartaSistema extends HandlebarsApplicationMixin(DocumentSheetV2) {
+export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(HandlebarsApplicationMixin(DocumentSheetV2))) {
 
   /** @override */
   static DEFAULT_OPTIONS = {
@@ -82,9 +85,35 @@ export class HojaCartaSistema extends HandlebarsApplicationMixin(DocumentSheetV2
 
     // Llamar al proceso estándar de DocumentSheetV2
     const resultado = await super._processSubmitData(event, formData, expanded);
+    await this._sincronizarCopiasYOriginal();
+    return resultado;
+  }
 
-    // Sincronización bidireccional con el mazo original (sourceCardId)
+  /**
+   * Retrato (v0.9.6): las Cartas guardan su imagen en `faces[0].img`, no en `img`.
+   * Actualiza la cara visible y propaga la imagen a la original o a sus copias.
+   * @override
+   * @param {string} ruta - Ruta elegida en el FilePicker.
+   */
+  async _actualizarImagen(ruta) {
+    const card = this.document;
+    const cara = foundry.utils.deepClone(card._source.faces?.[0] ?? {});
+    cara.name = nombreVisibleCarta(card);
+    cara.img = ruta;
+    await card.update({ face: 0, faces: [cara] });
+    await this._sincronizarCopiasYOriginal();
+  }
+
+  /**
+   * Sincronización bidireccional (nombre e imagen) entre una carta y su original
+   * del mazo (`sourceCardId`) o, si es la original, sus copias en otras pilas.
+   * v0.9.6: usa `nombreVisibleCarta()` (antes leía `nuevoNombre` fuera de su ámbito
+   * y fallaba con ReferenceError al editar una copia).
+   * @returns {Promise<void>}
+   */
+  async _sincronizarCopiasYOriginal() {
     const cartaEditada = this.document;
+    const nuevoNombre = nombreVisibleCarta(cartaEditada);
     const sourceId = cartaEditada.getFlag("cartas-y-dados", "sourceCardId");
 
     if (sourceId) {
@@ -141,7 +170,5 @@ export class HojaCartaSistema extends HandlebarsApplicationMixin(DocumentSheetV2
         if (actor.sheet?.rendered) actor.sheet.render();
       }
     }
-
-    return resultado;
   }
 }

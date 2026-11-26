@@ -96,7 +96,9 @@
   flex-direction: column;
   gap: 8px;
   height: 100%;
-  min-height: 500px;
+  min-height: 0;
+  /* Ventanas dinámicas (v0.9.6): el contenido se adapta al ancho de la ventana */
+  container: cyd-hoja / inline-size;
 }
 
 .cyd-cabecera {
@@ -108,14 +110,71 @@
   flex-shrink: 0;
 }
 
+/*
+ * Retrato (v0.9.6, `retrato-ficha.mjs`): imagen cuadrada clicable (ver a tamaño
+ * completo) y, debajo y agrupados a la izquierda, los botones Editar y Token.
+ * El tamaño lo fija SOLO `--cyd-retrato-tam` (los botones tienen ancho propio y
+ * nunca estiran ni encogen la imagen).
+ */
+.cyd-retrato {
+  --cyd-retrato-tam: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  flex: 0 0 var(--cyd-retrato-tam);
+  width: var(--cyd-retrato-tam);
+}
+
 .cyd-avatar {
-  width: 64px !important;
-  height: 64px !important;
+  width: var(--cyd-retrato-tam, 64px) !important;
+  height: var(--cyd-retrato-tam, 64px) !important;
+  min-width: var(--cyd-retrato-tam, 64px);
+  max-width: none;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: var(--cyd-radio);
   border: 1px solid var(--cyd-borde);
   flex-shrink: 0;
-  cursor: pointer;
+  cursor: zoom-in;
+  transition: border-color 0.15s ease;
+}
+
+.cyd-avatar:hover {
+  border-color: var(--cyd-oro-linea);
+}
+
+.cyd-retrato-botones {
+  display: flex;
+  justify-content: flex-start;
+  gap: 3px;
+}
+
+.cyd-retrato-botones:empty {
+  display: none;
+}
+
+/* Foundry v14 expande <button> al 100%: se fuerza un ancho fijo compacto */
+.cartas-y-dados .window-content button.cyd-btn-retrato {
+  flex: 0 0 30px;
+  width: 30px !important;
+  min-width: 0;
+  height: 20px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 0.7rem;
+  line-height: 18px;
+  color: var(--cyd-texto-tenue);
+}
+
+.cartas-y-dados .window-content button.cyd-btn-retrato:hover {
+  color: var(--cyd-texto);
+}
+
+.cartas-y-dados .window-content button.cyd-btn-retrato i {
+  margin: 0;
+  color: var(--cyd-azul);
 }
 
 .cyd-cabecera-principal {
@@ -128,12 +187,13 @@
 
 .cyd-fila-titulo {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
 .cartas-y-dados .window-content input.cyd-nombre-actor {
-  flex: 1;
+  flex: 1 1 12em;
   width: 100%;
   min-width: 0;
   height: auto;
@@ -197,9 +257,8 @@ p.cyd-subtitulo-cabecera {
 
 /* Ranuras de trasfondo: Raza, Origen y Clase */
 .cyd-trasfondo-barra {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  --cyd-cols: 3;
+  --cyd-col-min: 150px;
 }
 
 .cyd-slot-trasfondo {
@@ -230,9 +289,7 @@ p.cyd-subtitulo-cabecera {
 .cyd-slot-trasfondo .cyd-link-item {
   flex: 1;
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .cyd-slot-trasfondo .cyd-btn-mini:not(.cyd-btn-icono) {
@@ -250,7 +307,7 @@ p.cyd-subtitulo-cabecera {
   overflow-y: auto;
   padding-right: 4px;
   flex: 1 1 auto;
-  min-height: 300px;
+  min-height: 200px;
 }
 
 /* El <main> debe ser flex-container para que .cyd-cuerpo-hoja pueda hacer scroll */
@@ -263,14 +320,15 @@ p.cyd-subtitulo-cabecera {
 }
 
 .cyd-dos-columnas {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  --cyd-cols: 2;
+  --cyd-col-min: 240px;
+  --cyd-gap: 8px;
 }
 
+/* Bajo 640px de ancho de ficha pasa a una columna (ver 07-dinamico.css) */
 .cyd-layout-dos-columnas {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
   gap: 10px;
   align-items: start;
 }
@@ -338,6 +396,7 @@ p.cyd-subtitulo-cabecera {
 
 .cyd-atributo-fila-valores {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;

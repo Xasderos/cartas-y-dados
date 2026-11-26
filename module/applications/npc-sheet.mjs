@@ -5,12 +5,15 @@
  * e integra las zonas del Mazo de Jefe (Mano, Mazo, Descarte y Quemadas) directamente en la ficha.
  */
 
+import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
+import { RetratoFichaMixin } from "./retrato-ficha.mjs";
+
 import { abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-export class HojaPnjActor extends HandlebarsApplicationMixin(ActorSheetV2) {
+export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(HandlebarsApplicationMixin(ActorSheetV2))) {
 
   /** @override */
   static DEFAULT_OPTIONS = {

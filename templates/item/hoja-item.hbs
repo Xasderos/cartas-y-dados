@@ -4,7 +4,14 @@
 --}}
 <div class="cyd-hoja-contenedor">
   <header class="cyd-cabecera">
-    <img class="cyd-avatar" src="{{item.img}}" data-edit="img" title="{{item.name}}" />
+    <div class="cyd-retrato">
+      <img class="cyd-avatar" src="{{item.img}}" alt="{{item.name}}" data-action="verImagen" data-tooltip="Ver imagen a tamaño completo" />
+      <div class="cyd-retrato-botones">
+        {{#if retrato.puedeEditar}}
+          <button type="button" class="cyd-btn-retrato" data-action="editarImagen" data-tooltip="Editar imagen" aria-label="Editar imagen"><i class="fa-solid fa-pen-to-square"></i></button>
+        {{/if}}
+      </div>
+    </div>
     <div class="cyd-cabecera-principal">
       <div class="cyd-fila-titulo">
         <input type="text" name="name" value="{{item.name}}" class="cyd-nombre-actor" placeholder="Nombre..." />

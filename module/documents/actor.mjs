@@ -7,6 +7,7 @@
  */
 
 import { SISTEMA_CONFIG, abreviadoPalo, generarNombreMisticoUnico, nombreVisibleCarta } from "../config.mjs";
+import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 
 export class SistemaActor extends Actor {
 
@@ -1161,6 +1162,7 @@ export class SistemaActor extends Actor {
     botones.push({ action: "cancelar", label: "Cancelar", callback: () => null });
 
     const seleccion = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 440, lista: true }),
       window: { title: `Usar habilidad: ${nombreHabilidad}` },
       content: `<p>Selecciona la Carta de Misticismo (Copas) de tu mano que se consumirá al activar <strong>${nombreHabilidad}</strong>:</p>`,
       buttons: botones,

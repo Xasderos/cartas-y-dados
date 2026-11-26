@@ -4,12 +4,15 @@
  * Clase, Objetos equipables y creador visual de Cartas/Trinkets.
  */
 
+import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica.mjs";
+import { RetratoFichaMixin } from "./retrato-ficha.mjs";
+
 import { SISTEMA_CONFIG, abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
-export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2) {
+export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(HandlebarsApplicationMixin(ActorSheetV2))) {
 
   /** @override */
   static DEFAULT_OPTIONS = {
@@ -96,7 +99,7 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
 
     const todosLosTrinkets = actor.obtenerResumenTrinkets().map(t => {
       const tooltipHtml = `
-        <div style='text-align:left; max-width:260px;'>
+        <div class='cyd-tooltip-contenido'>
           <strong>${t.nombre}</strong> <em>(${t.etiquetaEstado})</em><hr/>
           <p><strong>Nivel:</strong> ${t.nivel}</p>
           ${t.efectoPermanente ? `<p><strong>Pasivo:</strong> ${t.efectoPermanente}</p>` : ""}
@@ -196,6 +199,7 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       `;
 
       const seleccion = await DialogV2.wait({
+        ...opcionesDialogoSistema({ width: 460, lista: true }),
         window: { title: `${actor.name} — Paso 1: Elige tu Clase` },
         content: contenidoPaso1,
         buttons: botonesClases,
@@ -207,6 +211,7 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       // Validación especial para la clase avanzada Tabula Rasa
       if (seleccion === "tabulaRasa") {
         const confirmarAvanzada = await DialogV2.confirm({
+          ...opcionesDialogoSistema(),
           window: { title: "Advertencia de Clase Avanzada" },
           content: "<p>Clase avanzada, no es recomendable para jugadores nuevos</p>",
           yes: { label: "Continuar con Tabula Rasa" },
@@ -224,12 +229,13 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
 
     /* ---------------- PASO 2: SELECCIÓN DE TRINKET ---------------- */
     const opcionesTrinket = configClase.trinkets.map((nombre, indice) => `
-      <label style="display: block; margin: 4px 0;">
+      <label class="cyd-opcion-radio">
         <input type="radio" name="cydTrinketElegido" value="${nombre}" ${indice === 0 ? "checked" : ""} />
         ${nombre}
       </label>`).join("");
 
     const trinketElegido = await DialogV2.prompt({
+      ...opcionesDialogoSistema(),
       window: { title: `${actor.name} — Paso 2: Elige tu Trinket Inicial` },
       content: `
         <p><strong>${configClase.nombre}</strong> — Trinkets iniciales disponibles (Nivel 1):</p>
@@ -311,10 +317,11 @@ export class HojaPersonajeActor extends HandlebarsApplicationMixin(ActorSheetV2)
       .join("");
 
     const seleccion = await DialogV2.prompt({
+      ...opcionesDialogoSistema({ width: 460 }),
       window: { title: "Robar Trinket por Descarte" },
       content: `
         <div class="form-group"><label>1. Carta de tu mano a descartar:</label><select name="cartaManoId">${opcionesMano}</select></div>
-        <div class="form-group" style="margin-top:10px;"><label>2. Trinket a tomar:</label><select name="trinketId">${opcionesTrinkets}</select></div>
+        <div class="form-group"><label>2. Trinket a tomar:</label><select name="trinketId">${opcionesTrinkets}</select></div>
       `,
       ok: {
         label: "Descartar y Robar",
