@@ -1,0 +1,37 @@
+{
+  "TYPES": {
+    "Actor": {
+      "personaje": "Player Character",
+      "pnj": "Non-Player Character"
+    },
+    "Item": {
+      "raza": "Race",
+      "origen": "Origin",
+      "clase": "Class",
+      "objeto": "Item / Equipment",
+      "habilidad": "Skill / Trait"
+    },
+    "Card": {
+      "accion": "Action Card",
+      "trinket": "Trinket"
+    }
+  },
+  "CARTASYDADOS": {
+    "Palos": {
+      "Espadas": "FISC",
+      "Copas": "MIST",
+      "Oros": "SOC",
+      "Bastos": "CONS"
+    },
+    "Caracteristicas": {
+      "Fisico": "Physical",
+      "Consciencia": "Awareness",
+      "Social": "Social",
+      "Misticismo": "Mysticism"
+    },
+    "Pausa": {
+      "Titulo": "Game Paused",
+      "Lema": "The cards wait face down, the dice lie still"
+    }
+  }
+}

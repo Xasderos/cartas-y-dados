@@ -1,0 +1,132 @@
+/**
+ * @file 06-pausa.css
+ * @description Banner temático de "Partida en Pausa" (`#pause.cyd-pausa`, ver
+ * module/applications/game-pause.mjs). Abanico de cuatro cartas (una por palo) sobre una
+ * franja sólida con filetes dorados. Sin degradados, sombras, brillos ni emojis.
+ * El banner flota sobre el canvas (siempre oscuro), así que usa la paleta oscura.
+ */
+
+#pause.cyd-pausa {
+  --cyd-oro: var(--color-light-3, #e7d1b1);
+  --cyd-oro-linea: color-mix(in srgb, var(--cyd-oro) 35%, transparent);
+  --cyd-azul: #8ea7d4;
+  --cyd-texto-suave: var(--color-light-2, #c2daea);
+  --cyd-fondo-carta: #15141f;
+
+  height: auto;
+  min-height: 200px;
+  top: calc(50vh - 120px);
+  padding-block: 1.25rem 1rem;
+  gap: 1rem;
+  /* Velo sutil: poca opacidad + desenfoque del canvas para que el texto siga legible.
+     Las cartas conservan su fondo opaco, así que los iconos no pierden contraste. */
+  background: rgba(11, 10, 19, 0.4);
+  backdrop-filter: blur(4px) saturate(0.8);
+  border-block: 1px solid color-mix(in srgb, var(--cyd-oro) 22%, transparent);
+}
+
+/* Sustituye el "pulso" de escala nativo por un balanceo suave del abanico */
+#pause.cyd-pausa.paused {
+  animation: none;
+}
+
+/* ---------- Abanico ---------- */
+
+.cyd-pausa-abanico {
+  position: relative;
+  width: 220px;
+  height: 110px;
+  animation: cyd-pausa-balanceo 6s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+.cyd-pausa-carta {
+  position: absolute;
+  left: calc(50% - 32px);
+  bottom: 0;
+  width: 64px;
+  height: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: var(--cyd-fondo-carta);
+  border: 1px solid var(--cyd-oro-linea);
+  border-radius: 6px;
+  outline: 1px solid var(--cyd-fondo-carta);
+  transform-origin: 50% 140%;
+}
+
+/* Marco interior, como el reverso de una baraja */
+.cyd-pausa-carta::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid color-mix(in srgb, var(--cyd-oro) 15%, transparent);
+  border-radius: 3px;
+}
+
+.cyd-pausa-carta i {
+  font-size: 1.5rem;
+  color: var(--cyd-oro);
+}
+
+.cyd-pausa-carta span {
+  font-family: var(--font-primary, "Signika", sans-serif);
+  font-size: var(--font-size-11, 0.7rem);
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  color: var(--cyd-azul);
+}
+
+.cyd-pausa-carta-1 { transform: rotate(-24deg); }
+.cyd-pausa-carta-2 { transform: rotate(-8deg); }
+.cyd-pausa-carta-3 { transform: rotate(8deg); }
+.cyd-pausa-carta-4 { transform: rotate(24deg); }
+
+/* ---------- Texto ---------- */
+
+#pause.cyd-pausa figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  line-height: 1.2;
+  color: var(--cyd-oro);
+}
+
+.cyd-pausa-titulo {
+  font-family: var(--font-serif, "Amiri", serif);
+  font-size: var(--font-size-24, 1.5rem);
+  letter-spacing: 0.3em;
+}
+
+.cyd-pausa-lema {
+  font-family: var(--font-primary, "Signika", sans-serif);
+  font-size: var(--font-size-14, 0.875rem);
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0.08em;
+  font-style: italic;
+  color: var(--cyd-texto-suave);
+}
+
+.cyd-pausa-lema::before,
+.cyd-pausa-lema::after {
+  content: "◆";
+  font-style: normal;
+  font-size: 0.6em;
+  color: var(--cyd-oro-linea);
+  margin-inline: 0.75em;
+  vertical-align: middle;
+}
+
+@keyframes cyd-pausa-balanceo {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cyd-pausa-abanico { animation: none; }
+}

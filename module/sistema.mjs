@@ -20,6 +20,7 @@ import { HojaItemSistema } from "./applications/item-sheet.mjs";
 import { HojaCartaSistema } from "./applications/card-sheet.mjs";
 import { PanelMasterApp } from "./applications/gm-panel.mjs";
 import { HojaPnjActor } from "./applications/npc-sheet.mjs";
+import { personalizarBannerPausa } from "./applications/game-pause.mjs";
 import { registrarAjustesDelSistema } from "./settings.mjs";
 import { limpiarNombreCarta, nombreVisibleCarta } from "./config.mjs";
 
@@ -183,6 +184,9 @@ Hooks.once("ready", async () => {
  * Al iniciar el mundo para el Master, añadimos un botón de acceso directo al Panel del Master
  * en los controles de escena (barra izquierda) y abrimos el panel si lo desea.
  */
+/** Banner temático de "Partida en Pausa" (ver applications/game-pause.mjs). */
+Hooks.on("renderGamePause", personalizarBannerPausa);
+
 Hooks.on("getSceneControlButtons", controls => {
   if (!game.user?.isGM) return;
 

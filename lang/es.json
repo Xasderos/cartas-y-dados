@@ -28,6 +28,10 @@
       "Consciencia": "Consciencia",
       "Social": "Social",
       "Misticismo": "Misticismo"
+    },
+    "Pausa": {
+      "Titulo": "Partida en Pausa",
+      "Lema": "Las cartas aguardan boca abajo, los dados en silencio"
     }
   }
 }
