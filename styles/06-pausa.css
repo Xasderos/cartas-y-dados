@@ -1,8 +1,11 @@
 /**
  * @file 06-pausa.css
  * @description Banner temático de "Partida en Pausa" (`#pause.cyd-pausa`, ver
- * module/applications/game-pause.mjs). Abanico de cuatro cartas (una por palo) sobre una
- * franja sólida con filetes dorados. Sin degradados, sombras, brillos ni emojis.
+ * module/applications/game-pause.mjs). Abanico de cuatro cartas (una por palo) que se
+ * baraja en bucle (v0.15.2): las cartas avanzan por las posiciones del abanico y la del
+ * extremo derecho sale por la derecha y entra deslizándose por la izquierda, sin cruzar
+ * a las demás, de modo que se ven todos los
+ * palos pasar al frente. Franja sólida con filetes dorados. Sin degradados, sombras, brillos ni emojis.
  * El banner flota sobre el canvas (siempre oscuro), así que usa la paleta oscura.
  */
 
@@ -34,10 +37,8 @@
 
 .cyd-pausa-abanico {
   position: relative;
-  width: 220px;
-  height: 110px;
-  animation: cyd-pausa-balanceo 6s ease-in-out infinite;
-  transform-origin: 50% 100%;
+  width: 240px;
+  height: 120px;
 }
 
 .cyd-pausa-carta {
@@ -56,6 +57,8 @@
   border-radius: 6px;
   outline: 1px solid var(--cyd-fondo-carta);
   transform-origin: 50% 140%;
+  /* Barajado: 4 posiciones x 2,5 s; cada carta empieza desfasada una posición. */
+  animation: cyd-pausa-barajar 10s ease-in-out infinite;
 }
 
 /* Marco interior, como el reverso de una baraja */
@@ -80,10 +83,11 @@
   color: var(--cyd-azul);
 }
 
-.cyd-pausa-carta-1 { transform: rotate(-24deg); }
-.cyd-pausa-carta-2 { transform: rotate(-8deg); }
-.cyd-pausa-carta-3 { transform: rotate(8deg); }
-.cyd-pausa-carta-4 { transform: rotate(24deg); }
+/* Posición estática (sin animación) y desfase de cada carta en el barajado */
+.cyd-pausa-carta-1 { transform: rotate(-24deg); animation-delay: 0s; }
+.cyd-pausa-carta-2 { transform: rotate(-8deg); animation-delay: -2.5s; }
+.cyd-pausa-carta-3 { transform: rotate(8deg); animation-delay: -5s; }
+.cyd-pausa-carta-4 { transform: rotate(24deg); animation-delay: -7.5s; }
 
 /* ---------- Texto ---------- */
 
@@ -122,11 +126,25 @@
   vertical-align: middle;
 }
 
-@keyframes cyd-pausa-balanceo {
-  0%, 100% { transform: rotate(-2deg); }
-  50% { transform: rotate(2deg); }
+/*
+ * Barajado del abanico: la carta reposa en cada posición (-24, -8, 8, 24 grados) y todas
+ * avanzan a la vez a la siguiente (ventanas 14-25, 39-50, 64-75 y 89-100 %). Desde la última
+ * posición la carta sale deslizándose por la derecha (por encima, sin cruzar a nadie), se
+ * oculta, reaparece por la izquierda por debajo del abanico y entra deslizándose en la
+ * primera posición. Los z-index van espaciados (3, 5, 7, 9) para que, al interpolarse, la
+ * carta que entra (1 → 3) quede siempre por debajo de la que avanza (3 → 5) y la que sale
+ * (10) por encima de la que ocupa su hueco: nunca se atraviesan.
+ */
+@keyframes cyd-pausa-barajar {
+  0%, 14%   { transform: translateX(0) rotate(-24deg); opacity: 1; z-index: 3; }
+  25%, 39%  { transform: translateX(0) rotate(-8deg);  opacity: 1; z-index: 5; }
+  50%, 64%  { transform: translateX(0) rotate(8deg);   opacity: 1; z-index: 7; }
+  75%, 89%  { transform: translateX(0) rotate(24deg);  opacity: 1; z-index: 9; }
+  94%       { transform: translateX(130px) rotate(40deg);  opacity: 0; z-index: 10; }
+  94.01%    { transform: translateX(-130px) rotate(-40deg); opacity: 0; z-index: 1; }
+  100%      { transform: translateX(0) rotate(-24deg); opacity: 1; z-index: 3; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cyd-pausa-abanico { animation: none; }
+  .cyd-pausa-carta { animation: none; }
 }
