@@ -7,8 +7,23 @@
 import { VentanaDinamicaMixin } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 import {
-  SISTEMA_CONFIG, claveClaseDeItem, contextoProgresionClase, contextoRasgosRaza, razaBaseDeItem
+  CLAVE_PERSONALIZADA, EFECTOS_VALOR_X, SISTEMA_CONFIG, claveClaseDeItem, contextoProgresionClase, contextoRasgosRaza, razaBaseDeItem
 } from "../config.mjs";
+
+/** Etiquetas del origen de una Habilidad (`system.origenHabilidad`, v0.15.1). */
+const ORIGENES_HABILIDAD = {
+  general: "General", raza: "Raza", origen: "Origen", clase: "Clase", criatura: "Criatura"
+};
+
+/**
+ * Convierte un objeto `{clave: etiqueta}` en opciones para un `<select>` (v0.15.1).
+ * @param {Object<string, string>} mapa
+ * @param {string} actual - Clave seleccionada.
+ * @returns {Array<{valor: string, etiqueta: string, seleccionado: boolean}>}
+ */
+function opcionesSelect(mapa, actual) {
+  return Object.entries(mapa).map(([valor, etiqueta]) => ({ valor, etiqueta, seleccionado: valor === (actual ?? "") }));
+}
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -44,6 +59,10 @@ export class HojaItemSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Hand
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const item = this.document;
+    // (v0.15.1) Selectores de comportamiento de reglas: Raza/Clase base y automatización de Habilidades.
+    const claveRaza = item.type === "raza" ? razaBaseDeItem(item)?.clave ?? CLAVE_PERSONALIZADA : "";
+    const claveClase = item.type === "clase" ? claveClaseDeItem(item) ?? CLAVE_PERSONALIZADA : "";
+    const mapaNombres = cfg => Object.fromEntries(Object.entries(cfg).map(([k, v]) => [k, v.nombre]));
     return {
       ...context,
       item,
@@ -56,6 +75,10 @@ export class HojaItemSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Hand
       esClase: item.type === "clase",
       esObjeto: item.type === "objeto",
       esHabilidad: item.type === "habilidad",
+      opcionesRazaBase: opcionesSelect({ [CLAVE_PERSONALIZADA]: "Personalizada (sin automatización)", ...mapaNombres(SISTEMA_CONFIG.RAZAS_BASE) }, claveRaza),
+      opcionesClaseBase: opcionesSelect({ [CLAVE_PERSONALIZADA]: "Personalizada (sin progresión automática)", ...mapaNombres(SISTEMA_CONFIG.CLASES_BASE) }, claveClase),
+      opcionesOrigenHabilidad: opcionesSelect(ORIGENES_HABILIDAD, item.system.origenHabilidad),
+      opcionesEfectoX: opcionesSelect(EFECTOS_VALOR_X, item.type === "habilidad" ? item.getFlag("cartas-y-dados", "efectoX") : ""),
       // Tabla de elecciones de la Clase base (v0.15.0), solo lectura; null en clases personalizadas
       progresionClase: item.type === "clase" ? contextoProgresionClase(claveClaseDeItem(item)) : null,
       // Nombre de la Clase Base asociada (v0.10.0), vacío en clases personalizadas

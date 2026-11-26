@@ -8,7 +8,12 @@ import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 
 const { DocumentSheetV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
-import { limpiarNombreCarta, nombreVisibleCarta } from "../config.mjs";
+import {
+  abalorioDeTrinket, catalogoAbalorios, claveClaseDeItem, esAbalorioEterno, limpiarNombreCarta, nombreVisibleCarta
+} from "../config.mjs";
+
+/** Claves de `flags.cartas-y-dados` editables en la ficha y sincronizadas entre copias (v0.15.1). */
+const FLAGS_REGLAS_CARTA = ["abalorio", "eterno"];
 
 export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(HandlebarsApplicationMixin(DocumentSheetV2))) {
 
@@ -49,6 +54,19 @@ export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Han
     const context = await super._prepareContext(options);
     const card = this.document;
     const nombreActual = nombreVisibleCarta(card);
+    // (v0.15.1) Comportamiento de reglas del Trinket: efecto de abalorio y «Eterno», editables.
+    let reglasTrinket = null;
+    if (card.type === "trinket") {
+      const claveClase = claveClaseDeItem(this._actorDueno()?.items.find(i => i.type === "clase"));
+      const abalorio = abalorioDeTrinket(card, claveClase) ?? "";
+      const catalogo = catalogoAbalorios();
+      reglasTrinket = {
+        abalorio,
+        eterno: esAbalorioEterno(card, claveClase),
+        opciones: catalogo.map(o => ({ ...o, seleccionado: o.clave === abalorio })),
+        auto: catalogo.find(o => o.clave === abalorio)?.auto ?? ""
+      };
+    }
     return {
       ...context,
       card,
@@ -57,8 +75,34 @@ export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Han
       system: card.system,
       esTrinket: card.type === "trinket",
       esAccion: card.type === "accion",
+      reglasTrinket,
       editable: this.isEditable
     };
+  }
+
+  /**
+   * Actor dueño de la carta (v0.15.1): el que tiene entre sus 6 pilas la pila que la contiene.
+   * @returns {Actor|null}
+   */
+  _actorDueno() {
+    const pilaId = this.document.parent?.id;
+    if (!pilaId) return null;
+    return game.actors.find(a => Object.values(a.system.pilas ?? {}).includes(pilaId)) ?? null;
+  }
+
+  /**
+   * Datos de reglas que se copian a la original o a las copias de una carta (v0.15.1): `system`
+   * completo y las claves de `FLAGS_REGLAS_CARTA` (sin tocar `sourceCardId`).
+   * @param {Card} carta - Carta editada.
+   * @returns {object} Fragmento de actualización.
+   */
+  static _datosReglasCarta(carta) {
+    const datos = { system: carta.toObject().system };
+    const flags = carta.flags?.["cartas-y-dados"] ?? {};
+    for (const clave of FLAGS_REGLAS_CARTA) {
+      if (clave in flags) datos[`flags.cartas-y-dados.${clave}`] = flags[clave];
+    }
+    return datos;
   }
 
   /** @override */
@@ -105,7 +149,7 @@ export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Han
   }
 
   /**
-   * Sincronización bidireccional (nombre e imagen) entre una carta y su original
+   * Sincronización bidireccional (nombre, imagen y, desde v0.15.1, `system` y flags de reglas) entre una carta y su original
    * del mazo (`sourceCardId`) o, si es la original, sus copias en otras pilas.
    * v0.9.6: usa `nombreVisibleCarta()` (antes leía `nuevoNombre` fuera de su ámbito
    * y fallaba con ReferenceError al editar una copia).
@@ -130,7 +174,9 @@ export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Han
             name: nuevoNombre,
             face: 0,
             faces: [{ ...(cartaOriginal.faces?.[0] ?? {}), name: nuevoNombre, img: cartaEditada.img || "icons/svg/card-hand.svg" }],
-            back: { ...(cartaOriginal.back ?? {}), name: nuevoNombre }
+            back: { ...(cartaOriginal.back ?? {}), name: nuevoNombre },
+            ...HojaCartaSistema._datosReglasCarta(cartaEditada),
+            _id: cartaOriginal.id
           };
           const pilaOriginal = cartaOriginal.parent;
           if (pilaOriginal) {
@@ -155,7 +201,8 @@ export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Han
           name: nombre,
           face: 0,
           faces: [{ ...(cartaEditada.faces?.[0] ?? {}), name: nombre, img: imgCarta }],
-          back: { ...(cartaEditada.back ?? {}), name: nombre }
+          back: { ...(cartaEditada.back ?? {}), name: nombre },
+          ...HojaCartaSistema._datosReglasCarta(cartaEditada)
         };
         for (const clave of ["mano", "enJuego", "descarte", "quemadas", "mazo", "trinkets"]) {
           const pila = pilas[clave];

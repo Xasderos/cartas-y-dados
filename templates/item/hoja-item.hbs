@@ -24,6 +24,12 @@
           <label>Rasgo Racial</label>
           <input type="text" name="system.rasgoRacial" value="{{system.rasgoRacial}}" placeholder="Ej. Visión Nocturna, Sangre Férrea..." />
         </div>
+        <div class="cyd-campo-linea" data-tooltip="Raza base cuyos rasgos raciales (y su automatización) aplica este Item.">
+          <label>Raza base</label>
+          <select name="system.claveRaza">
+            {{#each opcionesRazaBase as |opcion|}}<option value="{{opcion.valor}}" {{#if opcion.seleccionado}}selected{{/if}}>{{opcion.etiqueta}}</option>{{/each}}
+          </select>
+        </div>
       {{/if}}
 
       {{#if esOrigen}}
@@ -93,13 +99,23 @@
           </select>
         </div>
       </div>
+      {{!-- Comportamiento de reglas (v0.15.1): Clase base (tabla de elecciones y subida de nivel) y especialización --}}
+      <div class="cyd-recursos-barra cyd-cols-2">
+        <div class="cyd-recurso-caja" data-tooltip="Clase base cuya tabla de elecciones, abalorios y subida de nivel automática usa este Item.">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-scroll"></i> Clase base</span>
+          <select name="system.claveClase">
+            {{#each opcionesClaseBase as |opcion|}}<option value="{{opcion.valor}}" {{#if opcion.seleccionado}}selected{{/if}}>{{opcion.etiqueta}}</option>{{/each}}
+          </select>
+        </div>
+        <div class="cyd-recurso-caja" data-tooltip="Especialización elegida (normalmente se fija al subir a Nv. 3).">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-award"></i> Especialización</span>
+          <input type="text" name="system.especializacion" value="{{system.especializacion}}" placeholder="Sin especialización" />
+        </div>
+      </div>
       {{!-- Registro de progresión (v0.10.0): una entrada por cada subida de nivel --}}
       <div class="cyd-cabecera-seccion">
         <h3><i class="fa-solid fa-angles-up"></i> Progresión{{#if nombreClaseBase}} · {{nombreClaseBase}}{{/if}}</h3>
       </div>
-      {{#if system.especializacion}}
-        <p class="cyd-especializacion-clase"><i class="fa-solid fa-award"></i> Especialización: <strong>{{system.especializacion}}</strong></p>
-      {{/if}}
       {{#if system.historialNiveles.length}}
         <div class="cyd-lista-items">
           {{#each system.historialNiveles as |entrada|}}
@@ -192,6 +208,20 @@
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-plus"></i> No gasta acción</span>
           <input type="checkbox" name="system.sinAccion" {{checked system.sinAccion}} />
         </label>
+      </div>
+      <div class="cyd-recursos-barra cyd-cols-2">
+        <div class="cyd-recurso-caja">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-tag"></i> Origen</span>
+          <select name="system.origenHabilidad">
+            {{#each opcionesOrigenHabilidad as |opcion|}}<option value="{{opcion.valor}}" {{#if opcion.seleccionado}}selected{{/if}}>{{opcion.etiqueta}}</option>{{/each}}
+          </select>
+        </div>
+        <div class="cyd-recurso-caja" data-tooltip="Automatización del valor X sobre el Token objetivo (requiere «Tirada = valor X»).">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-bullseye"></i> Efecto del valor X</span>
+          <select name="flags.cartas-y-dados.efectoX">
+            {{#each opcionesEfectoX as |opcion|}}<option value="{{opcion.valor}}" {{#if opcion.seleccionado}}selected{{/if}}>{{opcion.etiqueta}}</option>{{/each}}
+          </select>
+        </div>
       </div>
       <div class="cyd-recursos-barra cyd-cols-2">
         <div class="cyd-recurso-caja">

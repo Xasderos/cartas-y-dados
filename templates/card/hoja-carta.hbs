@@ -64,13 +64,49 @@
       {{/if}}
 
       {{#if esAccion}}
-        <label class="cyd-recurso-caja cyd-check">
-          <span class="cyd-recurso-titulo"><i class="fa-solid fa-dice"></i> Lanza dados</span>
-          <input type="checkbox" name="system.realizaTirada" {{checked system.realizaTirada}} />
+        <label class="cyd-recurso-caja cyd-check" data-tooltip="Al usarla, el diálogo «Realizar acción» propone por defecto un ataque.">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-crosshairs"></i> Es Ataque</span>
+          <input type="checkbox" name="system.esAtaque" {{checked system.esAtaque}} />
         </label>
       {{/if}}
     </div>
+
+    {{#if esAccion}}
+      <div class="cyd-recursos-barra cyd-cols-2">
+        <label class="cyd-recurso-caja cyd-check" data-tooltip="Al usarla va a Cartas Quemadas en vez de al Descarte (las cartas MIST se queman siempre).">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-fire"></i> Se quema al usarla</span>
+          <input type="checkbox" name="system.seQuema" {{checked system.seQuema}} />
+        </label>
+      </div>
+    {{/if}}
   </section>
+
+  {{!-- Comportamiento de reglas del Trinket (v0.15.1): efecto de abalorio y Abalorio Eterno --}}
+  {{#if reglasTrinket}}
+    <section class="cyd-panel-controles">
+      <div class="cyd-cabecera-seccion">
+        <h3><i class="fa-solid fa-gem"></i> Reglas del Trinket</h3>
+      </div>
+      <div class="cyd-recursos-barra cyd-cols-2">
+        <div class="cyd-recurso-caja" data-tooltip="Efecto automatizado que se aplica mientras el Trinket está En Juego.">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-gears"></i> Efecto de abalorio</span>
+          <select name="flags.cartas-y-dados.abalorio">
+            <option value="" {{#unless reglasTrinket.abalorio}}selected{{/unless}}>Ninguno (efecto narrativo)</option>
+            {{#each reglasTrinket.opciones as |opcion|}}
+              <option value="{{opcion.clave}}" {{#if opcion.seleccionado}}selected{{/if}}>{{opcion.nombre}} · {{opcion.clase}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <label class="cyd-recurso-caja cyd-check" data-tooltip="Abalorio Eterno: solo puede estar En Juego o Quemado; empieza En Juego, sigue En Juego entre escenas y vuelve a estar En Juego al descansar.">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-infinity"></i> Eterno</span>
+          <input type="checkbox" name="flags.cartas-y-dados.eterno" {{checked reglasTrinket.eterno}} />
+        </label>
+      </div>
+      {{#if reglasTrinket.auto}}
+        <p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{reglasTrinket.auto}}</p>
+      {{/if}}
+    </section>
+  {{/if}}
 
   {{!-- Bloque de Automatización Mecánica --}}
   <section class="cyd-panel-controles">

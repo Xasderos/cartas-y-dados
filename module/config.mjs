@@ -531,6 +531,12 @@ export const SISTEMA_CONFIG = {
  * @returns {string} "FISC", "CONS", "SOC" o "MIST" (o la clave en mayúsculas si es desconocida).
  */
 /**
+ * Valor de `system.claveRaza` / `system.claveClase` que marca una Raza o Clase como personalizada
+ * desde su ficha (v0.15.1): desactiva el reconocimiento por nombre y toda automatización de la base.
+ */
+export const CLAVE_PERSONALIZADA = "personalizada";
+
+/**
  * Resuelve la clave de `SISTEMA_CONFIG.CLASES_BASE` de un Item de Clase (v0.10.0).
  * Usa `system.claveClase`; para personajes anteriores a v0.10.0 (sin clave guardada)
  * la deduce comparando el nombre del Item con `CLASES_BASE.<clave>.nombre`.
@@ -541,6 +547,8 @@ export function claveClaseDeItem(itemClase) {
   if (!itemClase) return null;
   const clases = SISTEMA_CONFIG.CLASES_BASE;
   const guardada = itemClase.system?.claveClase;
+  // (v0.15.1) Elegida «Personalizada» en la ficha: sin reconocimiento por nombre.
+  if (guardada === CLAVE_PERSONALIZADA) return null;
   if (guardada && clases[guardada]) return guardada;
   const nombre = String(itemClase.name ?? "").trim().toLowerCase();
   return Object.keys(clases).find(k => clases[k].nombre.toLowerCase() === nombre) ?? null;
@@ -583,6 +591,9 @@ export function opcionesTrinketsClase(configClase) {
  * @returns {boolean}
  */
 export function esAbalorioEterno(carta, claveClase = null) {
+  // (v0.15.1) Valor editado en la ficha de la Carta (`flags.cartas-y-dados.eterno`): tiene prioridad.
+  const marcado = carta?.flags?.["cartas-y-dados"]?.eterno;
+  if (typeof marcado === "boolean") return carta?.type === "trinket" && marcado;
   const clave = abalorioDeTrinket(carta, claveClase);
   if (!clave) return false;
   return Object.values(SISTEMA_CONFIG.CLASES_BASE)
@@ -635,13 +646,43 @@ export function contextoProgresionClase(claveClase) {
  */
 export function abalorioDeTrinket(carta, claveClase = null) {
   if (carta?.type !== "trinket") return null;
-  const guardado = carta.getFlag?.("cartas-y-dados", "abalorio");
-  if (guardado) return guardado;
+  // (v0.15.1) Una clave guardada (aunque sea vacía, «sin efecto» elegido en la ficha) tiene prioridad
+  // sobre el reconocimiento por nombre.
+  const guardado = carta.flags?.["cartas-y-dados"]?.abalorio;
+  if (typeof guardado === "string") return guardado || null;
   const nombre = String(carta.name ?? "").trim().toLowerCase();
   const opcion = opcionesTrinketsClase(SISTEMA_CONFIG.CLASES_BASE[claveClase])
     .find(o => o.clave && o.nombre.toLowerCase() === nombre);
   return opcion?.clave ?? null;
 }
+
+/**
+ * Catálogo de todos los abalorios automatizados de las Clases base (v0.15.1), para elegir el
+ * efecto de cualquier Trinket desde su ficha (`flags.cartas-y-dados.abalorio`).
+ * @returns {Array<{clave: string, nombre: string, clase: string, eterno: boolean, auto: string}>}
+ */
+export function catalogoAbalorios() {
+  const catalogo = [];
+  for (const cfg of Object.values(SISTEMA_CONFIG.CLASES_BASE)) {
+    for (const o of opcionesTrinketsClase(cfg)) {
+      if (o.clave && !catalogo.some(c => c.clave === o.clave)) {
+        catalogo.push({ clave: o.clave, nombre: o.nombre, clase: cfg.nombre, eterno: o.eterno, auto: o.auto });
+      }
+    }
+  }
+  return catalogo;
+}
+
+/**
+ * Automatizaciones disponibles para el valor X de una Habilidad (v0.15.1), guardadas en
+ * `flags.cartas-y-dados.efectoX` del Item (ver `SistemaActor#_htmlValorX`).
+ * La clave vacía significa que el Master aplica el efecto a mano.
+ */
+export const EFECTOS_VALOR_X = {
+  "": "Ninguno (lo aplica el Master)",
+  curacion: "Curar X al Token objetivo",
+  promesa: "Promesa: el objetivo elige entre sus X primeras cartas"
+};
 
 /**
  * Calcula el estado de Agotamiento de un nivel dado (v0.12.0).
@@ -730,6 +771,8 @@ export function razaBaseDeItem(itemRaza) {
   if (!itemRaza || itemRaza.type !== "raza") return null;
   const razas = SISTEMA_CONFIG.RAZAS_BASE;
   let clave = itemRaza.system?.claveRaza || "";
+  // (v0.15.1) Elegida «Personalizada» en la ficha: sin reconocimiento por nombre.
+  if (clave === CLAVE_PERSONALIZADA) return null;
   if (!razas[clave]) {
     const nombre = String(itemRaza.name ?? "").trim().toLowerCase();
     clave = Object.keys(razas).find(k => razas[k].nombre.toLowerCase() === nombre) ?? "";
