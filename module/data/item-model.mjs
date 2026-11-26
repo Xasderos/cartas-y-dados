@@ -42,7 +42,9 @@ export class RazaDataModel extends TypeDataModel {
   static defineSchema() {
     return {
       ...esquemaBonificadoresPersonaje(),
-      rasgoRacial: new StringField({ required: false, blank: true, initial: "" })
+      rasgoRacial: new StringField({ required: false, blank: true, initial: "" }),
+      // Clave de `SISTEMA_CONFIG.RAZAS_BASE` (v0.10.1); vacía en razas personalizadas.
+      claveRaza: new StringField({ required: false, blank: true, initial: "" })
     };
   }
 }

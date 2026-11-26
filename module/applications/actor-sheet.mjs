@@ -170,7 +170,9 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
 
   /**
    * Asistente de Creación de Personaje (v0.8.4) construido con `foundry.applications.api.DialogV2`:
-   * - Paso 1: elección entre las 5 Clases de `SISTEMA_CONFIG.CLASES_BASE`.
+   * - Paso de Raza (v0.10.1): elección entre las razas de `SISTEMA_CONFIG.RAZAS_BASE`
+   *   (se omite si el Actor ya tiene un Item `raza`).
+   * - Paso de Clase: elección entre las 5 Clases de `SISTEMA_CONFIG.CLASES_BASE`.
    * - Validación `tabulaRasa`: `DialogV2.confirm` con la advertencia exacta
    *   "Clase avanzada, no es recomendable para jugadores nuevos"; si se cancela,
    *   regresa a la selección de Clase.
@@ -184,7 +186,33 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     const clases = SISTEMA_CONFIG.CLASES_BASE;
     if (!clases) return;
 
-    /* ---------------- PASO 1: SELECCIÓN DE CLASE ---------------- */
+    // Numeración de pasos: con paso de Raza son 3 (Raza → Clase → Trinket), sin él 2.
+    const razas = SISTEMA_CONFIG.RAZAS_BASE ?? {};
+    const pedirRaza = !actor.items.some(i => i.type === "raza") && Object.keys(razas).length > 0;
+    const offsetPaso = pedirRaza ? 1 : 0;
+
+    /* ---------------- PASO 1: SELECCIÓN DE RAZA (v0.10.1) ---------------- */
+    let claveRaza = null;
+    if (pedirRaza) {
+      const botonesRazas = Object.entries(razas).map(([clave, cfg]) => ({
+        action: clave,
+        label: cfg.nombre, // Texto plano (DialogV2 escapa el label)
+        icon: "fa-solid fa-dna",
+        callback: () => clave
+      }));
+
+      claveRaza = await DialogV2.wait({
+        ...opcionesDialogoSistema({ width: 460, lista: true }),
+        window: { title: `${actor.name} — Paso 1: Elige tu Raza` },
+        content: "<p>Elige una de las siguientes razas:</p>",
+        buttons: botonesRazas,
+        rejectClose: false
+      });
+
+      if (!claveRaza) return; // El jugador canceló el asistente
+    }
+
+    /* ---------------- PASO DE CLASE ---------------- */
     let claveClase = null;
     while (!claveClase) {
       const botonesClases = Object.entries(clases).map(([clave, cfg]) => {
@@ -206,7 +234,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
 
       const seleccion = await DialogV2.wait({
         ...opcionesDialogoSistema({ width: 460, lista: true }),
-        window: { title: `${actor.name} — Paso 1: Elige tu Clase` },
+        window: { title: `${actor.name} — Paso ${1 + offsetPaso}: Elige tu Clase` },
         content: contenidoPaso1,
         buttons: botonesClases,
         rejectClose: false
@@ -242,7 +270,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
 
     const trinketElegido = await DialogV2.prompt({
       ...opcionesDialogoSistema(),
-      window: { title: `${actor.name} — Paso 2: Elige tu Trinket Inicial` },
+      window: { title: `${actor.name} — Paso ${2 + offsetPaso}: Elige tu Trinket Inicial` },
       content: `
         <p><strong>${configClase.nombre}</strong> — Trinkets iniciales disponibles (Nivel 1):</p>
         ${opcionesTrinket}
@@ -257,7 +285,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
 
     if (!trinketElegido) return; // El jugador canceló el Paso 2
 
-    await actor.inicializarPersonajeConClase(claveClase, trinketElegido);
+    await actor.inicializarPersonajeConClase(claveClase, trinketElegido, claveRaza);
     this.render();
   }
 

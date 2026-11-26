@@ -7,7 +7,6 @@
 
 import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica.mjs";
 
-import { poblarCompendiosDelSistema } from "../compendios-base.mjs";
 import { PRESETS_DIFICULTAD_POR_DEFECTO } from "../settings.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -48,8 +47,7 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
       ajustarCansancio: PanelMasterApp.#onAjustarCansancio,
       robarGrupo: PanelMasterApp.#onRobarGrupo,
       finCombateGrupo: PanelMasterApp.#onFinCombateGrupo,
-      descansoGrupo: PanelMasterApp.#onDescansoGrupo,
-      poblarCompendios: PanelMasterApp.#onPoblarCompendios
+      descansoGrupo: PanelMasterApp.#onDescansoGrupo
     }
   };
 
@@ -289,9 +287,5 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
       if (actor.system.pilasDocumentos?.mazo) await actor.realizarDescanso();
     }
     this.render();
-  }
-
-  static async #onPoblarCompendios() {
-    await poblarCompendiosDelSistema();
   }
 }

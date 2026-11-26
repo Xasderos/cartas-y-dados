@@ -80,6 +80,21 @@ export const SISTEMA_CONFIG = {
   tamanoBase: "Mediano",
 
   /**
+   * Razas Base del sistema (v0.10.1).
+   * El Asistente de Creación de Personaje ofrece estas razas en su primer paso y crea
+   * con la elegida el Item `raza` del Actor (`system.claveRaza` guarda la clave).
+   * Rasgos, bonificadores y descripción quedan a definir en la ficha del Item
+   * (todos los bonificadores a 0 por ahora).
+   */
+  RAZAS_BASE: {
+    humanos: { nombre: "Humanos" },
+    mairu: { nombre: "Mairu" },
+    mandragora: { nombre: "Mandrágora" },
+    trastolillos: { nombre: "Trastolillos" },
+    sierpes: { nombre: "Sierpes" }
+  },
+
+  /**
    * Clases Base del sistema (v0.8.4).
    * El Asistente de Creación de Personaje usa esta configuración para ofrecer
    * la elección de Clase y Trinket inicial, y para generar el Mazo de Juego:

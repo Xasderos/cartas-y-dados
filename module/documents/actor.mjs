@@ -78,10 +78,12 @@ export class SistemaActor extends Actor {
    * 3. Crea 1 carta tipo "trinket" con `system.nivel: 1` y el nombre del Trinket elegido,
    *    sincronizando `name`, `face: 0`, `faces[0].name` y `back.name`.
    * 4. Crea o actualiza en el Actor el Item de tipo "clase" con el nombre de la clase elegida.
+   * 5. (v0.10.1) Si se indica `claveRaza`, crea o actualiza el Item de tipo "raza".
    * @param {string} claveClase - Clave de `SISTEMA_CONFIG.CLASES_BASE` (ej. "fortisCorpore").
    * @param {string} nombreTrinket - Nombre del Trinket inicial elegido por el jugador.
+   * @param {string|null} [claveRaza=null] - Clave de `SISTEMA_CONFIG.RAZAS_BASE` (ej. "mairu").
    */
-  async inicializarPersonajeConClase(claveClase, nombreTrinket) {
+  async inicializarPersonajeConClase(claveClase, nombreTrinket, claveRaza = null) {
     const configClase = SISTEMA_CONFIG.CLASES_BASE?.[claveClase];
     if (!configClase) {
       ui.notifications.warn(`Clase desconocida: "${claveClase}".`);
@@ -140,8 +142,21 @@ export class SistemaActor extends Actor {
       await this.createEmbeddedDocuments("Item", [{ type: "clase", ...foundry.utils.expandObject(datosClase) }]);
     }
 
+    // 5. Crear o actualizar el Item de tipo 'raza' (v0.10.1)
+    const configRaza = claveRaza ? SISTEMA_CONFIG.RAZAS_BASE?.[claveRaza] : null;
+    if (configRaza) {
+      const datosRaza = { name: configRaza.nombre, "system.claveRaza": claveRaza };
+      const itemRaza = this.items.find(i => i.type === "raza");
+      if (itemRaza) {
+        await itemRaza.update(datosRaza);
+      } else {
+        await this.createEmbeddedDocuments("Item", [{ type: "raza", ...foundry.utils.expandObject(datosRaza) }]);
+      }
+    }
+
     this.prepareData();
-    ui.notifications.info(`${this.name} se une a la clase ${configClase.nombre} (Trinket inicial: "${trinketInicial}").`);
+    const textoRaza = configRaza ? `${configRaza.nombre}, ` : "";
+    ui.notifications.info(`${this.name} (${textoRaza}${configClase.nombre}) está listo (Trinket inicial: "${trinketInicial}").`);
   }
 
   /* ======================================================================== */
