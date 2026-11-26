@@ -56,6 +56,24 @@
           </select>
         </div>
       </div>
+      {{!-- Registro de progresión (v0.10.0): una entrada por cada subida de nivel --}}
+      <div class="cyd-cabecera-seccion">
+        <h3><i class="fa-solid fa-angles-up"></i> Progresión{{#if nombreClaseBase}} · {{nombreClaseBase}}{{/if}}</h3>
+      </div>
+      {{#if system.historialNiveles.length}}
+        <div class="cyd-lista-items">
+          {{#each system.historialNiveles as |entrada|}}
+            <div class="cyd-fila-item">
+              <div class="cyd-fila-item-info">
+                <strong>Nv. {{entrada.nivel}} · {{entrada.habilidad}}</strong>
+                <small>{{entrada.cartas}}</small>
+              </div>
+            </div>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="cyd-texto-vacio">Sin subidas de nivel registradas. Usa el botón <i class="fa-solid fa-angles-up"></i> de la ranura de Clase en la ficha del personaje.</p>
+      {{/if}}
     </section>
   {{/if}}
 

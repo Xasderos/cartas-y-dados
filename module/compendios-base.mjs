@@ -2,6 +2,8 @@
  * @file compendios-base.mjs
  * @description Pobla automáticamente los 4 Compendios del sistema en Foundry VTT v14
  * con Razas, Orígenes, Clases, Equipo, Ataques de Criatura y Bestiario.
+ * (v0.10.0) Sin Items de Clase de ejemplo: la Clase la crea el Asistente de Clase
+ * y registra el nivel y las elecciones de progresión del personaje.
  * (v0.8.4) El compendio `mazos-y-cartas` ya NO se puebla con cartas de prueba:
  * el Asistente de Clase genera el Mazo inicial de cada personaje directamente.
  */
@@ -50,26 +52,6 @@ export async function poblarCompendiosDelSistema() {
           beneficioTrasfondo: "Mente Analítica (+1 Social, +1 Mano)",
           bonificadores: { fisico: 0, consciencia: 0, social: 1, misticismo: 0, defensa: 0, limiteMano: 1, saludMax: 0, cansancioMax: 0 },
           descripcion: "<p>El estudio de grimorios y tácticas amplía tus opciones cada turno.</p>"
-        }
-      },
-      {
-        name: "Maestro de Armas",
-        type: "clase",
-        system: {
-          nivel: 1,
-          paloAfin: "espadas",
-          bonificadores: { fisico: 1, consciencia: 0, social: 0, misticismo: 0, defensa: 1, limiteMano: 0, saludMax: 4, cansancioMax: 1 },
-          descripcion: "<p>Especialista en el palo FISC y el combate directo.</p>"
-        }
-      },
-      {
-        name: "Tejedor del Destino",
-        type: "clase",
-        system: {
-          nivel: 1,
-          paloAfin: "copas",
-          bonificadores: { fisico: 0, consciencia: 0, social: 0, misticismo: 1, defensa: 0, limiteMano: 1, saludMax: 2, cansancioMax: 2 },
-          descripcion: "<p>Canalizador espiritual afín al palo MIST y al uso de Trinkets.</p>"
         }
       }
     ], { pack: packTrasfondos.collection });

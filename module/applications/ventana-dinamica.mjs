@@ -82,7 +82,7 @@ export function registrarReajusteEnResize() {
 /**
  * Opciones comunes para los `DialogV2` del sistema: tokens visuales, ancho acotado
  * a la pantalla y contenido con scroll. Con `lista: true` los botones se apilan en
- * una rejilla que hace wrap (diálogos con muchas opciones: clases, cartas MIST...).
+ * una sola columna (un botón por fila, texto con wrap) (diálogos con muchas opciones: clases, cartas MIST...).
  * @param {object} [config]
  * @param {number} [config.width=420] - Ancho preferido en px (se recorta al viewport).
  * @param {boolean} [config.lista=false] - Si los botones deben apilarse.

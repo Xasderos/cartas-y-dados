@@ -6,7 +6,9 @@
  * entre Mazo, Mano, En Juego, Descarte y Quemadas, recalculando la Defensa en tiempo real.
  */
 
-import { SISTEMA_CONFIG, abreviadoPalo, generarNombreMisticoUnico, nombreVisibleCarta } from "../config.mjs";
+import {
+  SISTEMA_CONFIG, abreviadoPalo, claveClaseDeItem, describirPackCartas, generarNombreMisticoUnico, nombreVisibleCarta
+} from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 
 export class SistemaActor extends Actor {
@@ -128,16 +130,131 @@ export class SistemaActor extends Actor {
       await trinkets.createEmbeddedDocuments("Card", [payloadTrinket]);
     }
 
-    // 4. Crear o actualizar el Item de tipo 'clase' en el Actor con el nombre elegido
+    // 4. Crear o actualizar el Item de tipo 'clase' (registro de progresión, v0.10.0)
+    const datosClase = { name: configClase.nombre, "system.claveClase": claveClase };
+    if (configClase.paloPrincipal) datosClase["system.paloAfin"] = configClase.paloPrincipal;
     const itemClase = this.items.find(i => i.type === "clase");
     if (itemClase) {
-      await itemClase.update({ name: configClase.nombre });
+      await itemClase.update(datosClase);
     } else {
-      await this.createEmbeddedDocuments("Item", [{ name: configClase.nombre, type: "clase" }]);
+      await this.createEmbeddedDocuments("Item", [{ type: "clase", ...foundry.utils.expandObject(datosClase) }]);
     }
 
     this.prepareData();
     ui.notifications.info(`${this.name} se une a la clase ${configClase.nombre} (Trinket inicial: "${trinketInicial}").`);
+  }
+
+  /* ======================================================================== */
+  /*  1b. PROGRESIÓN DE CLASE: SUBIDA DE NIVEL (v0.10.0)                      */
+  /* ======================================================================== */
+
+  /**
+   * Devuelve las opciones de la siguiente subida de nivel según
+   * `SISTEMA_CONFIG.CLASES_BASE.<clave>.progresion[nivelDestino]`.
+   * @returns {{itemClase: Item, claveClase: string, configClase: object, nivelActual: number,
+   *   nivelDestino: number, habilidades: object[], packs: object[][]}|null}
+   *   null si el Actor no tiene Clase base reconocida o no hay progresión definida para el siguiente nivel.
+   */
+  obtenerOpcionesSubidaNivel() {
+    const itemClase = this.items.find(i => i.type === "clase");
+    const claveClase = claveClaseDeItem(itemClase);
+    const configClase = claveClase ? SISTEMA_CONFIG.CLASES_BASE[claveClase] : null;
+    if (!configClase) return null;
+    const nivelActual = Number(itemClase.system.nivel) || 1;
+    const nivelDestino = nivelActual + 1;
+    const recompensas = configClase.progresion?.[nivelDestino];
+    if (!recompensas) return null;
+    return {
+      itemClase, claveClase, configClase, nivelActual, nivelDestino,
+      habilidades: recompensas.habilidades ?? [],
+      packs: recompensas.packs ?? []
+    };
+  }
+
+  /**
+   * Sube el personaje un nivel de Clase aplicando las recompensas elegidas (v0.10.0):
+   * 1. Crea el Item `habilidad` elegido (origen "clase", activable, MIST; efecto a definir en su ficha).
+   * 2. Añade las cartas del pack elegido al Mazo de Juego con nombres místicos únicos y baraja.
+   * 3. Sube `system.nivel` del Item de Clase y registra la elección en `system.historialNiveles`.
+   * 4. Anuncia la subida en el chat.
+   * La confirmación del jugador se pide en la ficha (`HojaPersonajeActor#abrirSubidaNivel`).
+   * @param {{indiceHabilidad: number, indicePack: number}} eleccion - Índices dentro de las opciones.
+   * @returns {Promise<boolean>} true si se aplicó la subida.
+   */
+  async subirDeNivel({ indiceHabilidad, indicePack }) {
+    const opciones = this.obtenerOpcionesSubidaNivel();
+    if (!opciones) {
+      ui.notifications.warn(`${this.name} no tiene una subida de nivel disponible.`);
+      return false;
+    }
+    const habilidad = opciones.habilidades[indiceHabilidad];
+    const pack = opciones.packs[indicePack];
+    if (!habilidad || !pack) {
+      ui.notifications.warn("Debes elegir una habilidad y un pack de cartas.");
+      return false;
+    }
+
+    // Las cartas nuevas van al Mazo: las pilas deben existir
+    if (!this.system.pilasDocumentos?.mazo) await this.inicializarPilasDeJugador();
+    const { mazo } = this.system.pilasDocumentos;
+    if (!mazo) return false;
+
+    const { itemClase, configClase, nivelDestino } = opciones;
+
+    // 1. Habilidad de clase
+    await this.createEmbeddedDocuments("Item", [{
+      name: habilidad.nombre,
+      type: "habilidad",
+      system: {
+        origenHabilidad: "clase",
+        esActivable: true,
+        requiereTirada: true,
+        esAtaque: Boolean(habilidad.esAtaque),
+        caracteristica: "misticismo",
+        descripcion: `<p>Habilidad de ${configClase.nombre} obtenida al alcanzar el Nivel ${nivelDestino}.</p>`
+      },
+      flags: { "cartas-y-dados": { habilidadDeClase: opciones.claveClase, nivelObtenida: nivelDestino } }
+    }]);
+
+    // 2. Cartas del pack: nombres místicos únicos frente a todas las cartas del personaje
+    const nombresUsados = new Set();
+    for (const pila of Object.values(this.system.pilasDocumentos ?? {})) {
+      for (const carta of pila?.cards ?? []) nombresUsados.add(carta.name);
+    }
+    const payloadCartas = pack.map(({ palo, numero }) => {
+      const nombre = generarNombreMisticoUnico(nombresUsados);
+      nombresUsados.add(nombre);
+      return this._normalizarPayloadCarta({ name: nombre, type: "accion", system: { palo, numero } });
+    });
+    await mazo.createEmbeddedDocuments("Card", payloadCartas);
+    await mazo.shuffle({ chatNotification: false });
+
+    // 3. Nivel e historial en el Item de Clase
+    const descripcionPack = describirPackCartas(pack);
+    await itemClase.update({
+      "system.claveClase": opciones.claveClase,
+      "system.nivel": nivelDestino,
+      "system.historialNiveles": [
+        ...(itemClase.system.historialNiveles ?? []),
+        { nivel: nivelDestino, habilidad: habilidad.nombre, cartas: descripcionPack }
+      ]
+    });
+
+    this.prepareData();
+
+    // 4. Aviso en el chat
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-angles-up"></i> ${this.name} sube a Nivel ${nivelDestino}</h3>
+          <p><strong>${configClase.nombre}</strong></p>
+          <p><i class="fa-solid fa-wand-magic-sparkles"></i> Nueva habilidad: <strong>${habilidad.nombre}</strong></p>
+          <p><i class="fa-solid fa-layer-group"></i> Cartas añadidas al Mazo: ${descripcionPack}</p>
+        </div>`
+    });
+    ui.notifications.info(`${this.name} ha subido a Nivel ${nivelDestino}.`);
+    return true;
   }
 
   /* ======================================================================== */

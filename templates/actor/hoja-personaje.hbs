@@ -46,12 +46,15 @@
           {{/if}}
         </div>
 
-        <div class="cyd-slot-trasfondo" data-tooltip="{{#if itemClase}}Palo Afín: {{itemClase.system.paloAfin}}<br>{{itemClase.system.descripcion}}{{else}}Define la Clase del personaje{{/if}}">
+        <div class="cyd-slot-trasfondo" data-tooltip="{{#if itemClase}}{{itemClase.name}} · Nivel {{itemClase.system.nivel}}{{else}}Define la Clase del personaje{{/if}}">
           <span class="cyd-slot-etiqueta"><i class="fa-solid fa-scroll"></i> Clase</span>
           {{#if itemClase}}
             <strong data-action="editarItem" data-item-id="{{itemClase.id}}" class="cyd-link-item">
               {{itemClase.name}} · Nv. {{itemClase.system.nivel}}
             </strong>
+            {{#if subidaNivel}}
+              <button type="button" class="cyd-btn-mini cyd-btn-icono" data-action="subirNivel" data-tooltip="Subir a Nivel {{subidaNivel.nivelDestino}}" aria-label="Subir de Nivel"><i class="fa-solid fa-angles-up"></i></button>
+            {{/if}}
             <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{itemClase.id}}" data-tooltip="Quitar Clase"><i class="fa-solid fa-xmark"></i></button>
           {{else}}
             <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="clase"><i class="fa-solid fa-plus"></i> Elegir</button>
@@ -249,54 +252,90 @@
         </div>
       </section>
 
-      {{!-- ================= 5. VISOR PÚBLICO DE TRINKETS ================= --}}
-      <section class="cyd-panel-trinkets">
-        <div class="cyd-cabecera-seccion">
-          <h3><i class="fa-solid fa-gem"></i> Trinkets</h3>
-          <small>Pasa el cursor para ver sus efectos</small>
-        </div>
+      {{!-- ================= 5. TRINKETS | HABILIDADES (rejilla adaptable de 2 columnas) ================= --}}
+      <div class="cyd-dos-columnas cyd-fila-trinkets-habilidades">
+        {{!-- Visor público de Trinkets --}}
+        <section class="cyd-panel-trinkets">
+          <div class="cyd-cabecera-seccion">
+            <h3><i class="fa-solid fa-gem"></i> Trinkets</h3>
+            <small>Pasa el cursor para ver sus efectos</small>
+          </div>
 
-        <div class="cyd-trinkets-activos-contenedor">
-          <div class="cyd-subtitulo-panel">En Juego</div>
-          {{#if trinketsEnJuego.length}}
-            <div class="cyd-lista-pildoras">
-              {{#each trinketsEnJuego as |trinket|}}
-                <div class="cyd-pildora-trinket cyd-estado-enJuego" data-tooltip="{{trinket.tooltipHtml}}" data-tooltip-class="cyd-tooltip">
-                  <i class="fa-solid fa-circle cyd-estado-icono"></i>
-                  <span class="cyd-pildora-nombre">{{trinket.nombre}}</span>
-                  <span class="cyd-nivel">Nv. {{trinket.nivel}}</span>
-                  {{#if ../esPropietario}}
-                    <button type="button" class="cyd-btn-mini cyd-btn-icono" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="false" data-tooltip="Enviar al Descarte"><i class="fa-solid fa-box-archive"></i></button>
-                    <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="true" data-tooltip="Quemar Trinket"><i class="fa-solid fa-fire"></i></button>
-                  {{/if}}
-                </div>
-              {{/each}}
-            </div>
-          {{else}}
-            <span class="cyd-texto-vacio">Ninguno activo.</span>
-          {{/if}}
-        </div>
+          <div class="cyd-trinkets-activos-contenedor">
+            <div class="cyd-subtitulo-panel">En Juego</div>
+            {{#if trinketsEnJuego.length}}
+              <div class="cyd-lista-pildoras">
+                {{#each trinketsEnJuego as |trinket|}}
+                  <div class="cyd-pildora-trinket cyd-estado-enJuego" data-tooltip="{{trinket.tooltipHtml}}" data-tooltip-class="cyd-tooltip">
+                    <i class="fa-solid fa-circle cyd-estado-icono"></i>
+                    <span class="cyd-pildora-nombre">{{trinket.nombre}}</span>
+                    <span class="cyd-nivel">Nv. {{trinket.nivel}}</span>
+                    {{#if ../esPropietario}}
+                      <button type="button" class="cyd-btn-mini cyd-btn-icono" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="false" data-tooltip="Enviar al Descarte"><i class="fa-solid fa-box-archive"></i></button>
+                      <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="retirarTrinket" data-trinket-id="{{trinket.idEnPilaActual}}" data-quemar="true" data-tooltip="Quemar Trinket"><i class="fa-solid fa-fire"></i></button>
+                    {{/if}}
+                  </div>
+                {{/each}}
+              </div>
+            {{else}}
+              <span class="cyd-texto-vacio">Ninguno activo.</span>
+            {{/if}}
+          </div>
 
-        <div class="cyd-trinkets-coleccion">
-          <div class="cyd-subtitulo-panel">Colección</div>
-          {{#if todosLosTrinkets.length}}
-            <div class="cyd-lista-pildoras">
-              {{#each todosLosTrinkets as |trinket|}}
-                <div class="cyd-pildora-trinket cyd-estado-{{trinket.estado}}" data-tooltip="{{trinket.tooltipHtml}}" data-tooltip-class="cyd-tooltip">
-                  <i class="fa-solid {{#if (eq trinket.estado "quemado")}}fa-fire{{else if (eq trinket.estado "descartado")}}fa-box-archive{{else if (eq trinket.estado "enMano")}}fa-hand{{else if (eq trinket.estado "enJuego")}}fa-circle{{else}}fa-circle-notch{{/if}} cyd-estado-icono"></i>
-                  <strong class="cyd-pildora-nombre">{{trinket.nombre}}</strong>
-                  <span class="cyd-nivel">Nv. {{trinket.nivel}}</span>
-                  {{#if (and ../esPropietario trinket.estaDisponible)}}
-                    <button type="button" class="cyd-btn-mini" data-action="robarTrinket" data-trinket-id="{{trinket.idOriginal}}" data-tooltip="Llevar a la Mano (descartando una carta)"><i class="fa-solid fa-hand"></i></button>
-                  {{/if}}
-                </div>
-              {{/each}}
+          <div class="cyd-trinkets-coleccion">
+            <div class="cyd-subtitulo-panel">Colección</div>
+            {{#if todosLosTrinkets.length}}
+              <div class="cyd-lista-pildoras">
+                {{#each todosLosTrinkets as |trinket|}}
+                  <div class="cyd-pildora-trinket cyd-estado-{{trinket.estado}}" data-tooltip="{{trinket.tooltipHtml}}" data-tooltip-class="cyd-tooltip">
+                    <i class="fa-solid {{#if (eq trinket.estado "quemado")}}fa-fire{{else if (eq trinket.estado "descartado")}}fa-box-archive{{else if (eq trinket.estado "enMano")}}fa-hand{{else if (eq trinket.estado "enJuego")}}fa-circle{{else}}fa-circle-notch{{/if}} cyd-estado-icono"></i>
+                    <strong class="cyd-pildora-nombre">{{trinket.nombre}}</strong>
+                    <span class="cyd-nivel">Nv. {{trinket.nivel}}</span>
+                    {{#if (and ../esPropietario trinket.estaDisponible)}}
+                      <button type="button" class="cyd-btn-mini" data-action="robarTrinket" data-trinket-id="{{trinket.idOriginal}}" data-tooltip="Llevar a la Mano (descartando una carta)"><i class="fa-solid fa-hand"></i></button>
+                    {{/if}}
+                  </div>
+                {{/each}}
+              </div>
+            {{else}}
+              <span class="cyd-texto-vacio">Pulsa "Trinket" en Mazo y Pilas para añadir tu primer Trinket.</span>
+            {{/if}}
+          </div>
+        </section>
+
+        {{!-- Habilidades (activables con carta MIST) --}}
+          <section class="cyd-panel cyd-panel-habilidades">
+            <div class="cyd-cabecera-seccion">
+              <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidades</h3>
+              {{#if esPropietario}}
+                <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="habilidad"><i class="fa-solid fa-plus"></i> Habilidad</button>
+              {{/if}}
             </div>
-          {{else}}
-            <span class="cyd-texto-vacio">Pulsa "Trinket" en Mazo y Pilas para añadir tu primer Trinket.</span>
-          {{/if}}
-        </div>
-      </section>
+
+            {{#if habilidades.length}}
+              <div class="cyd-lista-items">
+                {{#each habilidades as |hab|}}
+                  <div class="cyd-fila-item" data-tooltip="{{hab.system.descripcion}}" data-tooltip-class="cyd-tooltip">
+                    <div class="cyd-fila-item-info">
+                      <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{hab.id}}">{{hab.name}}</strong>
+                      {{#if hab.system.origenHabilidad}}<small>{{hab.system.origenHabilidad}}</small>{{/if}}
+                    </div>
+                    <div class="cyd-fila-item-acciones">
+                      {{#if ../esPropietario}}
+                        <button type="button" class="cyd-btn-mini" data-action="usarHabilidad" data-item-id="{{hab.id}}" data-tooltip="{{#if hab.system.esActivable}}Activar (consume una carta MIST){{else}}Mostrar en el chat{{/if}}">
+                          {{#if hab.system.esActivable}}<i class="fa-solid fa-dice-d20"></i> Usar{{else}}<i class="fa-solid fa-comment"></i> Chat{{/if}}
+                        </button>
+                        <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{hab.id}}" data-tooltip="Eliminar"><i class="fa-solid fa-xmark"></i></button>
+                      {{/if}}
+                    </div>
+                  </div>
+                {{/each}}
+              </div>
+            {{else}}
+              <p class="cyd-texto-vacio">No tienes habilidades registradas.</p>
+            {{/if}}
+          </section>
+      </div>
 
       {{!-- ================= 6. MANO ACTUAL DEL JUGADOR ================= --}}
       <section class="cyd-panel-mano">
@@ -350,78 +389,42 @@
         {{/if}}
       </section>
 
-      {{!-- ================= 7. EQUIPO Y HABILIDADES ================= --}}
-      <div class="cyd-dos-columnas">
-
-        <section class="cyd-panel">
-          <div class="cyd-cabecera-seccion">
-            <h3><i class="fa-solid fa-box-open"></i> Equipo</h3>
-            {{#if esPropietario}}
-              <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="objeto"><i class="fa-solid fa-plus"></i> Objeto</button>
-            {{/if}}
-          </div>
-
-          {{#if objetos.length}}
-            <div class="cyd-lista-items">
-              {{#each objetos as |obj|}}
-                <div class="cyd-fila-item {{#if obj.system.equipado}}cyd-item-equipado{{/if}}" data-tooltip="{{obj.system.descripcion}}" data-tooltip-class="cyd-tooltip">
-                  <div class="cyd-fila-item-info">
-                    <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-btn-equipar {{#if obj.system.equipado}}cyd-activo{{/if}}" data-action="alternarEquipado" data-item-id="{{obj.id}}" data-tooltip="{{#if obj.system.equipado}}Desequipar{{else}}Equipar{{/if}}">
-                      <i class="{{#if obj.system.equipado}}fa-solid fa-shield-halved{{else}}fa-regular fa-circle{{/if}}"></i>
-                    </button>
-                    <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{obj.id}}">{{obj.name}}</strong>
-                    <small class="cyd-detalle-item">
-                      {{#if obj.system.bonificadores.defensa}}<span><i class="fa-solid fa-shield-halved"></i> +{{obj.system.bonificadores.defensa}}</span>{{/if}}
-                      {{#if obj.system.bonificadores.limiteMano}}<span><i class="fa-solid fa-hand"></i> +{{obj.system.bonificadores.limiteMano}}</span>{{/if}}
-                    </small>
-                  </div>
-                  <div class="cyd-fila-item-acciones">
-                    <span class="cyd-tag-cantidad">×{{obj.system.cantidad}}</span>
-                    {{#if ../esPropietario}}
-                      <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{obj.id}}" data-tooltip="Eliminar"><i class="fa-solid fa-xmark"></i></button>
-                    {{/if}}
-                  </div>
-                </div>
-              {{/each}}
-            </div>
-          {{else}}
-            <p class="cyd-texto-vacio">No tienes objetos en el inventario.</p>
+      {{!-- ================= 7. EQUIPO (ancho completo; Habilidades va junto a Trinkets) ================= --}}
+      <section class="cyd-panel cyd-panel-equipo">
+        <div class="cyd-cabecera-seccion">
+          <h3><i class="fa-solid fa-box-open"></i> Equipo</h3>
+          {{#if esPropietario}}
+            <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="objeto"><i class="fa-solid fa-plus"></i> Objeto</button>
           {{/if}}
-        </section>
+        </div>
 
-        <section class="cyd-panel">
-          <div class="cyd-cabecera-seccion">
-            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidades</h3>
-            {{#if esPropietario}}
-              <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="habilidad"><i class="fa-solid fa-plus"></i> Habilidad</button>
-            {{/if}}
-          </div>
-
-          {{#if habilidades.length}}
-            <div class="cyd-lista-items">
-              {{#each habilidades as |hab|}}
-                <div class="cyd-fila-item" data-tooltip="{{hab.system.descripcion}}" data-tooltip-class="cyd-tooltip">
-                  <div class="cyd-fila-item-info">
-                    <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{hab.id}}">{{hab.name}}</strong>
-                    {{#if hab.system.origenHabilidad}}<small>{{hab.system.origenHabilidad}}</small>{{/if}}
-                  </div>
-                  <div class="cyd-fila-item-acciones">
-                    {{#if ../esPropietario}}
-                      <button type="button" class="cyd-btn-mini" data-action="usarHabilidad" data-item-id="{{hab.id}}" data-tooltip="{{#if hab.system.esActivable}}Activar (consume una carta MIST){{else}}Mostrar en el chat{{/if}}">
-                        {{#if hab.system.esActivable}}<i class="fa-solid fa-dice-d20"></i> Usar{{else}}<i class="fa-solid fa-comment"></i> Chat{{/if}}
-                      </button>
-                      <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{hab.id}}" data-tooltip="Eliminar"><i class="fa-solid fa-xmark"></i></button>
-                    {{/if}}
-                  </div>
+        {{#if objetos.length}}
+          <div class="cyd-lista-items">
+            {{#each objetos as |obj|}}
+              <div class="cyd-fila-item {{#if obj.system.equipado}}cyd-item-equipado{{/if}}" data-tooltip="{{obj.system.descripcion}}" data-tooltip-class="cyd-tooltip">
+                <div class="cyd-fila-item-info">
+                  <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-btn-equipar {{#if obj.system.equipado}}cyd-activo{{/if}}" data-action="alternarEquipado" data-item-id="{{obj.id}}" data-tooltip="{{#if obj.system.equipado}}Desequipar{{else}}Equipar{{/if}}">
+                    <i class="{{#if obj.system.equipado}}fa-solid fa-shield-halved{{else}}fa-regular fa-circle{{/if}}"></i>
+                  </button>
+                  <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{obj.id}}">{{obj.name}}</strong>
+                  <small class="cyd-detalle-item">
+                    {{#if obj.system.bonificadores.defensa}}<span><i class="fa-solid fa-shield-halved"></i> +{{obj.system.bonificadores.defensa}}</span>{{/if}}
+                    {{#if obj.system.bonificadores.limiteMano}}<span><i class="fa-solid fa-hand"></i> +{{obj.system.bonificadores.limiteMano}}</span>{{/if}}
+                  </small>
                 </div>
-              {{/each}}
-            </div>
-          {{else}}
-            <p class="cyd-texto-vacio">No tienes habilidades registradas.</p>
-          {{/if}}
-        </section>
-
-      </div>
+                <div class="cyd-fila-item-acciones">
+                  <span class="cyd-tag-cantidad">×{{obj.system.cantidad}}</span>
+                  {{#if ../esPropietario}}
+                    <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{obj.id}}" data-tooltip="Eliminar"><i class="fa-solid fa-xmark"></i></button>
+                  {{/if}}
+                </div>
+              </div>
+            {{/each}}
+          </div>
+        {{else}}
+          <p class="cyd-texto-vacio">No tienes objetos en el inventario.</p>
+        {{/if}}
+      </section>
     {{/unless}}
     </section>
 

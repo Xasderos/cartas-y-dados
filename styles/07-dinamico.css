@@ -110,18 +110,39 @@
   cursor: pointer;
 }
 
-/* Diálogos con muchas opciones: un botón por fila, texto alineado y legible */
-.cyd-dialogo-lista .form-footer {
+/* Botones del pie de cualquier diálogo del sistema: el texto largo hace wrap
+   y el botón crece en altura en vez de desbordarse (v0.10.0). */
+.application.cyd-dialogo .form-footer button {
+  height: auto;
+  min-height: var(--button-size, 32px);
+  min-width: 0;
+  padding-block: 4px;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Diálogos con muchas opciones: un botón por fila, texto alineado y legible.
+   Foundry v14 maqueta el pie como rejilla/flex con wrap: se fuerza una columna. */
+.application.cyd-dialogo-lista .form-footer {
+  display: flex;
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: stretch;
   gap: 4px;
 }
 
-.cyd-dialogo-lista .form-footer button {
+.application.cyd-dialogo-lista .form-footer button {
   flex: 0 0 auto;
+  width: 100%;
   justify-content: flex-start;
-  white-space: normal;
   text-align: left;
+}
+
+/* Grupos de radios (Subida de Nivel) */
+.cyd-dialogo fieldset {
+  margin: 8px 0 0;
+  min-width: 0;
 }
 
 /* ======================================================================== */

@@ -9,7 +9,7 @@
  */
 
 const { TypeDataModel } = foundry.abstract;
-const { BooleanField, HTMLField, NumberField, SchemaField, StringField } = foundry.data.fields;
+const { ArrayField, BooleanField, HTMLField, NumberField, SchemaField, StringField } = foundry.data.fields;
 
 /**
  * Esquema reutilizable de bonificadores que cualquier Raza, Origen, Clase u Objeto
@@ -61,11 +61,22 @@ export class OrigenDataModel extends TypeDataModel {
 
 /**
  * 3. Modelo de datos para CLASE ('clase')
+ * (v0.10.0) El Item de Clase es el registro de progresión del personaje:
+ * - `claveClase`: clave de `SISTEMA_CONFIG.CLASES_BASE` (vacía en clases personalizadas).
+ * - `nivel`: nivel actual (lo sube `SistemaActor#subirDeNivel`).
+ * - `historialNiveles`: una entrada por subida con la habilidad y el pack elegidos.
+ * Los `bonificadores` se conservan por compatibilidad, pero las clases base no aportan ninguno.
  */
 export class ClaseDataModel extends TypeDataModel {
   static defineSchema() {
     return {
       ...esquemaBonificadoresPersonaje(),
+      claveClase: new StringField({ required: true, blank: true, initial: "" }),
+      historialNiveles: new ArrayField(new SchemaField({
+        nivel: new NumberField({ required: true, integer: true, min: 2 }),
+        habilidad: new StringField({ required: true, blank: true, initial: "" }),
+        cartas: new StringField({ required: true, blank: true, initial: "" })
+      })),
       nivel: new NumberField({ required: true, integer: true, initial: 1, min: 1, max: 20 }),
       paloAfin: new StringField({
         required: true,

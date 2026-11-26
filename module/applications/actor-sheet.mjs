@@ -7,7 +7,7 @@
 import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica.mjs";
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 
-import { SISTEMA_CONFIG, abreviadoPalo, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -46,7 +46,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       editarItem: HojaPersonajeActor.#onEditarItem,
       eliminarItem: HojaPersonajeActor.#onEliminarItem,
       alternarEquipado: HojaPersonajeActor.#onAlternarEquipado,
-      usarHabilidad: HojaPersonajeActor.#onUsarHabilidad
+      usarHabilidad: HojaPersonajeActor.#onUsarHabilidad,
+      subirNivel: HojaPersonajeActor.#onSubirNivel
     }
   };
 
@@ -131,6 +132,10 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     const objetos = actor.items.filter(i => i.type === "objeto");
     const habilidades = actor.items.filter(i => i.type === "habilidad");
 
+    // Subida de nivel disponible (v0.10.0): solo si la clase base tiene progresión para el siguiente nivel
+    const opcionesNivel = actor.isOwner ? actor.obtenerOpcionesSubidaNivel() : null;
+    const subidaNivel = opcionesNivel ? { nivelDestino: opcionesNivel.nivelDestino } : null;
+
     return {
       ...context,
       actor,
@@ -145,7 +150,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       itemOrigen: system.itemOrigen,
       itemClase: system.itemClase,
       objetos,
-      habilidades
+      habilidades,
+      subidaNivel
     };
   }
 
@@ -255,6 +261,76 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     this.render();
   }
 
+  /**
+   * Diálogo de Subida de Nivel (v0.10.0), solo `DialogV2`:
+   * - Paso 1 (`DialogV2.prompt`): radios `cydHabilidadNivel` (una habilidad) y `cydPackNivel`
+   *   (un pack de cartas) de `progresion[nivelDestino]` de la clase.
+   * - Paso 2 (`DialogV2.confirm`): resumen de la elección; la subida no se puede deshacer.
+   * Cancelar en cualquier paso sale sin cambios. Aplica con `SistemaActor#subirDeNivel`.
+   */
+  async abrirSubidaNivel() {
+    const actor = this.document;
+    const opciones = actor.obtenerOpcionesSubidaNivel();
+    if (!opciones) {
+      ui.notifications.warn("No hay una subida de nivel disponible para esta Clase.");
+      return;
+    }
+    const { configClase, nivelActual, nivelDestino, habilidades, packs } = opciones;
+    const escapar = foundry.utils.escapeHTML;
+
+    const radiosHabilidades = habilidades.map((h, i) => `
+      <label class="cyd-opcion-radio">
+        <input type="radio" name="cydHabilidadNivel" value="${i}" ${i === 0 ? "checked" : ""} />
+        ${escapar(h.nombre)}
+      </label>`).join("");
+    const radiosPacks = packs.map((p, i) => `
+      <label class="cyd-opcion-radio">
+        <input type="radio" name="cydPackNivel" value="${i}" ${i === 0 ? "checked" : ""} />
+        Pack ${i + 1}: ${escapar(describirPackCartas(p))}
+      </label>`).join("");
+
+    const eleccion = await DialogV2.prompt({
+      ...opcionesDialogoSistema({ width: 460 }),
+      window: { title: `${actor.name} — Subida a Nivel ${nivelDestino}` },
+      content: `
+        <p><strong>${escapar(configClase.nombre)}</strong> · Nivel ${nivelActual} → ${nivelDestino}</p>
+        <fieldset><legend><i class="fa-solid fa-wand-magic-sparkles"></i> Elige una habilidad</legend>${radiosHabilidades}</fieldset>
+        <fieldset><legend><i class="fa-solid fa-layer-group"></i> Elige un pack de cartas</legend>${radiosPacks}</fieldset>
+      `,
+      ok: {
+        label: "Continuar",
+        icon: "fa-solid fa-angles-up",
+        callback: (event, button) => ({
+          indiceHabilidad: Number(button.form.elements.cydHabilidadNivel.value),
+          indicePack: Number(button.form.elements.cydPackNivel.value)
+        })
+      },
+      rejectClose: false
+    });
+    if (!eleccion) return;
+
+    const habilidad = habilidades[eleccion.indiceHabilidad];
+    const pack = packs[eleccion.indicePack];
+    const confirmado = await DialogV2.confirm({
+      ...opcionesDialogoSistema(),
+      window: { title: "Confirmar Subida de Nivel" },
+      content: `
+        <p>${escapar(actor.name)} subirá a <strong>Nivel ${nivelDestino}</strong> y obtendrá:</p>
+        <p><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidad: <strong>${escapar(habilidad.nombre)}</strong></p>
+        <p><i class="fa-solid fa-layer-group"></i> Cartas: ${escapar(describirPackCartas(pack))}</p>
+        <p>Esta elección no se puede deshacer. ¿Continuar?</p>
+      `,
+      yes: { label: "Subir de Nivel", icon: "fa-solid fa-angles-up" },
+      no: { label: "Cancelar" },
+      defaultYes: false,
+      rejectClose: false
+    });
+    if (!confirmado) return;
+
+    await actor.subirDeNivel(eleccion);
+    this.render();
+  }
+
   /* ======================================================================== */
   /*  ACCIONES DE CARTAS Y TURNO                                              */
   /* ======================================================================== */
@@ -274,6 +350,11 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       await this.abrirAsistenteClase();
     }
     this.render();
+  }
+
+  /** Botón "Subir de Nivel" de la ranura de Clase (v0.10.0). */
+  static async #onSubirNivel() {
+    await this.abrirSubidaNivel();
   }
 
   static async #onRobarTurno() {

@@ -88,31 +88,92 @@ export const SISTEMA_CONFIG = {
    *   en cuyo caso el Mazo de Acción queda vacío para personalización manual).
    * - `avanzada`: si es true, requiere confirmación explícita (no recomendada a novatos).
    * - `trinkets`: nombres de Trinkets ofrecidos al crear el personaje.
+   * - `progresion` (v0.10.0): recompensas por nivel alcanzado, `{ <nivelDestino>: { habilidades, packs } }`.
+   *   · `habilidades`: lista de `{ nombre, esAtaque }`; el jugador elige UNA y se crea como
+   *     Item `habilidad` (origen "clase") en el Actor.
+   *   · `packs`: lista de packs de cartas; el jugador elige UNO y sus cartas `{ palo, numero }`
+   *     (numero 1 = d4, 2 = d6...) se añaden al Mazo de Juego con nombre místico.
+   *   Sin entrada para el nivel siguiente → la subida de nivel no está disponible.
    */
   CLASES_BASE: {
     fortisCorpore: {
       nombre: "Fortis Corpore",
       atributo: "fisico",
       paloPrincipal: "espadas",
-      trinkets: ["Espada", "Escudo", "Daga"]
+      trinkets: ["Espada", "Escudo", "Daga"],
+      progresion: {
+        2: {
+          habilidades: [
+            { nombre: "Potenciación", esAtaque: false },
+            { nombre: "Baluarte", esAtaque: false },
+            { nombre: "Paso de las sombras", esAtaque: false }
+          ],
+          packs: [
+            [{ palo: "oros", numero: 1 }, { palo: "espadas", numero: 2 }],
+            [{ palo: "bastos", numero: 1 }, { palo: "espadas", numero: 2 }]
+          ]
+        }
+      }
     },
     mendaciumCharisma: {
       nombre: "Mendacium Charisma",
       atributo: "social",
       paloPrincipal: "oros",
-      trinkets: ["Empatía", "Compañero Eterno", "Amistad"]
+      trinkets: ["Empatía", "Compañero Eterno", "Amistad"],
+      progresion: {
+        2: {
+          habilidades: [
+            { nombre: "Sanación", esAtaque: false },
+            { nombre: "Promesa", esAtaque: false },
+            { nombre: "Limpieza", esAtaque: false }
+          ],
+          packs: [
+            [{ palo: "espadas", numero: 1 }, { palo: "oros", numero: 2 }],
+            [{ palo: "bastos", numero: 1 }, { palo: "oros", numero: 2 }]
+          ]
+        }
+      }
     },
     altaScentia: {
       nombre: "Alta Scentia",
       atributo: "consciencia",
       paloPrincipal: "bastos",
-      trinkets: ["Elementalismo", "Visión del futuro", "Artilugio de primera"]
+      trinkets: ["Elementalismo", "Visión del futuro", "Artilugio de primera"],
+      progresion: {
+        2: {
+          habilidades: [
+            { nombre: "Manifestar arma", esAtaque: false },
+            { nombre: "Tiempo embotellado", esAtaque: false },
+            { nombre: "Descarga elemental (hielo)", esAtaque: true },
+            { nombre: "Descarga elemental (rayo)", esAtaque: true },
+            { nombre: "Descarga elemental (fuego)", esAtaque: true }
+          ],
+          packs: [
+            [{ palo: "oros", numero: 1 }, { palo: "bastos", numero: 2 }],
+            [{ palo: "espadas", numero: 1 }, { palo: "bastos", numero: 2 }]
+          ]
+        }
+      }
     },
     potensMystica: {
       nombre: "Potens Mystica",
       atributo: "misticismo",
       paloPrincipal: "copas",
-      trinkets: ["Ojo por ojo", "Preservación espiritual", "Barrera espiritual"]
+      trinkets: ["Ojo por ojo", "Preservación espiritual", "Barrera espiritual"],
+      progresion: {
+        2: {
+          habilidades: [
+            { nombre: "Mal de ojo", esAtaque: true },
+            { nombre: "Sellar destino", esAtaque: false },
+            { nombre: "Flagelar esencia", esAtaque: true }
+          ],
+          packs: [
+            [{ palo: "espadas", numero: 1 }, { palo: "copas", numero: 2 }],
+            [{ palo: "bastos", numero: 1 }, { palo: "copas", numero: 2 }],
+            [{ palo: "oros", numero: 1 }, { palo: "copas", numero: 2 }]
+          ]
+        }
+      }
     },
     tabulaRasa: {
       nombre: "Tabula Rasa",
@@ -129,6 +190,37 @@ export const SISTEMA_CONFIG = {
  * @param {string} clavePalo - Clave interna del palo ("espadas", "bastos", "oros", "copas").
  * @returns {string} "FISC", "CONS", "SOC" o "MIST" (o la clave en mayúsculas si es desconocida).
  */
+/**
+ * Resuelve la clave de `SISTEMA_CONFIG.CLASES_BASE` de un Item de Clase (v0.10.0).
+ * Usa `system.claveClase`; para personajes anteriores a v0.10.0 (sin clave guardada)
+ * la deduce comparando el nombre del Item con `CLASES_BASE.<clave>.nombre`.
+ * @param {Item|null} itemClase - Item de tipo "clase" del Actor.
+ * @returns {string|null} Clave de la clase base o null si no corresponde a ninguna.
+ */
+export function claveClaseDeItem(itemClase) {
+  if (!itemClase) return null;
+  const clases = SISTEMA_CONFIG.CLASES_BASE;
+  const guardada = itemClase.system?.claveClase;
+  if (guardada && clases[guardada]) return guardada;
+  const nombre = String(itemClase.name ?? "").trim().toLowerCase();
+  return Object.keys(clases).find(k => clases[k].nombre.toLowerCase() === nombre) ?? null;
+}
+
+/**
+ * Describe un pack de cartas de progresión en texto plano (v0.10.0),
+ * p. ej. "1× SOC d4 + 1× FISC d6". Apto para labels de `DialogV2` y chat.
+ * @param {Array<{palo: string, numero: number}>} pack - Cartas del pack.
+ * @returns {string} Descripción legible del pack.
+ */
+export function describirPackCartas(pack) {
+  const conteo = new Map();
+  for (const { palo, numero } of pack ?? []) {
+    const etiqueta = `${abreviadoPalo(palo)} ${SISTEMA_CONFIG.dadoPorNumeroCarta[numero] ?? "?"}`;
+    conteo.set(etiqueta, (conteo.get(etiqueta) ?? 0) + 1);
+  }
+  return [...conteo].map(([etiqueta, n]) => `${n}× ${etiqueta}`).join(" + ");
+}
+
 export function abreviadoPalo(clavePalo) {
   return SISTEMA_CONFIG.palosCartas[clavePalo]?.abreviado
     ?? String(clavePalo ?? "").toUpperCase();
