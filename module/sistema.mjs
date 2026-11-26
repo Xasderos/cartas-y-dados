@@ -13,7 +13,7 @@ import {
   ObjetoDataModel,
   HabilidadDataModel
 } from "./data/item-model.mjs";
-import { SistemaActor } from "./documents/actor.mjs";
+import { SistemaActor, registrarSocketAltaScentia } from "./documents/actor.mjs";
 import { SistemaCombat } from "./documents/combat.mjs";
 import { HojaPersonajeActor } from "./applications/actor-sheet.mjs";
 import { HojaItemSistema } from "./applications/item-sheet.mjs";
@@ -164,6 +164,7 @@ Hooks.once("ready", async () => {
   registrarReajusteEnResize();
   // Crítico/Pifia y privacidad de ataques (v0.11.0): mensajes solo Master pedidos por jugadores.
   registrarSocketDados();
+  registrarSocketAltaScentia(); // (v0.16.0) Monóculo indiscreto
 
   // (v0.14.1) El ajuste "tamanoBase" guardaba índices ("0".."4"): se convierte al nombre del tamaño.
   if (game.user.isGM && game.settings.get("cartas-y-dados", "tamanoBase") !== leerTamanoBase()) {
@@ -345,6 +346,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   anadirBotonEsperaUnMomento(message, html);
   activarBotonCuracion(html);
   activarBotonesMendacium(message, html);
+  activarBotonEstadoAlterado(html);
 
   const btnDano = html.querySelector(".cyd-btn-aplicar-dano");
   if (!btnDano) return;
@@ -438,7 +440,38 @@ function activarBotonCuracion(html) {
 }
 
 /**
+ * Alta Scentia · Descarga elemental (v0.16.0): botón del Master para aplicar al objetivo el estado
+ * alterado del elemento (`CONFIG.statusEffects`, `data-estado`). Se elimina para el resto de usuarios.
+ * @param {HTMLElement} html
+ */
+function activarBotonEstadoAlterado(html) {
+  for (const boton of html.querySelectorAll(".cyd-btn-aplicar-estado")) {
+    if (!game.user.isGM) {
+      boton.remove();
+      continue;
+    }
+    boton.addEventListener("click", async ev => {
+      ev.preventDefault();
+      const actorObjetivo = await fromUuid(boton.dataset.actorUuid);
+      if (!actorObjetivo) {
+        ui.notifications.warn("No se encontró la criatura objetivo.");
+        return;
+      }
+      const estado = boton.dataset.estado;
+      if (!CONFIG.statusEffects.some(e => e.id === estado)) {
+        ui.notifications.warn(`El estado «${boton.dataset.nombre || estado}» no existe en este mundo: aplícalo a mano.`);
+        return;
+      }
+      await actorObjetivo.toggleStatusEffect(estado, { active: true });
+      boton.disabled = true;
+      boton.innerHTML = `<i class="fa-solid fa-check"></i> ${foundry.utils.escapeHTML(boton.dataset.nombre || estado)} aplicado`;
+    });
+  }
+}
+
+/**
  * Mendacium Charisma (v0.15.0): botones «Robar carta (Empatía)» y «Elegir carta (Promesa)».
+ * (v0.16.0) También «Descartar la primera carta del Mazo» (Visión del futuro, Alta Scentia).
  * Solo los ve y usa el propietario del Actor indicado en `data-actor-uuid`; cada mensaje se
  * usa una sola vez por Actor (`flags.cartas-y-dados.ultimaEmpatia` / `ultimaPromesa`).
  * @param {ChatMessage} message
@@ -449,7 +482,10 @@ function activarBotonesMendacium(message, html) {
     { selector: ".cyd-btn-empatia", flag: "ultimaEmpatia",
       usar: (actor, b) => actor.usarEmpatia(b.dataset.origen ?? "") },
     { selector: ".cyd-btn-promesa", flag: "ultimaPromesa",
-      usar: (actor, b) => actor.elegirCartaPromesa(Number(b.dataset.x) || 0, b.dataset.origen ?? "") }
+      usar: (actor, b) => actor.elegirCartaPromesa(Number(b.dataset.x) || 0, b.dataset.origen ?? "") },
+    // (v0.16.0) Alta Scentia · Visión del futuro: descartar la primera carta del Mazo tras la tirada.
+    { selector: ".cyd-btn-vision-futuro", flag: "ultimaVisionFuturo",
+      usar: actor => actor.descartarPrimeraCartaMazo() }
   ];
   for (const { selector, flag, usar } of botones) {
     for (const boton of html.querySelectorAll(selector)) {

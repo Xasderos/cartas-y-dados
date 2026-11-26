@@ -223,6 +223,15 @@
           </select>
         </div>
       </div>
+      {{!-- (v0.16.0) Descarga elemental: potenciar con cartas CONS y estado alterado del elemento --}}
+      <div class="cyd-recursos-barra">
+        <div class="cyd-recurso-caja" data-tooltip="Con un elemento, antes de tirar eliges cartas CONS de la mano para potenciar el ataque y el Master recibe un botón para aplicar el estado alterado del elemento. Con el abalorio Elementalismo se puede cambiar el elemento.">
+          <span class="cyd-recurso-titulo"><i class="fa-solid fa-fire-flame-curved"></i> Elemento</span>
+          <select name="flags.cartas-y-dados.elemento">
+            {{#each opcionesElemento as |opcion|}}<option value="{{opcion.valor}}" {{#if opcion.seleccionado}}selected{{/if}}>{{opcion.etiqueta}}</option>{{/each}}
+          </select>
+        </div>
+      </div>
       <div class="cyd-recursos-barra cyd-cols-2">
         <div class="cyd-recurso-caja">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-star-of-life"></i> Atributo</span>

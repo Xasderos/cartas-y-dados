@@ -338,7 +338,8 @@ export const SISTEMA_CONFIG = {
    *   en `flags.cartas-y-dados.abalorio` del Trinket y activa su efecto mientras está En Juego
    *   (`SistemaActor#abaloriosActivos`); `texto` se copia a `efectoPermanente`. Normalizar con
    *   `opcionesTrinketsClase()`. `eterno: true` (v0.15.0, Abalorio Eterno): solo puede estar En Juego
-   *   o Quemado (ver `SistemaActor#_destinoAbalorioEterno`).
+   *   o Quemado (ver `SistemaActor#_destinoAbalorioEterno`). `artilugios` (v0.16.0, Artilugio de primera):
+   *   claves de `ARTILUGIOS` entre las que se elige el objeto mágico asociado (cambiable al subir de nivel).
    * - `tablaElecciones` (opcional, v0.15.0): resumen por nivel en texto plano `{ nivel, beneficios }`
    *   (se muestra en la ficha del Item de Clase).
    * - `progresion` (v0.10.0): recompensas por nivel alcanzado,
@@ -348,13 +349,48 @@ export const SISTEMA_CONFIG = {
    *     `habilidad` (origen "clase"). `texto` → descripción; `valorX` → la tirada MIST fija el valor X
    *     (sin Dificultad); `sinAccion` → usarla no gasta acción (v0.15.0); `efectoX` (v0.15.0) →
    *     automatización del valor X sobre el Token objetivo (`curacion` o `promesa`), guardada en
-   *     `flags.cartas-y-dados.efectoX` del Item.
+   *     `flags.cartas-y-dados.efectoX` del Item (v0.16.0: también `manifestarArma` y `tiempoEmbotellado`);
+   *     `elemento` (v0.16.0, Descarga elemental) → clave de `ELEMENTOS`, guardada en
+   *     `flags.cartas-y-dados.elemento`: potenciar con cartas CONS y aplicar el estado alterado.
    *   · `packs`: lista de packs de cartas; sus cartas `{ palo, numero }` (numero 1 = d4, 2 = d6...)
    *     se añaden al Mazo de Juego con nombre místico.
    *   · `especializaciones` (v0.15.0): `{ clave, nombre, texto }`; se guarda en
    *     `system.especializacion` del Item de Clase y se crea como Habilidad pasiva.
    *   Sin entrada para el nivel siguiente → la subida de nivel no está disponible.
    */
+  /**
+   * Elementos de las Descargas elementales y del abalorio Elementalismo (v0.16.0). `estado` es el id
+   * del estado alterado de Foundry (`CONFIG.statusEffects`) que la Descarga aplica siempre al objetivo;
+   * `nombreEstado` es el texto de respaldo si el estado no existe en el mundo.
+   */
+  ELEMENTOS: {
+    fuego: { nombre: "Fuego", icono: "fa-fire", estado: "burning", nombreEstado: "Ardiendo" },
+    hielo: { nombre: "Hielo", icono: "fa-snowflake", estado: "frozen", nombreEstado: "Congelado" },
+    rayo: { nombre: "Rayo", icono: "fa-bolt-lightning", estado: "shock", nombreEstado: "Electrocutado" }
+  },
+
+  /**
+   * Objetos mágicos del abalorio «Artilugio de primera» de Alta Scentia (v0.16.0). La clave elegida se
+   * guarda en `flags.cartas-y-dados.artilugio` del Trinket; `auto` describe lo automatizado.
+   */
+  ARTILUGIOS: {
+    monoculo: {
+      nombre: "Monóculo indiscreto", icono: "fa-magnifying-glass",
+      texto: "Un artilugio perfecto para los más cotillas, permite revelar cosas de los demás que quizás no están dispuestos a revelar: con este puedes mirar dentro de los bolsillos y bolsas de los que te rodean. Además puedes ver la carta superior (sin revelarla) de tus aliados y enemigos.",
+      auto: "Botón «Monóculo» en la ficha: te muestra en privado la carta superior del Mazo del Token objetivo (T)."
+    },
+    botas: {
+      nombre: "Botas de gato", icono: "fa-shoe-prints",
+      texto: "Tan cómodas como útiles, las botas de gato reducen a la mitad el daño que recibes al caer y no haces ruido al caminar.",
+      auto: ""
+    },
+    agujero: {
+      nombre: "Agujero portátil", icono: "fa-circle-dot",
+      texto: "La bolsa que nunca se acaba, un bolsillo que realmente puede guardar todo lo que quieras meter. (ADVERTENCIA: No guardar criaturas vivas u otros agujeros portátiles. Ningún proveedor de artilugios mágicos o baratijas se hace responsable de un uso indebido; para más información consulte los «Términos y Condiciones de Uso» proporcionados por AdTifacto S.A.)",
+      auto: ""
+    }
+  },
+
   CLASES_BASE: {
     fortisCorpore: {
       nombre: "Fortis Corpore",
@@ -478,19 +514,76 @@ export const SISTEMA_CONFIG = {
       nombre: "Alta Scentia",
       atributo: "consciencia",
       paloPrincipal: "bastos",
-      trinkets: ["Elementalismo", "Visión del futuro", "Artilugio de primera"],
+      tablaElecciones: [
+        { nivel: 1, beneficios: "Mazo Inicial (Consciencia) · Elección de abalorio" },
+        { nivel: 2, beneficios: "Elección de habilidad · Elección de cartas" },
+        { nivel: 3, beneficios: "Elección de especialización" }
+      ],
+      trinkets: [
+        {
+          clave: "elementalismo", nombre: "Elementalismo", icono: "fa-fire-flame-curved",
+          texto: "Puedes cambiar el elemento de tus poderes, cambiar el tipo de daño de tus ataques y el tipo de elemento de tus defensas, al que quieras.",
+          auto: "En Juego: el diálogo de acción permite elegir el elemento de la acción (se indica en el chat) y la Descarga elemental puede cambiar de elemento (y con él, de estado alterado)."
+        },
+        {
+          clave: "visionFuturo", nombre: "Visión del futuro", icono: "fa-eye",
+          texto: "Puedes ver la primera carta de tu mazo en todo momento. Siempre que hagas una tirada usando misticismo o consciencia puedes descartar la primera carta de tu mazo.",
+          auto: "En Juego: la ficha muestra la primera carta de tu Mazo (solo a ti y al Master). Tras cada tirada de Consciencia o Misticismo, el chat te ofrece el botón «Descartar la primera carta del Mazo»."
+        },
+        {
+          clave: "artilugio", nombre: "Artilugio de primera", icono: "fa-toolbox", eterno: true,
+          texto: "Abalorio Eterno (solo puede estar En Juego o Quemado). Al elegir este abalorio obtienes uno de los siguientes objetos mágicos a tu elección, que queda asociado a tu abalorio; solo podrás cambiarlo una vez cada vez que subas de nivel: Monóculo indiscreto, Botas de gato o Agujero portátil.",
+          auto: "Eliges el artilugio al crear el personaje y puedes cambiarlo en cada subida de nivel. Empieza En Juego. Monóculo indiscreto: botón en la ficha para ver en privado la carta superior del Mazo del Token objetivo. Botas de gato y Agujero portátil: narrativos.",
+          artilugios: ["monoculo", "botas", "agujero"]
+        }
+      ],
       progresion: {
         2: {
           habilidades: [
-            { nombre: "Manifestar arma", esAtaque: false },
-            { nombre: "Tiempo embotellado", esAtaque: false },
-            { nombre: "Descarga elemental (hielo)", esAtaque: true },
-            { nombre: "Descarga elemental (rayo)", esAtaque: true },
-            { nombre: "Descarga elemental (fuego)", esAtaque: true }
+            {
+              nombre: "Manifestar arma", esAtaque: false, valorX: true, efectoX: "manifestarArma",
+              texto: "Manifiestas un arma, esta puede tener categorías según: Carta d4 = 1 categoría / Carta d6 = 2 categorías / Carta d8 = 3 categorías / Carta d10 = 4 categorías / Carta d12 = 5 categorías (consultar armas para las categorías de armas). Este arma permanece manifestada X turnos. (X es el resultado de la tirada de misticismo)"
+            },
+            {
+              nombre: "Tiempo embotellado", esAtaque: false, valorX: true, efectoX: "tiempoEmbotellado",
+              texto: "Realizas la tirada de misticismo y apuntas el resultado de cada dado, puedes sustituir el valor de hasta esa cantidad de dados en cualquier otra tirada. Solo puedes afectar el resultado de los dados."
+            },
+            {
+              nombre: "Descarga elemental (Fuego)", esAtaque: true, elemento: "fuego",
+              texto: "Concentras el poder elemental en un ataque dirigido a distancia, del elemento indicado, haces una cantidad de daño igual a la tirada de misticismo y puedes usar tantas cartas de consciencia como tengas en la mano para potenciar este ataque. Siempre aplicas el estado alterado relacionado con este ataque."
+            },
+            {
+              nombre: "Descarga elemental (Hielo)", esAtaque: true, elemento: "hielo",
+              texto: "Concentras el poder elemental en un ataque dirigido a distancia, del elemento indicado, haces una cantidad de daño igual a la tirada de misticismo y puedes usar tantas cartas de consciencia como tengas en la mano para potenciar este ataque. Siempre aplicas el estado alterado relacionado con este ataque."
+            },
+            {
+              nombre: "Descarga elemental (Rayo)", esAtaque: true, elemento: "rayo",
+              texto: "Concentras el poder elemental en un ataque dirigido a distancia, del elemento indicado, haces una cantidad de daño igual a la tirada de misticismo y puedes usar tantas cartas de consciencia como tengas en la mano para potenciar este ataque. Siempre aplicas el estado alterado relacionado con este ataque."
+            }
           ],
           packs: [
             [{ palo: "oros", numero: 1 }, { palo: "bastos", numero: 2 }],
             [{ palo: "espadas", numero: 1 }, { palo: "bastos", numero: 2 }]
+          ]
+        },
+        3: {
+          especializaciones: [
+            {
+              clave: "mecanicista", nombre: "Mecanicista",
+              texto: "Especialización de Alta Scentia. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+            },
+            {
+              clave: "adivinador", nombre: "Adivinador",
+              texto: "Especialización de Alta Scentia. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+            },
+            {
+              clave: "ilusionista", nombre: "Ilusionista",
+              texto: "Especialización de Alta Scentia. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+            },
+            {
+              clave: "elementalista", nombre: "Elementalista",
+              texto: "Especialización de Alta Scentia. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+            }
           ]
         }
       }
@@ -579,7 +672,7 @@ export function opcionesTrinketsClase(configClase) {
   return (configClase?.trinkets ?? []).map(t => typeof t === "string"
     ? { clave: null, nombre: t, icono: "fa-gem", texto: "", auto: "" }
     : { clave: t.clave ?? null, nombre: t.nombre, icono: t.icono ?? "fa-gem", texto: t.texto ?? "", auto: t.auto ?? "",
-        eterno: Boolean(t.eterno) });
+        eterno: Boolean(t.eterno), artilugios: Boolean(t.artilugios?.length) });
 }
 
 /**
@@ -614,6 +707,10 @@ export function contextoProgresionClase(claveClase) {
   const grupos = [];
   const abalorios = opcionesTrinketsClase(cfg);
   if (abalorios.length) grupos.push({ titulo: "Elección de abalorio", icono: "fa-gem", nivel: 1, opciones: abalorios });
+  // (v0.16.0) Objetos del «Artilugio de primera» (Alta Scentia).
+  if (abalorios.some(a => a.artilugios)) {
+    grupos.push({ titulo: "Artilugio de primera: objeto mágico", icono: "fa-toolbox", nivel: 1, opciones: opcionesArtilugio() });
+  }
   for (const [nivel, recompensas] of Object.entries(cfg.progresion ?? {})) {
     if (recompensas.habilidades?.length) {
       grupos.push({
@@ -681,8 +778,49 @@ export function catalogoAbalorios() {
 export const EFECTOS_VALOR_X = {
   "": "Ninguno (lo aplica el Master)",
   curacion: "Curar X al Token objetivo",
-  promesa: "Promesa: el objetivo elige entre sus X primeras cartas"
+  promesa: "Promesa: el objetivo elige entre sus X primeras cartas",
+  // (v0.16.0) Alta Scentia
+  manifestarArma: "Manifestar arma: categorías según el dado de la carta, X turnos",
+  tiempoEmbotellado: "Tiempo embotellado: guardar los dados para sustituirlos después"
 };
+
+/**
+ * Nombre visible del estado alterado de un elemento (v0.16.0): la etiqueta localizada de
+ * `CONFIG.statusEffects` si existe; si no, `nombreEstado` de `SISTEMA_CONFIG.ELEMENTOS`.
+ * @param {string} claveElemento - Clave de `SISTEMA_CONFIG.ELEMENTOS`.
+ * @returns {string} "" si el elemento no está en el catálogo.
+ */
+export function nombreEstadoElemento(claveElemento) {
+  const elemento = SISTEMA_CONFIG.ELEMENTOS[claveElemento];
+  if (!elemento) return "";
+  const estado = CONFIG.statusEffects?.find?.(e => e.id === elemento.estado);
+  return estado?.name ? game.i18n.localize(estado.name) : elemento.nombreEstado;
+}
+
+/**
+ * Opciones del artilugio del abalorio «Artilugio de primera» (v0.16.0).
+ * @param {string|null} [seleccionado=null] - Clave elegida (se marca `seleccionado`).
+ * @returns {Array<{clave: string, nombre: string, icono: string, texto: string, auto: string, seleccionado: boolean}>}
+ */
+export function opcionesArtilugio(seleccionado = null) {
+  return Object.entries(SISTEMA_CONFIG.ARTILUGIOS)
+    .map(([clave, a]) => ({ clave, ...a, seleccionado: clave === seleccionado }));
+}
+
+/**
+ * Texto del efecto permanente de un Trinket de abalorio (v0.16.0): el texto del abalorio y, en el
+ * «Artilugio de primera», el del artilugio elegido.
+ * @param {{texto?: string}|null} abalorio - Opción de `opcionesTrinketsClase`.
+ * @param {string|null} [claveArtilugio=null]
+ * @returns {string} HTML ("" si no hay texto).
+ */
+export function efectoPermanenteAbalorio(abalorio, claveArtilugio = null) {
+  const artilugio = claveArtilugio ? SISTEMA_CONFIG.ARTILUGIOS[claveArtilugio] : null;
+  return [
+    abalorio?.texto ? `<p>${abalorio.texto}</p>` : "",
+    artilugio ? `<p><strong>${artilugio.nombre}:</strong> ${artilugio.texto}</p>` : ""
+  ].join("");
+}
 
 /**
  * Calcula el estado de Agotamiento de un nivel dado (v0.12.0).

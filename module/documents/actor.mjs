@@ -7,8 +7,9 @@
  */
 
 import {
-  SISTEMA_CONFIG, abalorioDeTrinket, abreviadoPalo, claveClaseDeItem, describirPackCartas, esAbalorioEterno, estadoAgotamiento,
-  generarNombreMisticoUnico, nombreVisibleCarta, opcionesTrinketsClase, razaBaseDeActor, tieneRasgoRacial
+  SISTEMA_CONFIG, abalorioDeTrinket, abreviadoPalo, claveClaseDeItem, describirPackCartas, efectoPermanenteAbalorio,
+  esAbalorioEterno, estadoAgotamiento, generarNombreMisticoUnico, nombreEstadoElemento, nombreVisibleCarta, opcionesArtilugio,
+  opcionesTrinketsClase, razaBaseDeActor, tieneRasgoRacial
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 import { combinarTiradas, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
@@ -84,8 +85,11 @@ export class SistemaActor extends Actor {
    * @param {string} claveClase - Clave de `SISTEMA_CONFIG.CLASES_BASE` (ej. "fortisCorpore").
    * @param {string} nombreTrinket - Nombre del Trinket inicial elegido por el jugador.
    * @param {string|null} [claveRaza=null] - Clave de `SISTEMA_CONFIG.RAZAS_BASE` (ej. "mairu").
+   * @param {Object} [opciones]
+   * @param {string|null} [opciones.artilugio=null] - (v0.16.0) Clave de `SISTEMA_CONFIG.ARTILUGIOS` si el
+   *   Trinket elegido es el «Artilugio de primera» (se guarda en `flags.cartas-y-dados.artilugio`).
    */
-  async inicializarPersonajeConClase(claveClase, nombreTrinket, claveRaza = null) {
+  async inicializarPersonajeConClase(claveClase, nombreTrinket, claveRaza = null, { artilugio = null } = {}) {
     const configClase = SISTEMA_CONFIG.CLASES_BASE?.[claveClase];
     if (!configClase) {
       ui.notifications.warn(`Clase desconocida: "${claveClase}".`);
@@ -129,15 +133,22 @@ export class SistemaActor extends Actor {
     const opcionesTrinket = opcionesTrinketsClase(configClase);
     const trinketInicial = nombreTrinket || opcionesTrinket[0]?.nombre || "Vasija vacía";
     const abalorio = opcionesTrinket.find(o => o.nombre === trinketInicial) ?? null;
+    // (v0.16.0) Artilugio de primera: objeto mágico elegido (el primero si no se indica).
+    const claveArtilugio = abalorio?.artilugios
+      ? (SISTEMA_CONFIG.ARTILUGIOS[artilugio] ? artilugio : Object.keys(SISTEMA_CONFIG.ARTILUGIOS)[0])
+      : null;
     if (trinkets.cards.size === 0) {
       const payloadTrinket = this._normalizarPayloadCarta({
         name: trinketInicial,
         type: "trinket",
         system: {
           nivel: 1, realizaTirada: false, esAtaque: false, bonoDefensaEnJuego: 0,
-          efectoPermanente: abalorio?.texto ? `<p>${abalorio.texto}</p>` : ""
+          efectoPermanente: efectoPermanenteAbalorio(abalorio, claveArtilugio)
         },
-        ...(abalorio?.clave ? { flags: { "cartas-y-dados": { abalorio: abalorio.clave } } } : {})
+        ...(abalorio?.clave ? { flags: { "cartas-y-dados": {
+          abalorio: abalorio.clave,
+          ...(claveArtilugio ? { artilugio: claveArtilugio } : {})
+        } } } : {})
       });
       await trinkets.createEmbeddedDocuments("Card", [payloadTrinket]);
     }
@@ -183,8 +194,11 @@ export class SistemaActor extends Actor {
   /**
    * Devuelve las opciones de la siguiente subida de nivel según
    * `SISTEMA_CONFIG.CLASES_BASE.<clave>.progresion[nivelDestino]`.
+   * (v0.16.0) `artilugio`: si el personaje tiene el «Artilugio de primera», `{actual, opciones}` para
+   * cambiar su objeto mágico (una vez por subida de nivel); null si no lo tiene.
    * @returns {{itemClase: Item, claveClase: string, configClase: object, nivelActual: number,
-   *   nivelDestino: number, habilidades: object[], packs: object[][], especializaciones: object[]}|null}
+   *   nivelDestino: number, habilidades: object[], packs: object[][], especializaciones: object[],
+   *   artilugio: {actual: string|null, opciones: object[]}|null}|null}
    *   null si el Actor no tiene Clase base reconocida o no hay progresión definida para el siguiente nivel.
    */
   obtenerOpcionesSubidaNivel() {
@@ -200,7 +214,10 @@ export class SistemaActor extends Actor {
       itemClase, claveClase, configClase, nivelActual, nivelDestino,
       habilidades: recompensas.habilidades ?? [],
       packs: recompensas.packs ?? [],
-      especializaciones: recompensas.especializaciones ?? []
+      especializaciones: recompensas.especializaciones ?? [],
+      artilugio: this._cartasDeAbalorio("artilugio").length
+        ? { actual: this.artilugioActual(), opciones: opcionesArtilugio(this.artilugioActual()) }
+        : null
     };
   }
 
@@ -214,11 +231,12 @@ export class SistemaActor extends Actor {
    * 4. Sube `system.nivel` del Item de Clase y registra la elección en `system.historialNiveles`.
    * 5. Anuncia la subida en el chat.
    * La confirmación del jugador se pide en la ficha (`HojaPersonajeActor#abrirSubidaNivel`).
-   * @param {{indiceHabilidad?: number, indicePack?: number, indiceEspecializacion?: number}} eleccion
+   * 6. (v0.16.0) Si se indica `artilugio` distinto del actual, cambia el objeto del «Artilugio de primera».
+   * @param {{indiceHabilidad?: number, indicePack?: number, indiceEspecializacion?: number, artilugio?: string|null}} eleccion
    *   Índices dentro de las opciones (solo se exigen los de las listas que el nivel ofrece).
    * @returns {Promise<boolean>} true si se aplicó la subida.
    */
-  async subirDeNivel({ indiceHabilidad, indicePack, indiceEspecializacion } = {}) {
+  async subirDeNivel({ indiceHabilidad, indicePack, indiceEspecializacion, artilugio = null } = {}) {
     const opciones = this.obtenerOpcionesSubidaNivel();
     if (!opciones) {
       ui.notifications.warn(`${this.name} no tiene una subida de nivel disponible.`);
@@ -257,7 +275,9 @@ export class SistemaActor extends Actor {
         flags: { "cartas-y-dados": {
           habilidadDeClase: opciones.claveClase, nivelObtenida: nivelDestino,
           // (v0.15.0) Automatización del valor X (Sanación, Promesa...): ver `_htmlValorX`.
-          ...(habilidad.efectoX ? { efectoX: habilidad.efectoX } : {})
+          ...(habilidad.efectoX ? { efectoX: habilidad.efectoX } : {}),
+          // (v0.16.0) Descarga elemental: elemento y estado alterado (ver `_usarDescargaElemental`).
+          ...(habilidad.elemento ? { elemento: habilidad.elemento } : {})
         } }
       }]);
     }
@@ -318,13 +338,19 @@ export class SistemaActor extends Actor {
     if (especializacion) datosClase["system.especializacion"] = especializacion.nombre;
     await itemClase.update(datosClase);
 
+    // 6. (v0.16.0) Cambio del objeto del Artilugio de primera (una vez por subida de nivel)
+    const artilugioAnterior = opciones.artilugio?.actual ?? null;
+    const cambiaArtilugio = Boolean(opciones.artilugio && SISTEMA_CONFIG.ARTILUGIOS[artilugio] && artilugio !== artilugioAnterior);
+    if (cambiaArtilugio) await this.cambiarArtilugio(artilugio);
+
     this.prepareData();
 
     // 5. Aviso en el chat
     const lineas = [
       habilidad ? `<p><i class="fa-solid fa-wand-magic-sparkles"></i> Nueva habilidad: <strong>${habilidad.nombre}</strong></p>` : "",
       pack ? `<p><i class="fa-solid fa-layer-group"></i> Cartas añadidas al Mazo: ${descripcionPack}</p>` : "",
-      especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${especializacion.nombre}</strong></p>` : ""
+      especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${especializacion.nombre}</strong></p>` : "",
+      cambiaArtilugio ? `<p><i class="fa-solid fa-toolbox"></i> Artilugio de primera: <strong>${SISTEMA_CONFIG.ARTILUGIOS[artilugio].nombre}</strong>${artilugioAnterior ? ` (antes: ${SISTEMA_CONFIG.ARTILUGIOS[artilugioAnterior]?.nombre ?? artilugioAnterior})` : ""}</p>` : ""
     ].join("");
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
@@ -622,7 +648,8 @@ export class SistemaActor extends Actor {
         await this.barajarDescarteEnMazo();
       }
 
-      const disponibles = mazo.availableCards;
+      // (v0.16.0) En el orden del barajado (la primera es la carta superior).
+      const disponibles = this._cartasDisponiblesEnOrden(mazo);
       const lote = Math.min(porRobar, disponibles.length);
       if (lote <= 0) break;
 
@@ -775,6 +802,8 @@ export class SistemaActor extends Actor {
    * @param {string} [opciones.resolucion="auto"] - Clave de `SISTEMA_CONFIG.RESOLUCIONES_ACCION`.
    * @param {boolean} [opciones.comoFisico=false] - (v0.15.0, abalorio Espada) La carta CONS se usa como
    *   carta de Físico: tira con Físico.
+   * @param {string|null} [opciones.elemento=null] - (v0.16.0, abalorio Elementalismo) Elemento de la acción:
+   *   clave de `SISTEMA_CONFIG.ELEMENTOS` o texto libre; se indica en el chat.
    * (v0.15.0) Abalorios En Juego: con Espada o Daga el Ataque apuntado admite combinar FISC y CONS
    * (con Espada ambas tiran con Físico; con Daga cada una con su característica). Las acciones con
    * `reaccionAdicional` (Escudo) no gastan ni exigen la reacción del turno.
@@ -782,7 +811,7 @@ export class SistemaActor extends Actor {
    */
   async jugarCarta(cartaId, {
     quemar, modo = "usar", accion = null, cartaApuntadoId = null, puntoDebil = false,
-    cartaPotenciarId = null, reaccion = false, resolucion = "auto", comoFisico = false
+    cartaPotenciarId = null, reaccion = false, resolucion = "auto", comoFisico = false, elemento = null
   } = {}) {
     const { mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mano || !enJuego || !descarte || !quemadas) return null;
@@ -810,6 +839,12 @@ export class SistemaActor extends Actor {
     let claveCaract = usaEspada ? "fisico" : carta.system.caracteristicaAsociada;
     if (configAccion?.abalorio && !abalorios.has(configAccion.abalorio)
         && !(await this._confirmarExcepcion("Abalorio no activo", [`«${configAccion.nombre}» requiere el abalorio En Juego.`]))) {
+      return null;
+    }
+    // (v0.16.0) Elementalismo: elemento elegido para el ataque o la defensa.
+    const nombreElemento = elemento ? (SISTEMA_CONFIG.ELEMENTOS[elemento]?.nombre ?? String(elemento).trim()) : "";
+    if (nombreElemento && !abalorios.has("elementalismo")
+        && !(await this._confirmarExcepcion("Elementalismo no activo", ["El Trinket «Elementalismo» no está En Juego: no puedes cambiar el elemento."]))) {
       return null;
     }
 
@@ -945,6 +980,7 @@ export class SistemaActor extends Actor {
     if (configAccion?.adicional) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-plus"></i> Acción adicional</span>');
     if (cartaApuntado) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-bullseye"></i> Ataque apuntado (÷ 2)</span>');
     if (cartaPotenciar) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-moon"></i> Potenciada</span>');
+    if (nombreElemento) etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid ${SISTEMA_CONFIG.ELEMENTOS[elemento]?.icono ?? "fa-fire-flame-curved"}"></i> Elementalismo: ${foundry.utils.escapeHTML(nombreElemento)}</span>`);
     if (resolucion && resolucion !== "auto") etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-sliders"></i> ${SISTEMA_CONFIG.RESOLUCIONES_ACCION[resolucion] ?? resolucion}</span>`);
 
     const lineasExtra = [];
@@ -972,6 +1008,7 @@ export class SistemaActor extends Actor {
         ${tipoResolucion === "sinTirada" ? '<p><small><i class="fa-solid fa-circle-info"></i> Acción sin tirada: su efecto se aplica directamente.</small></p>' : ""}
         ${htmlEfectosAuto}
         ${efectoHtml ? `<div class="cyd-efecto">${efectoHtml}</div>` : ""}
+        ${tirada ? this._htmlBotonVisionFuturo([claveCaract, caractApuntado, cartaPotenciar ? "misticismo" : null]) : ""}
       </div>
     `;
 
@@ -1352,7 +1389,7 @@ export class SistemaActor extends Actor {
       ui.notifications.warn(`${this.name} no tiene las pilas de cartas inicializadas.`);
       return false;
     }
-    const primeras = mazo.availableCards.slice(0, Math.max(0, Number(x) || 0));
+    const primeras = this._cartasDisponiblesEnOrden(mazo).slice(0, Math.max(0, Number(x) || 0));
     if (!primeras.length) {
       ui.notifications.warn(`No quedan cartas en el Mazo de ${this.name}.`);
       return false;
@@ -1386,6 +1423,355 @@ export class SistemaActor extends Actor {
       content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-hand-holding-hand"></i><p><strong>${this.name}</strong> mira ${primeras.length} carta(s) de su Mazo${deQuien}, añade una a su mano y baraja el Mazo.</p></div>`
     });
     return true;
+  }
+
+  /* ======================================================================== */
+  /*  5c. ALTA SCENTIA: ABALORIOS Y HABILIDADES (v0.16.0)                     */
+  /* ======================================================================== */
+
+  /**
+   * Cartas disponibles de un Mazo en el orden en que se roban (v0.16.0): `Cards#availableCards` no
+   * respeta el barajado (Foundry ordena por `sort` al robar, `Cards#sortShuffled`), así que todo robo
+   * del sistema y la «primera carta del Mazo» usan este orden.
+   * @param {Cards|null} mazo
+   * @returns {Card[]} La primera es la carta superior.
+   */
+  _cartasDisponiblesEnOrden(mazo) {
+    if (!mazo) return [];
+    return mazo.availableCards.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+  }
+
+  /**
+   * Carta superior del Mazo de Juego (la próxima que se robaría), o null si no queda ninguna.
+   * @returns {Card|null}
+   */
+  primeraCartaMazo() {
+    return this._cartasDisponiblesEnOrden(this.system.pilasDocumentos?.mazo)[0] ?? null;
+  }
+
+  /**
+   * Trinkets del Actor (en cualquiera de sus 6 pilas) con un abalorio dado.
+   * @param {string} claveAbalorio - Clave de abalorio (`artilugio`, `visionFuturo`...).
+   * @returns {Card[]}
+   */
+  _cartasDeAbalorio(claveAbalorio) {
+    const claveClase = claveClaseDeItem(this.items.find(i => i.type === "clase"));
+    return Object.values(this.system.pilasDocumentos ?? {})
+      .flatMap(pila => pila?.cards?.contents ?? [])
+      .filter(c => c.type === "trinket" && abalorioDeTrinket(c, claveClase) === claveAbalorio);
+  }
+
+  /**
+   * Objeto mágico del «Artilugio de primera» del Actor (`flags.cartas-y-dados.artilugio`).
+   * @returns {string|null} Clave de `SISTEMA_CONFIG.ARTILUGIOS` o null.
+   */
+  artilugioActual() {
+    for (const carta of this._cartasDeAbalorio("artilugio")) {
+      const clave = carta.getFlag("cartas-y-dados", "artilugio");
+      if (SISTEMA_CONFIG.ARTILUGIOS[clave]) return clave;
+    }
+    return null;
+  }
+
+  /**
+   * Cambia el objeto del «Artilugio de primera» en el Trinket original y todas sus copias (flag y
+   * texto del efecto permanente). La regla «una vez por subida de nivel» la aplica `subirDeNivel`.
+   * @param {string} claveArtilugio - Clave de `SISTEMA_CONFIG.ARTILUGIOS`.
+   * @returns {Promise<void>}
+   */
+  async cambiarArtilugio(claveArtilugio) {
+    if (!SISTEMA_CONFIG.ARTILUGIOS[claveArtilugio]) return;
+    const opcion = opcionesTrinketsClase(SISTEMA_CONFIG.CLASES_BASE.altaScentia).find(o => o.clave === "artilugio");
+    const porPila = new Map();
+    for (const carta of this._cartasDeAbalorio("artilugio")) {
+      const lista = porPila.get(carta.parent) ?? [];
+      lista.push({
+        _id: carta.id,
+        "flags.cartas-y-dados.artilugio": claveArtilugio,
+        "system.efectoPermanente": efectoPermanenteAbalorio(opcion, claveArtilugio)
+      });
+      porPila.set(carta.parent, lista);
+    }
+    for (const [pila, updates] of porPila) await pila.updateEmbeddedDocuments("Card", updates);
+    this.prepareData();
+  }
+
+  /**
+   * Botón de chat «Descartar la primera carta del Mazo» (abalorio Visión del futuro) para una tirada
+   * que usa Consciencia o Misticismo. Lo activa `sistema.mjs` (solo el propietario, una vez por mensaje).
+   * @param {Iterable<string>} caracteristicas - Características usadas en la tirada.
+   * @returns {string} HTML ("" si no aplica).
+   */
+  _htmlBotonVisionFuturo(caracteristicas) {
+    const usadas = new Set(caracteristicas);
+    if (!usadas.has("consciencia") && !usadas.has("misticismo")) return "";
+    if (!this.abaloriosActivos().has("visionFuturo")) return "";
+    return `
+      <button type="button" class="cyd-btn-vision-futuro" data-actor-uuid="${this.uuid}">
+        <i class="fa-solid fa-eye"></i> Descartar la primera carta del Mazo (Visión del futuro)
+      </button>`;
+  }
+
+  /**
+   * Visión del futuro (v0.16.0): descarta la carta superior del Mazo (Mazo → Descarte, conservando
+   * `sourceCardId`). Sin el abalorio En Juego pide confirmar una excepción.
+   * @returns {Promise<boolean>} true si descartó una carta.
+   */
+  async descartarPrimeraCartaMazo() {
+    const { mazo, descarte } = this.system.pilasDocumentos ?? {};
+    if (!mazo || !descarte) return false;
+    if (!this.abaloriosActivos().has("visionFuturo")
+        && !(await this._confirmarExcepcion("Visión del futuro no activa", ["El Trinket «Visión del futuro» no está En Juego."]))) {
+      return false;
+    }
+    const carta = this.primeraCartaMazo();
+    if (!carta) {
+      ui.notifications.warn(`No quedan cartas en el Mazo de ${this.name}.`);
+      return false;
+    }
+    const [descartada] = await this._extraerCartasDeMazo(mazo, descarte, [carta.id]);
+    if (!descartada) return false;
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-eye"></i><p><strong>${this.name}</strong> descarta la primera carta de su Mazo (Visión del futuro): <strong>${foundry.utils.escapeHTML(nombreVisibleCarta(descartada))}</strong> (${abreviadoPalo(descartada.system.palo)} · ${descartada.system.tipoDado ?? ""}).</p></div>`
+    });
+    if (this.sheet?.rendered) this.sheet.render();
+    return true;
+  }
+
+  /**
+   * Monóculo indiscreto (Artilugio de primera, v0.16.0): muestra en privado al usuario la carta
+   * superior del Mazo del Token objetivo (`T`). Si quien lo usa es un jugador, el Master activo la
+   * consulta por socket (los Mazos son privados) y se la susurra (ver `revelarCartaSuperiorMonoculo`).
+   * @returns {Promise<boolean>} true si se pidió la carta.
+   */
+  async usarMonoculo() {
+    const motivos = [];
+    if (!this.abaloriosActivos().has("artilugio")) motivos.push("El Trinket «Artilugio de primera» no está En Juego.");
+    if (this.artilugioActual() !== "monoculo") motivos.push("Tu Artilugio de primera no es el Monóculo indiscreto.");
+    if (motivos.length && !(await this._confirmarExcepcion("Monóculo indiscreto", motivos))) return false;
+
+    const token = game.user.targets.first() ?? null;
+    const objetivo = token?.actor ?? null;
+    if (!objetivo || objetivo.id === this.id) {
+      ui.notifications.warn("Marca con T el Token de la criatura cuya carta superior quieres ver (no puedes ser tú).");
+      return false;
+    }
+    const datos = {
+      objetivoUuid: objetivo.uuid, nombreObjetivo: token.name ?? objetivo.name,
+      observadorUuid: this.uuid, usuarioId: game.user.id
+    };
+    if (game.user.isGM) {
+      await revelarCartaSuperiorMonoculo(datos);
+      return true;
+    }
+    if (!game.users.activeGM) {
+      ui.notifications.warn("No hay ningún Master conectado: el Monóculo necesita que un Master consulte el Mazo.");
+      return false;
+    }
+    game.socket.emit(CANAL_SOCKET, { tipo: "monoculo", datos });
+    ui.notifications.info(`Miras con el Monóculo a ${datos.nombreObjetivo}...`);
+    return true;
+  }
+
+  /**
+   * Valores embotellados con «Tiempo embotellado» (`flags.cartas-y-dados.tiempoEmbotellado`).
+   * @returns {{valores: number[], tipoDado: string}|null}
+   */
+  tiempoEmbotellado() {
+    const datos = this.getFlag("cartas-y-dados", "tiempoEmbotellado");
+    return datos?.valores?.length ? datos : null;
+  }
+
+  /**
+   * Guarda (o borra, si la tirada es un fallo automático) los dados de una tirada de «Tiempo
+   * embotellado». Sustituye a los valores que hubiera embotellados.
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
+   * @returns {Promise<void>}
+   */
+  async _guardarTiempoEmbotellado(tirada) {
+    if (tirada.esNegativo) {
+      await this.unsetFlag("cartas-y-dados", "tiempoEmbotellado");
+      return;
+    }
+    await this.setFlag("cartas-y-dados", "tiempoEmbotellado", {
+      valores: [...tirada.resultadosBase], tipoDado: tirada.tipoDado
+    });
+  }
+
+  /**
+   * Descarta los valores embotellados que queden (botón de la ficha).
+   * @returns {Promise<void>}
+   */
+  async descartarTiempoEmbotellado() {
+    await this.unsetFlag("cartas-y-dados", "tiempoEmbotellado");
+  }
+
+  /**
+   * Tiempo embotellado (v0.16.0): lo llama `tirarDadosSistema` (vía el hablante de la tirada) tras
+   * lanzar los dados base y antes de evaluar Crítico y Pifia. Si el Actor tiene valores embotellados
+   * y el usuario es su propietario, pregunta qué dados sustituir; cada valor se usa una sola vez y
+   * no puede superar el máximo del dado («solo puedes afectar el resultado de los dados»).
+   * @param {{resultados: number[], caras: number, titulo: string}} datos
+   * @returns {Promise<import("../dados.mjs").SustitucionDado[]>}
+   */
+  async elegirSustitucionesTiempoEmbotellado({ resultados, caras, titulo }) {
+    const embotellado = this.isOwner ? this.tiempoEmbotellado() : null;
+    if (!embotellado) return [];
+    const escapar = foundry.utils.escapeHTML;
+    const opcionesValor = embotellado.valores.map((v, i) =>
+      `<option value="${i}">${Math.min(v, caras)}${v > caras ? ` (${v}, máx. d${caras})` : ""} · embotellado n.º ${i + 1}</option>`).join("");
+    const filas = resultados.map((r, i) => `
+      <div class="form-group">
+        <label>Dado ${i + 1}: <strong>${r}</strong></label>
+        <select name="dado${i}"><option value="">Mantener ${r}</option>${opcionesValor}</select>
+      </div>`).join("");
+    const eleccion = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 420 }),
+      window: { title: "Tiempo embotellado", icon: "fa-solid fa-hourglass-start" },
+      content: `
+        <p><strong>${escapar(titulo || "Tirada")}</strong> · d${caras}: [${resultados.join(", ")}]</p>
+        <p class="hint">Valores embotellados: [${embotellado.valores.join(", ")}] (${escapar(embotellado.tipoDado ?? "")}). Cada uno se usa una sola vez.</p>
+        ${filas}`,
+      buttons: [
+        { action: "sustituir", label: "Sustituir", icon: "fa-solid fa-hourglass-start", default: true,
+          callback: (_e, button) => resultados.map((_, i) => button.form.elements[`dado${i}`]?.value ?? "") },
+        { action: "no", label: "No sustituir", icon: "fa-solid fa-xmark", callback: () => null }
+      ],
+      rejectClose: false
+    });
+    if (!Array.isArray(eleccion)) return [];
+
+    const usados = new Set();
+    const sustituciones = [];
+    eleccion.forEach((valor, indice) => {
+      if (valor === "") return;
+      const idx = Number(valor);
+      if (usados.has(idx) || !(idx in embotellado.valores)) return; // cada valor, una sola vez
+      usados.add(idx);
+      const despues = Math.min(Number(embotellado.valores[idx]) || 1, caras);
+      if (despues !== resultados[indice]) sustituciones.push({ indice, antes: resultados[indice], despues });
+    });
+    if (usados.size) {
+      const restantes = embotellado.valores.filter((_, i) => !usados.has(i));
+      if (restantes.length) await this.setFlag("cartas-y-dados", "tiempoEmbotellado", { ...embotellado, valores: restantes });
+      else await this.unsetFlag("cartas-y-dados", "tiempoEmbotellado");
+    }
+    return sustituciones;
+  }
+
+  /**
+   * Datos de Alta Scentia para la ficha del PJ (v0.16.0); null si no hay nada que mostrar.
+   * @returns {{primeraCarta: object|null, verPrimera: boolean, artilugio: object|null, monoculo: boolean,
+   *   tiempoEmbotellado: object|null}|null}
+   */
+  contextoAltaScentia() {
+    const abalorios = this.abaloriosActivos();
+    const verPrimera = abalorios.has("visionFuturo");
+    const carta = verPrimera ? this.primeraCartaMazo() : null;
+    const claveArtilugio = this._cartasDeAbalorio("artilugio").length ? this.artilugioActual() : null;
+    const artilugio = claveArtilugio ? { clave: claveArtilugio, ...SISTEMA_CONFIG.ARTILUGIOS[claveArtilugio] } : null;
+    const embotellado = this.tiempoEmbotellado();
+    if (!verPrimera && !artilugio && !embotellado) return null;
+    return {
+      verPrimera,
+      primeraCarta: carta ? {
+        nombre: nombreVisibleCarta(carta), palo: abreviadoPalo(carta.system.palo), tipoDado: carta.system.tipoDado ?? ""
+      } : null,
+      artilugio,
+      artilugioEnJuego: abalorios.has("artilugio"),
+      monoculo: claveArtilugio === "monoculo",
+      tiempoEmbotellado: embotellado
+    };
+  }
+
+  /**
+   * Diálogo previo de una Descarga elemental (v0.16.0): cartas CONS de la mano con las que potenciar
+   * el ataque (tantas como se quiera) y, con el abalorio Elementalismo En Juego, el elemento.
+   * Sin cartas CONS ni Elementalismo no pregunta nada.
+   * @param {Item} item - Habilidad con `flags.cartas-y-dados.elemento`.
+   * @param {string} elementoBase - Elemento de la habilidad.
+   * @returns {Promise<{cartasIds: string[], elemento: string, elementoLibre: string}|null>} null si se cancela.
+   */
+  async _dialogoDescargaElemental(item, elementoBase) {
+    const mano = this.system.pilasDocumentos?.mano;
+    const cartasCons = (mano?.cards.contents ?? []).filter(c => c.type === "accion" && c.system.palo === "bastos");
+    const elementalismo = this.abaloriosActivos().has("elementalismo");
+    if (!cartasCons.length && !elementalismo) return { cartasIds: [], elemento: elementoBase, elementoLibre: "" };
+
+    const escapar = foundry.utils.escapeHTML;
+    const dadosCons = this._dadosDeCaracteristica("consciencia");
+    const casillas = cartasCons.map(c => `
+      <label class="cyd-opcion-radio"><input type="checkbox" name="cons" value="${c.id}" />
+        <span>${escapar(nombreVisibleCarta(c))} <small>(CONS · ${dadosCons}${c.system.tipoDado})</small></span></label>`).join("");
+    const opcionesElemento = Object.entries(SISTEMA_CONFIG.ELEMENTOS).map(([clave, e]) =>
+      `<option value="${clave}" ${clave === elementoBase ? "selected" : ""}>${escapar(e.nombre)} (${escapar(nombreEstadoElemento(clave))})</option>`).join("");
+    const eleccion = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 440 }),
+      window: { title: item.name, icon: "fa-solid fa-wand-magic-sparkles" },
+      content: `
+        <fieldset>
+          <legend><i class="fa-solid fa-book"></i> Potenciar con cartas de Consciencia</legend>
+          ${casillas || '<p class="hint">No tienes cartas CONS en la mano.</p>'}
+          ${casillas ? '<p class="hint">Cada carta suma su tirada de Consciencia al ataque y se descarta.</p>' : ""}
+        </fieldset>
+        ${elementalismo ? `
+        <fieldset>
+          <legend><i class="fa-solid fa-fire-flame-curved"></i> Elementalismo</legend>
+          <div class="form-group"><label>Elemento</label>
+            <select name="elemento">${opcionesElemento}<option value="otro">Otro elemento</option></select></div>
+          <div class="form-group"><label>Otro elemento</label><input type="text" name="elementoLibre" placeholder="Ácido, sombra..." /></div>
+          <p class="hint">Con «Otro elemento», el Master decide y aplica su estado alterado.</p>
+        </fieldset>` : ""}`,
+      buttons: [
+        { action: "lanzar", label: "Lanzar descarga", icon: "fa-solid fa-wand-magic-sparkles", default: true,
+          callback: (_e, button) => {
+            const f = button.form;
+            return {
+              cartasIds: [...f.querySelectorAll("input[name='cons']:checked")].map(i => i.value),
+              elemento: f.elements.elemento?.value ?? elementoBase,
+              elementoLibre: String(f.elements.elementoLibre?.value ?? "").trim()
+            };
+          } },
+        { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => null }
+      ],
+      rejectClose: false
+    });
+    return eleccion && typeof eleccion === "object" ? eleccion : null;
+  }
+
+  /**
+   * Bloques del estado alterado de una Descarga elemental (v0.16.0): «siempre aplicas el estado
+   * alterado relacionado» salvo fallo automático. Público: elemento y estado; Master: botón para
+   * aplicarlo al objetivo (`.cyd-btn-aplicar-estado`, ver `sistema.mjs`).
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
+   * @param {string} elemento - Clave de `SISTEMA_CONFIG.ELEMENTOS` u "otro".
+   * @param {string} elementoLibre - Nombre del elemento si es "otro".
+   * @param {Token|null} tokenObjetivo
+   * @returns {{publico: string, master: string}}
+   */
+  _htmlEstadoDescarga(tirada, elemento, elementoLibre, tokenObjetivo) {
+    const escapar = foundry.utils.escapeHTML;
+    const config = SISTEMA_CONFIG.ELEMENTOS[elemento] ?? null;
+    const nombreElemento = config?.nombre ?? (elementoLibre || "Otro");
+    const nombreEstado = config ? nombreEstadoElemento(elemento) : "";
+    const icono = config?.icono ?? "fa-fire-flame-curved";
+    if (tirada.esNegativo) {
+      return { publico: `<p><i class="fa-solid ${icono}"></i> Elemento: <strong>${escapar(nombreElemento)}</strong> · fallo automático: sin estado alterado.</p>`, master: "" };
+    }
+    const textoEstado = nombreEstado
+      ? `aplica <strong>${escapar(nombreEstado)}</strong>`
+      : "aplica su estado alterado (lo decide el Master)";
+    const publico = `<p><i class="fa-solid ${icono}"></i> Elemento: <strong>${escapar(nombreElemento)}</strong> · ${textoEstado}${tokenObjetivo ? ` a <strong>${escapar(tokenObjetivo.name)}</strong>` : ""}.</p>`;
+    const actorObjetivo = tokenObjetivo?.actor ?? null;
+    const master = config && actorObjetivo ? `
+      <div class="cyd-carta-jugada">
+        <h3><i class="fa-solid ${icono}"></i> Estado alterado <small>(solo Master)</small></h3>
+        <button type="button" class="cyd-btn-aplicar-estado" data-actor-uuid="${actorObjetivo.uuid}" data-estado="${config.estado}" data-nombre="${escapar(nombreEstado)}">
+          <i class="fa-solid ${icono}"></i> Aplicar ${escapar(nombreEstado)} a ${escapar(tokenObjetivo.name)}
+        </button>
+      </div>` : "";
+    return { publico, master };
   }
 
   /**
@@ -1988,7 +2374,8 @@ export class SistemaActor extends Actor {
    * @returns {Object|null}
    */
   _datosRepeticionTirada(tirada, {
-    titulo, esAtaque = false, etiquetaDificultad = "Dificultad del Master", valorX = false, efectoX = null, tokenObjetivo = null
+    titulo, esAtaque = false, etiquetaDificultad = "Dificultad del Master", valorX = false, efectoX = null, tokenObjetivo = null,
+    numeroCarta = null
   }) {
     if (!tieneRasgoRacial(this, "esperaUnMomento")) return null;
     const objetivo = esAtaque ? game.user.targets.first() ?? null : tokenObjetivo;
@@ -2004,6 +2391,7 @@ export class SistemaActor extends Actor {
       // (v0.15.0) La repetición vuelve a mostrar el valor X en vez de compararse con la Dificultad.
       valorX: Boolean(valorX),
       efectoX: efectoX ?? null,
+      numeroCarta: numeroCarta ?? null, // (v0.16.0) Manifestar arma
       totalAnterior: tirada.total
     };
   }
@@ -2038,8 +2426,10 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `Espera un momento · ${datos.titulo}`
     });
     const tokenObjetivo = datos.objetivoTokenUuid ? (fromUuidSync(datos.objetivoTokenUuid) ?? null) : null;
+    // (v0.16.0) Tiempo embotellado: la nueva tirada sustituye a los dados apuntados.
+    if (datos.efectoX === "tiempoEmbotellado") await this._guardarTiempoEmbotellado(tirada);
     const resolucion = datos.valorX
-      ? { publico: this._htmlValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo }), master: "" }
+      ? { publico: this._htmlValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo, numeroCarta: datos.numeroCarta ?? null }), master: "" }
       : this._htmlResolucionTirada(tirada, datos.esAtaque, datos.etiquetaDificultad, { tokenObjetivo });
 
     const saborChat = `
@@ -2277,6 +2667,16 @@ export class SistemaActor extends Actor {
       tipoDado = this.system.dadosCaracteristicas?.misticismo || "d6";
     }
 
+    // (v0.16.0) Descarga elemental (`flags.cartas-y-dados.elemento`): antes de tirar se eligen las
+    // cartas CONS con las que potenciarla y, con Elementalismo, el elemento. Cancelar no gasta nada.
+    const elementoBase = item.getFlag("cartas-y-dados", "elemento");
+    const esDescarga = Boolean(SISTEMA_CONFIG.ELEMENTOS[elementoBase]) && item.system.requiereTirada !== false;
+    const descarga = esDescarga ? await this._dialogoDescargaElemental(item, elementoBase) : null;
+    if (esDescarga && !descarga) return null;
+    const cartasDescarga = (descarga?.cartasIds ?? [])
+      .map(id => mano?.cards.get(id) ?? null)
+      .filter(c => c && c.type === "accion" && c.system.palo === "bastos");
+
     // `Number(undefined)` es NaN (no null), por eso se usa `||` en lugar de `??`.
     const cantidadDados =
       Number(this.system.caracteristicasTotales?.misticismo) ||
@@ -2323,25 +2723,63 @@ export class SistemaActor extends Actor {
     // Habilidad con tirada: XdY de Misticismo (v0.15.0: +1 dado con el abalorio Amistad).
     const bono = bonoTirada;
     const amistad = this._bonoDadoAmistad("misticismo");
-    const tirada = await tirarDadosSistema({
-      cantidadDados: cantidadDados + (amistad ? 1 : 0), tipoDado, bono, rollData: this.getRollData(),
-      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
-      speaker: ChatMessage.getSpeaker({ actor: this }), titulo: item.name
-    });
+    const mitadPorAgotamiento = this._tiradasAMitadPorAgotamiento();
+    const hayPartes = cartasDescarga.length > 0;
+    const partes = [{
+      tirada: await tirarDadosSistema({
+        cantidadDados: cantidadDados + (amistad ? 1 : 0), tipoDado, bono, rollData: this.getRollData(),
+        mitadPorAgotamiento, parcial: hayPartes,
+        speaker: ChatMessage.getSpeaker({ actor: this }), titulo: item.name
+      }),
+      etiqueta: nombreCarta ? `${nombreCarta} (Misticismo)` : "Misticismo"
+    }];
+    // (v0.16.0) Descarga elemental: cada carta CONS suma su tirada de Consciencia.
+    for (const c of cartasDescarga) {
+      partes.push({
+        tirada: await tirarDadosSistema({
+          cantidadDados: this._dadosDeCaracteristica("consciencia"), tipoDado: c.system.tipoDado ?? "d6",
+          bono: Number(c.system.automatizacion?.bonoTirada) || 0, rollData: this.getRollData(),
+          mitadPorAgotamiento, parcial: true,
+          speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `${item.name} · ${nombreVisibleCarta(c)}`
+        }),
+        etiqueta: `${nombreVisibleCarta(c)} (Consciencia)`
+      });
+    }
+    const tirada = combinarTiradas(partes);
     // (v0.15.0) `valorX`: el resultado de la tirada fija el valor X del efecto (sin Dificultad ni
     // objetivo); un resultado negativo es fallo automático.
     const usaValorX = Boolean(item.system.valorX) && !esAtaque;
     // (v0.15.0) Efecto automatizado del valor X sobre el Token objetivo (Sanación, Promesa).
     const efectoX = usaValorX ? item.getFlag("cartas-y-dados", "efectoX") ?? null : null;
     const tokenObjetivoX = efectoX ? game.user.targets.first() ?? null : null;
+    // (v0.16.0) Manifestar arma: las categorías dependen del dado de la carta (d4 = 1 ... d12 = 5).
+    const numeroCarta = numero ?? (Number(Object.entries(SISTEMA_CONFIG.dadoPorNumeroCarta)
+      .find(([, dado]) => dado === tipoDado)?.[0]) || null);
     const resolucion = usaValorX
-      ? { publico: this._htmlValorX(tirada, { efectoX, tokenObjetivo: tokenObjetivoX }), master: "" }
-      : this._htmlResolucionTirada(tirada, esAtaque, "Dificultad");
+      ? { publico: this._htmlValorX(tirada, { efectoX, tokenObjetivo: tokenObjetivoX, numeroCarta }), master: "" }
+      : this._htmlResolucionTirada(tirada, esAtaque || esDescarga, "Dificultad");
+    // (v0.16.0) Descarga elemental: elemento y estado alterado (botón del Master).
+    if (descarga) {
+      const estado = this._htmlEstadoDescarga(tirada, descarga.elemento, descarga.elementoLibre, game.user.targets.first() ?? null);
+      resolucion.publico += estado.publico;
+      resolucion.master += estado.master;
+    }
+    // (v0.16.0) Tiempo embotellado: se apuntan los dados para sustituirlos en otras tiradas.
+    if (efectoX === "tiempoEmbotellado") await this._guardarTiempoEmbotellado(tirada);
     const bloqueResolucionHtml = resolucion.publico;
     const htmlMaster = resolucion.master;
+
+    // (v0.16.0) Cartas CONS de la Descarga elemental: al Descarte (o Quemadas si se queman).
+    const efectosAgotamiento = this.system.agotamiento?.efectos ?? {};
+    const lineasDescarga = cartasDescarga.map(c => {
+      const quemar = Boolean(c.system.seQuema || efectosAgotamiento.quemarAlUsar);
+      return { carta: c, quemar, html: this._lineaCartaUsada(c, "Potencia la descarga", quemar ? "Carta Quemada" : "Descarte") };
+    });
     const etiquetasHabilidad = [
       item.system.sinAccion ? '<span class="cyd-tag-accion"><i class="fa-solid fa-plus"></i> No gasta acción</span>' : "",
-      amistad ? `<span class="cyd-tag-accion"><i class="fa-solid fa-handshake"></i> Amistad con ${foundry.utils.escapeHTML(amistad.aliado)}: +1 dado</span>` : ""
+      amistad ? `<span class="cyd-tag-accion"><i class="fa-solid fa-handshake"></i> Amistad con ${foundry.utils.escapeHTML(amistad.aliado)}: +1 dado</span>` : "",
+      cartasDescarga.length ? `<span class="cyd-tag-accion"><i class="fa-solid fa-book"></i> Potenciada con ${cartasDescarga.length} carta(s) CONS</span>` : "",
+      descarga && descarga.elemento !== elementoBase ? '<span class="cyd-tag-accion"><i class="fa-solid fa-fire-flame-curved"></i> Elementalismo</span>' : ""
     ].filter(Boolean);
     const etiquetaSinAccion = etiquetasHabilidad.length
       ? `<p class="cyd-tags-accion-fila">${etiquetasHabilidad.join(" ")}</p>`
@@ -2352,11 +2790,13 @@ export class SistemaActor extends Actor {
         <h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3>
         ${etiquetaSinAccion}
         ${lineaCartaUsada}
-        <p><strong>Tirada:</strong> Misticismo × ${tipoDado}</p>
+        ${lineasDescarga.map(l => l.html).join("")}
+        <p><strong>Tirada:</strong> Misticismo × ${tipoDado}${hayPartes ? " + Consciencia" : ""}</p>
         ${tirada.html}
         ${bloqueResolucionHtml}
         ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
         ${lineaQuemada}
+        ${this._htmlBotonVisionFuturo(hayPartes ? ["misticismo", "consciencia"] : ["misticismo"])}
       </div>
     `;
 
@@ -2364,13 +2804,18 @@ export class SistemaActor extends Actor {
       speaker: ChatMessage.getSpeaker({ actor: this }),
       flavor: saborChat,
       htmlMaster,
-      repeticion: this._datosRepeticionTirada(tirada, {
-        titulo: item.name, esAtaque, etiquetaDificultad: "Dificultad", valorX: usaValorX, efectoX, tokenObjetivo: tokenObjetivoX
+      // «Espera un momento» solo repite tiradas simples (sin cartas CONS de la Descarga).
+      repeticion: hayPartes ? null : this._datosRepeticionTirada(tirada, {
+        titulo: item.name, esAtaque: esAtaque || esDescarga, etiquetaDificultad: "Dificultad", valorX: usaValorX, efectoX,
+        tokenObjetivo: tokenObjetivoX, numeroCarta
       })
     });
 
     // Quemar la carta usada: mano -> quemadas (motor propio de pilas, sin Cards#pass()).
     if (cartaElegida) await this._moverCartaEntrePilas(mano, quemadas, cartaElegida.id);
+    for (const { carta: c, quemar } of lineasDescarga) {
+      await this._moverCartaEntrePilas(mano, quemar ? quemadas : pilas.descarte, c.id);
+    }
 
     // Automatización (curación, cambio de cansancio y robo de cartas) si está configurada.
     await this._aplicarAutomatizacionHabilidad(item);
@@ -2392,15 +2837,31 @@ export class SistemaActor extends Actor {
    * (`.cyd-btn-promesa`, ver `sistema.mjs`).
    * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
    * @param {Object} [opciones]
-   * @param {string|null} [opciones.efectoX=null] - `curacion` o `promesa`.
+   * @param {string|null} [opciones.efectoX=null] - `curacion`, `promesa` o (v0.16.0) `manifestarArma`
+   *   (sin objetivo: categorías del arma según `numeroCarta`) y `tiempoEmbotellado` (sin X: muestra los
+   *   dados apuntados, que guarda `_guardarTiempoEmbotellado`).
    * @param {Token|TokenDocument|null} [opciones.tokenObjetivo=null] - Objetivo marcado al usarla.
+   * @param {number|null} [opciones.numeroCarta=null] - (v0.16.0) Número (1–5) de la carta MIST usada.
    * @returns {string} HTML público.
    */
-  _htmlValorX(tirada, { efectoX = null, tokenObjetivo = null } = {}) {
+  _htmlValorX(tirada, { efectoX = null, tokenObjetivo = null, numeroCarta = null } = {}) {
     const valor = Math.max(0, Number(tirada.total) || 0);
     const exito = !tirada.esNegativo && valor > 0;
+    // (v0.16.0) Tiempo embotellado: no hay valor X, se apuntan los dados.
+    if (efectoX === "tiempoEmbotellado") {
+      return `
+        <div class="cyd-resolucion-caja ${tirada.esNegativo ? "cyd-fallo" : "cyd-exito"}">
+          <p><i class="fa-solid fa-hourglass-start"></i> ${tirada.esNegativo
+            ? '<span class="cyd-resultado-fallo">FALLO AUTOMÁTICO</span>: no se embotella ningún dado.'
+            : `<strong>Dados embotellados:</strong> [${tirada.resultadosBase.join(", ")}] (${tirada.tipoDado})`}</p>
+          ${tirada.esNegativo ? "" : `<p class="hint">Puedes sustituir hasta ${tirada.resultadosBase.length} dado(s) de cualquier otra tirada tuya por estos valores (se te preguntará al tirar).</p>`}
+        </div>`;
+    }
     let htmlEfecto = "";
-    if (exito && efectoX) {
+    if (exito && efectoX === "manifestarArma") {
+      const categorias = Math.min(5, Math.max(1, Number(numeroCarta) || 1));
+      htmlEfecto = `<p><i class="fa-solid fa-khanda"></i> Arma manifestada de <strong>${categorias} categoría(s)</strong> (carta ${SISTEMA_CONFIG.dadoPorNumeroCarta[categorias] ?? ""}) durante <strong>${valor} turno(s)</strong>.</p>`;
+    } else if (exito && efectoX) {
       const escapar = foundry.utils.escapeHTML;
       const actorObjetivo = tokenObjetivo?.actor ?? null;
       if (!actorObjetivo || actorObjetivo.id === this.id) {
@@ -2523,4 +2984,50 @@ export async function preguntarTipoDescanso(quien) {
   // cerrar la ventana: solo "comodo" e "incomodo" son respuestas válidas.
   if (respuesta !== "comodo" && respuesta !== "incomodo") return null;
   return { comodo: respuesta === "comodo" };
+}
+
+/** Canal de socket del sistema (requiere `"socket": true` en `system.json`). */
+const CANAL_SOCKET = "system.cartas-y-dados";
+
+/**
+ * Monóculo indiscreto (v0.16.0): consulta la carta superior del Mazo de un Actor y la susurra al
+ * usuario que usó el Monóculo y a los Masters, sin revelarla al resto. Debe ejecutarlo un Master
+ * (los Mazos son privados): directamente si el Master usa el Monóculo, o vía socket.
+ * @param {Object} datos
+ * @param {string} datos.objetivoUuid - Actor cuyo Mazo se mira.
+ * @param {string} datos.nombreObjetivo - Nombre del Token objetivo.
+ * @param {string} datos.observadorUuid - Actor que usa el Monóculo.
+ * @param {string} datos.usuarioId - Usuario que recibe el susurro.
+ * @returns {Promise<void>}
+ */
+export async function revelarCartaSuperiorMonoculo({ objetivoUuid, nombreObjetivo, observadorUuid, usuarioId }) {
+  const escapar = foundry.utils.escapeHTML;
+  const objetivo = await fromUuid(objetivoUuid);
+  const observador = await fromUuid(observadorUuid);
+  const mazo = objetivo?.system?.pilasDocumentos?.mazo ?? null;
+  const carta = mazo && typeof objetivo._cartasDisponiblesEnOrden === "function"
+    ? objetivo._cartasDisponiblesEnOrden(mazo)[0] ?? null
+    : null;
+  const nombre = escapar(nombreObjetivo || objetivo?.name || "el objetivo");
+  let detalle;
+  if (!mazo) detalle = `<strong>${nombre}</strong> no tiene Mazo de cartas.`;
+  else if (!carta) detalle = `El Mazo de <strong>${nombre}</strong> está vacío.`;
+  else detalle = `Carta superior del Mazo de <strong>${nombre}</strong>: <strong>${escapar(nombreVisibleCarta(carta))}</strong> (${abreviadoPalo(carta.system.palo)} · ${carta.system.tipoDado ?? ""}).`;
+  await ChatMessage.create({
+    speaker: observador ? ChatMessage.getSpeaker({ actor: observador }) : ChatMessage.getSpeaker(),
+    whisper: [...new Set([usuarioId, ...game.users.filter(u => u.isGM).map(u => u.id)])].filter(Boolean),
+    content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-magnifying-glass"></i><p>Monóculo indiscreto · ${detalle} <small>(sin revelarla)</small></p></div>`
+  });
+}
+
+/**
+ * Escucha en el socket del sistema las peticiones del Monóculo indiscreto (v0.16.0). Solo el Master
+ * activo las atiende. Llamar en `ready`.
+ */
+export function registrarSocketAltaScentia() {
+  game.socket.on(CANAL_SOCKET, async mensaje => {
+    if (mensaje?.tipo !== "monoculo") return;
+    if (game.user !== game.users.activeGM) return;
+    await revelarCartaSuperiorMonoculo(mensaje.datos ?? {});
+  });
 }

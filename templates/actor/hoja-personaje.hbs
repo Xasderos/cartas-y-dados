@@ -305,6 +305,34 @@
               </span>
             {{/if}}
           </div>
+          {{!-- (v0.16.0) Alta Scentia: Visión del futuro, Artilugio de primera y Tiempo embotellado --}}
+          {{#if altaScentia}}
+          <div class="cyd-estado-acciones cyd-alta-scentia">
+            {{#if altaScentia.verPrimera}}
+              {{#if altaScentia.primeraCarta}}
+                <span class="cyd-chip-estado cyd-activo" data-tooltip="Visión del futuro: la primera carta de tu Mazo (solo la ves tú y el Master). Tras una tirada de CONS o MIST, el chat te deja descartarla">
+                  <i class="fa-solid fa-eye"></i> Primera carta: <strong>{{altaScentia.primeraCarta.nombre}}</strong> · {{altaScentia.primeraCarta.palo}} {{altaScentia.primeraCarta.tipoDado}}
+                </span>
+              {{else}}
+                <span class="cyd-chip-estado" data-tooltip="Visión del futuro: no quedan cartas en tu Mazo"><i class="fa-solid fa-eye"></i> Mazo vacío</span>
+              {{/if}}
+            {{/if}}
+            {{#if altaScentia.artilugio}}
+              <span class="cyd-chip-estado{{#if altaScentia.artilugioEnJuego}} cyd-activo{{/if}}" data-tooltip="{{altaScentia.artilugio.texto}}{{#if altaScentia.artilugio.auto}}<br><em>{{altaScentia.artilugio.auto}}</em>{{/if}}" data-tooltip-class="cyd-tooltip">
+                <i class="fa-solid {{altaScentia.artilugio.icono}}"></i> {{altaScentia.artilugio.nombre}}
+              </span>
+              {{#if altaScentia.monoculo}}
+                <button type="button" class="cyd-btn-mini" data-action="usarMonoculo" data-tooltip="Marca con T un Token y mira en privado la carta superior de su Mazo"><i class="fa-solid fa-magnifying-glass"></i> Monóculo</button>
+              {{/if}}
+            {{/if}}
+            {{#if altaScentia.tiempoEmbotellado}}
+              <span class="cyd-chip-estado cyd-activo" data-tooltip="Tiempo embotellado: al hacer otra tirada se te preguntará qué dados sustituir por estos valores (cada uno, una vez)">
+                <i class="fa-solid fa-hourglass-start"></i> Embotellado: [{{#each altaScentia.tiempoEmbotellado.valores as |v|}}{{#unless @first}}, {{/unless}}{{v}}{{/each}}] {{altaScentia.tiempoEmbotellado.tipoDado}}
+              </span>
+              <button type="button" class="cyd-btn-icono cyd-peligro" data-action="descartarTiempoEmbotellado" data-tooltip="Descartar los dados embotellados"><i class="fa-solid fa-xmark"></i></button>
+            {{/if}}
+          </div>
+          {{/if}}
           <div class="cyd-acciones-turno cyd-cols-2">
             {{#if estadoAcciones.miniTurno}}
               {{#if estadoAcciones.miniTurno.esReaccion}}

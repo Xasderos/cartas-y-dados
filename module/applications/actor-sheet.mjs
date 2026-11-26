@@ -8,7 +8,7 @@ import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 import { abrirDialogoAccion } from "./dialogo-accion.mjs";
 
-import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud, contextoRasgosRaza, opcionesTrinketsClase } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud, contextoRasgosRaza, opcionesArtilugio, opcionesTrinketsClase } from "../config.mjs";
 import { preguntarTipoDescanso } from "../documents/actor.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -55,7 +55,9 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       alternarEquipado: HojaPersonajeActor.#onAlternarEquipado,
       usarHabilidad: HojaPersonajeActor.#onUsarHabilidad,
       subirNivel: HojaPersonajeActor.#onSubirNivel,
-      usarAlquimia: HojaPersonajeActor.#onUsarAlquimia
+      usarAlquimia: HojaPersonajeActor.#onUsarAlquimia,
+      usarMonoculo: HojaPersonajeActor.#onUsarMonoculo,
+      descartarTiempoEmbotellado: HojaPersonajeActor.#onDescartarTiempoEmbotellado
     }
   };
 
@@ -183,7 +185,9 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       objetos,
       habilidades,
       subidaNivel,
-      estadoAcciones: actor.contextoAcciones()
+      estadoAcciones: actor.contextoAcciones(),
+      // (v0.16.0) Alta Scentia: primera carta del Mazo, artilugio y dados embotellados
+      altaScentia: actor.isOwner ? actor.contextoAltaScentia() : null
     };
   }
 
@@ -327,7 +331,29 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
 
     if (!trinketElegido) return; // El jugador canceló el Paso 2
 
-    await actor.inicializarPersonajeConClase(claveClase, trinketElegido, claveRaza);
+    // (v0.16.0) Artilugio de primera: elegir el objeto mágico asociado al abalorio.
+    let artilugio = null;
+    if (opcionesTrinketsClase(configClase).find(o => o.nombre === trinketElegido)?.artilugios) {
+      const radiosArtilugio = opcionesArtilugio().map((a, i) => `
+        <label class="cyd-opcion-radio">
+          <input type="radio" name="cydArtilugio" value="${a.clave}" ${i === 0 ? "checked" : ""} />
+          <span><i class="fa-solid ${a.icono}"></i> <strong>${escapar(a.nombre)}</strong><br><small>${escapar(a.texto)}</small>${a.auto ? `<br><small><em>${escapar(a.auto)}</em></small>` : ""}</span>
+        </label>`).join("");
+      artilugio = await DialogV2.prompt({
+        ...opcionesDialogoSistema(),
+        window: { title: `${actor.name} — Artilugio de primera` },
+        content: `<p>Elige el objeto mágico asociado a tu abalorio. Solo podrás cambiarlo una vez cada vez que subas de nivel.</p>${radiosArtilugio}`,
+        ok: {
+          label: "Confirmar y Generar Mazo",
+          icon: "fa-solid fa-toolbox",
+          callback: (event, button) => button.form.elements.cydArtilugio.value
+        },
+        rejectClose: false
+      });
+      if (!artilugio) return;
+    }
+
+    await actor.inicializarPersonajeConClase(claveClase, trinketElegido, claveRaza, { artilugio });
     this.render();
   }
 
@@ -346,7 +372,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       ui.notifications.warn("No hay una subida de nivel disponible para esta Clase.");
       return;
     }
-    const { configClase, nivelActual, nivelDestino, habilidades, packs, especializaciones } = opciones;
+    const { configClase, nivelActual, nivelDestino, habilidades, packs, especializaciones, artilugio } = opciones;
     const escapar = foundry.utils.escapeHTML;
 
     /** Radio con nombre y, si lo hay, texto de reglas debajo (v0.15.0). */
@@ -357,6 +383,14 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       </label>`;
     const radiosHabilidades = habilidades.map((h, i) => radio("cydHabilidadNivel", i, h.nombre, h.texto)).join("");
     const radiosEspecializaciones = especializaciones.map((e, i) => radio("cydEspecializacionNivel", i, e.nombre, e.texto)).join("");
+    // (v0.16.0) Artilugio de primera: se puede cambiar una vez por subida de nivel.
+    const radiosArtilugio = artilugio
+      ? artilugio.opciones.map((a, i) => `
+        <label class="cyd-opcion-radio">
+          <input type="radio" name="cydArtilugioNivel" value="${a.clave}" ${a.seleccionado || (!artilugio.actual && i === 0) ? "checked" : ""} />
+          <span><i class="fa-solid ${a.icono}"></i> <strong>${escapar(a.nombre)}</strong>${a.seleccionado ? " (actual)" : ""}</span>
+        </label>`).join("")
+      : "";
     const radiosPacks = packs.map((p, i) => `
       <label class="cyd-opcion-radio">
         <input type="radio" name="cydPackNivel" value="${i}" ${i === 0 ? "checked" : ""} />
@@ -371,6 +405,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
         ${habilidades.length ? `<fieldset><legend><i class="fa-solid fa-wand-magic-sparkles"></i> Elige una habilidad</legend>${radiosHabilidades}</fieldset>` : ""}
         ${packs.length ? `<fieldset><legend><i class="fa-solid fa-layer-group"></i> Elige un pack de cartas</legend>${radiosPacks}</fieldset>` : ""}
         ${especializaciones.length ? `<fieldset><legend><i class="fa-solid fa-award"></i> Elige una especialización</legend>${radiosEspecializaciones}</fieldset>` : ""}
+        ${artilugio ? `<fieldset><legend><i class="fa-solid fa-toolbox"></i> Artilugio de primera (puedes cambiarlo)</legend>${radiosArtilugio}</fieldset>` : ""}
       `,
       ok: {
         label: "Continuar",
@@ -380,7 +415,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
           return {
             indiceHabilidad: Number(f.cydHabilidadNivel?.value ?? 0),
             indicePack: Number(f.cydPackNivel?.value ?? 0),
-            indiceEspecializacion: Number(f.cydEspecializacionNivel?.value ?? 0)
+            indiceEspecializacion: Number(f.cydEspecializacionNivel?.value ?? 0),
+            artilugio: f.cydArtilugioNivel?.value || null
           };
         }
       },
@@ -399,6 +435,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
         ${habilidad ? `<p><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidad: <strong>${escapar(habilidad.nombre)}</strong></p>` : ""}
         ${pack ? `<p><i class="fa-solid fa-layer-group"></i> Cartas: ${escapar(describirPackCartas(pack))}</p>` : ""}
         ${especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${escapar(especializacion.nombre)}</strong></p>` : ""}
+        ${artilugio && eleccion.artilugio && eleccion.artilugio !== artilugio.actual
+          ? `<p><i class="fa-solid fa-toolbox"></i> Artilugio de primera: <strong>${escapar(SISTEMA_CONFIG.ARTILUGIOS[eleccion.artilugio]?.nombre ?? "")}</strong></p>` : ""}
         <p>Esta elección no se puede deshacer. ¿Continuar?</p>
       `,
       yes: { label: "Subir de Nivel", icon: "fa-solid fa-angles-up" },
@@ -430,6 +468,17 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     } else {
       await this.abrirAsistenteClase();
     }
+    this.render();
+  }
+
+  /** (v0.16.0) Alta Scentia · Monóculo indiscreto: ver la carta superior del Mazo del objetivo (T). */
+  static async #onUsarMonoculo() {
+    await this.document.usarMonoculo();
+  }
+
+  /** (v0.16.0) Alta Scentia · Tiempo embotellado: descartar los dados embotellados que queden. */
+  static async #onDescartarTiempoEmbotellado() {
+    await this.document.descartarTiempoEmbotellado();
     this.render();
   }
 

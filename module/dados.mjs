@@ -40,6 +40,7 @@ import { leerAjuste } from "./settings.mjs";
  * @property {number} bono - Bonificador plano aplicado.
  * @property {string[]} mensajesPendientes - (v0.14.1) Ids de las tarjetas de tirada pendiente
  *   (modo manual de Crítico/Pifia); `publicarTirada()` reutiliza la primera y borra el resto.
+ * @property {SustitucionDado[]} sustituciones - (v0.16.0) Dados sustituidos con «Tiempo embotellado».
  * @property {string} html - Bloque HTML `.cyd-tirada-detalle` con el desglose para el chat.
  */
 
@@ -82,6 +83,11 @@ export async function tirarDadosSistema({
   const tiradaBase = await new Roll(`${n}d${caras}`, rollData).evaluate();
   const rolls = [tiradaBase];
   const resultadosBase = valoresDados(tiradaBase);
+  // (v0.16.0) Tiempo embotellado: antes de evaluar Crítico y Pifia, quien tira puede sustituir dados
+  // por los valores embotellados de su Actor. Los dados de la `Roll` conservan el valor original
+  // (tooltip); el desglose del chat indica cada sustitución.
+  const sustituciones = await pedirSustitucionesDados({ speaker, resultadosBase, caras, titulo });
+  for (const s of sustituciones) resultadosBase[s.indice] = s.despues;
   const sumaBase = resultadosBase.reduce((a, b) => a + b, 0);
 
   // Crítico: una única repetición por cada dado máximo (sin encadenar).
@@ -148,10 +154,40 @@ export async function tirarDadosSistema({
     tipoDado: `d${caras}`,
     bono: bonoNum,
     mensajesPendientes: pendiente ? [pendiente.mensajeId] : [],
+    sustituciones,
     html: ""
   };
   resultado.html = htmlDetalleTirada(resultado, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial });
   return resultado;
+}
+
+/**
+ * @typedef {Object} SustitucionDado
+ * @property {number} indice - Posición del dado en la tirada base (0..n-1).
+ * @property {number} antes - Valor que salió.
+ * @property {number} despues - Valor embotellado que lo sustituye.
+ */
+
+/**
+ * Pide al Actor que tira (resuelto desde `speaker`) las sustituciones de dados de «Tiempo
+ * embotellado» (v0.16.0). El Actor decide si tiene valores guardados y pregunta al usuario
+ * (`SistemaActor#elegirSustitucionesTiempoEmbotellado`); sin Actor o sin valores no hace nada.
+ * @param {Object} datos
+ * @param {Object|null} datos.speaker - Hablante de la tirada.
+ * @param {number[]} datos.resultadosBase - Dados base (no se modifican aquí).
+ * @param {number} datos.caras - Caras del dado.
+ * @param {string} datos.titulo - Título de la tirada (para el diálogo).
+ * @returns {Promise<SustitucionDado[]>}
+ */
+async function pedirSustitucionesDados({ speaker, resultadosBase, caras, titulo }) {
+  const actor = speaker ? ChatMessage.getSpeakerActor(speaker) : null;
+  if (typeof actor?.elegirSustitucionesTiempoEmbotellado !== "function") return [];
+  try {
+    return await actor.elegirSustitucionesTiempoEmbotellado({ resultados: [...resultadosBase], caras, titulo }) ?? [];
+  } catch (err) {
+    console.error("Cartas y Dados | Error en Tiempo embotellado:", err);
+    return [];
+  }
 }
 
 /**
@@ -164,6 +200,10 @@ function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, s
   const lista = valores => `[${valores.join(", ")}]`;
   const lineas = [];
 
+  if (t.sustituciones?.length) {
+    const cambios = t.sustituciones.map(s => `dado ${s.indice + 1}: ${s.antes} → ${s.despues}`).join(" · ");
+    lineas.push(`<p class="cyd-tirada-embotellado"><i class="fa-solid fa-hourglass-start"></i> <strong>TIEMPO EMBOTELLADO</strong> · ${cambios}</p>`);
+  }
   if (t.esCritico) {
     lineas.push(`<p class="cyd-tirada-critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO</strong> · ${maximos} dado(s) al máximo (${caras}) se repiten: ${lista(t.resultadosCritico)} <strong>+${sumaCritico}</strong></p>`);
   }

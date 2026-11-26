@@ -102,6 +102,17 @@
           <input type="checkbox" name="flags.cartas-y-dados.eterno" {{checked reglasTrinket.eterno}} />
         </label>
       </div>
+      {{#if reglasTrinket.artilugios}}
+        {{!-- (v0.16.0) Objeto mágico del Artilugio de primera --}}
+        <div class="cyd-recursos-barra">
+          <div class="cyd-recurso-caja" data-tooltip="Objeto mágico asociado al abalorio. Por reglas solo se cambia una vez en cada subida de nivel (desde el diálogo de subida).">
+            <span class="cyd-recurso-titulo"><i class="fa-solid fa-toolbox"></i> Artilugio</span>
+            <select name="flags.cartas-y-dados.artilugio">
+              {{#each reglasTrinket.artilugios as |a|}}<option value="{{a.clave}}" {{#if a.seleccionado}}selected{{/if}}>{{a.nombre}}</option>{{/each}}
+            </select>
+          </div>
+        </div>
+      {{/if}}
       {{#if reglasTrinket.auto}}
         <p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{reglasTrinket.auto}}</p>
       {{/if}}

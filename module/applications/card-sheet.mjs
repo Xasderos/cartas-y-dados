@@ -9,11 +9,12 @@ import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 const { DocumentSheetV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 import {
-  abalorioDeTrinket, catalogoAbalorios, claveClaseDeItem, esAbalorioEterno, limpiarNombreCarta, nombreVisibleCarta
+  abalorioDeTrinket, catalogoAbalorios, claveClaseDeItem, esAbalorioEterno, limpiarNombreCarta, nombreVisibleCarta,
+  opcionesArtilugio
 } from "../config.mjs";
 
 /** Claves de `flags.cartas-y-dados` editables en la ficha y sincronizadas entre copias (v0.15.1). */
-const FLAGS_REGLAS_CARTA = ["abalorio", "eterno"];
+const FLAGS_REGLAS_CARTA = ["abalorio", "eterno", "artilugio"];
 
 export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(HandlebarsApplicationMixin(DocumentSheetV2))) {
 
@@ -64,7 +65,9 @@ export class HojaCartaSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Han
         abalorio,
         eterno: esAbalorioEterno(card, claveClase),
         opciones: catalogo.map(o => ({ ...o, seleccionado: o.clave === abalorio })),
-        auto: catalogo.find(o => o.clave === abalorio)?.auto ?? ""
+        auto: catalogo.find(o => o.clave === abalorio)?.auto ?? "",
+        // (v0.16.0) Artilugio de primera: objeto mágico asociado
+        artilugios: abalorio === "artilugio" ? opcionesArtilugio(card.getFlag("cartas-y-dados", "artilugio") ?? null) : null
       };
     }
     return {

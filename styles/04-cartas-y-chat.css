@@ -587,3 +587,32 @@ button.cyd-btn-aplicar-curacion i {
 .cyd-tirada-mitad i {
   color: var(--cyd-azul);
 }
+
+/* ======================================================================== */
+/*  ALTA SCENTIA (v0.16.0): ficha, chat y desglose de tirada                */
+/* ======================================================================== */
+
+/* Fila de la ficha: primera carta del Mazo, artilugio y dados embotellados (el texto largo se parte) */
+.cyd-alta-scentia .cyd-chip-estado {
+  max-width: 100%;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Sustitución de dados con Tiempo embotellado */
+.cyd-tirada-embotellado i {
+  color: var(--cyd-azul);
+}
+
+/* Visión del futuro (descartar la primera carta) y estado alterado de la Descarga elemental */
+button.cyd-btn-vision-futuro,
+button.cyd-btn-aplicar-estado {
+  width: 100%;
+  margin-top: 6px;
+}
+
+button.cyd-btn-vision-futuro i,
+button.cyd-btn-aplicar-estado i {
+  margin-right: 4px;
+  color: var(--cyd-azul);
+}

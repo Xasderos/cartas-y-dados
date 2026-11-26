@@ -79,6 +79,11 @@ export class HojaItemSistema extends VentanaDinamicaMixin(RetratoFichaMixin(Hand
       opcionesClaseBase: opcionesSelect({ [CLAVE_PERSONALIZADA]: "Personalizada (sin progresión automática)", ...mapaNombres(SISTEMA_CONFIG.CLASES_BASE) }, claveClase),
       opcionesOrigenHabilidad: opcionesSelect(ORIGENES_HABILIDAD, item.system.origenHabilidad),
       opcionesEfectoX: opcionesSelect(EFECTOS_VALOR_X, item.type === "habilidad" ? item.getFlag("cartas-y-dados", "efectoX") : ""),
+      // (v0.16.0) Descarga elemental: elemento (potenciar con cartas CONS y estado alterado)
+      opcionesElemento: opcionesSelect(
+        { "": "Ninguno", ...Object.fromEntries(Object.entries(SISTEMA_CONFIG.ELEMENTOS).map(([k, e]) => [k, `Descarga elemental: ${e.nombre}`])) },
+        item.type === "habilidad" ? item.getFlag("cartas-y-dados", "elemento") ?? "" : ""
+      ),
       // Tabla de elecciones de la Clase base (v0.15.0), solo lectura; null en clases personalizadas
       progresionClase: item.type === "clase" ? contextoProgresionClase(claveClaseDeItem(item)) : null,
       // Nombre de la Clase Base asociada (v0.10.0), vacío en clases personalizadas

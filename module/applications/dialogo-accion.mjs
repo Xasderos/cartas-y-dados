@@ -9,6 +9,7 @@
  * (v0.15.0) Abalorios de clase En Juego (`SistemaActor#abaloriosActivos`): Espada añade a las cartas
  * CONS un grupo «Como FISC (Espada)» (valor `fisc:<accion>` → `comoFisico`); Espada y Daga permiten un
  * Ataque apuntado FISC + CONS; Escudo añade la reacción adicional «Defender a un aliado».
+ * (v0.16.0) Elementalismo (Alta Scentia) añade la elección del elemento de la acción (`elemento`).
  */
 
 import {
@@ -72,6 +73,10 @@ export async function abrirDialogoAccion(actor, cartaId, { quemar = false } = {}
     || (apuntadoMixto && PALOS_APUNTADO_MIXTO.includes(c.system.palo)));
   const nombreApuntado = apuntadoMixto ? "FISC o CONS" : abreviadoPalo(carta.system.palo);
   const cartasMist = otrasCartas.filter(c => c.system.palo === "copas");
+  // (v0.16.0) Elementalismo: elegir el elemento del ataque o la defensa.
+  const elementalismo = abalorios.has("elementalismo");
+  const opcionesElemento = Object.entries(SISTEMA_CONFIG.ELEMENTOS)
+    .map(([clave, e]) => `<option value="${clave}">${escapar(e.nombre)}</option>`).join("");
 
   // Acción por defecto: la primera del catálogo; si la carta está marcada como ataque y hay
   // una acción de ataque para su característica, esa.
@@ -146,6 +151,20 @@ export async function abrirDialogoAccion(actor, cartaId, { quemar = false } = {}
           : '<p class="hint">Necesitas otra carta MIST en la mano.</p>'}
       </fieldset>
 
+      ${elementalismo ? `
+      <fieldset>
+        <legend><i class="fa-solid fa-fire-flame-curved"></i> Elementalismo</legend>
+        <div class="form-group">
+          <label>Elemento</label>
+          <select name="elemento"><option value="">Sin cambiar</option>${opcionesElemento}<option value="otro">Otro elemento</option></select>
+        </div>
+        <div class="form-group">
+          <label>Otro elemento</label>
+          <input type="text" name="elementoLibre" placeholder="Ácido, sombra..." />
+        </div>
+        <p class="hint">Cambia el tipo de daño de tu ataque o el elemento de tu defensa (se indica en el chat).</p>
+      </fieldset>` : ""}
+
       <fieldset>
         <legend><i class="fa-solid fa-sliders"></i> Opciones y excepciones</legend>
         <label class="cyd-opcion-radio"><input type="checkbox" name="reaccion" /> <span><i class="fa-solid fa-bolt"></i> Es una reacción (fuera de tu turno)</span></label>
@@ -204,7 +223,10 @@ export async function abrirDialogoAccion(actor, cartaId, { quemar = false } = {}
             cartaPotenciarId: f.cartaPotenciar?.value || null,
             reaccion: f.reaccion.checked,
             quemar: f.quemar.checked,
-            resolucion: f.resolucion.value
+            resolucion: f.resolucion.value,
+            elemento: f.elemento?.value === "otro"
+              ? (String(f.elementoLibre?.value ?? "").trim() || null)
+              : (f.elemento?.value || null)
           };
         }
       },
