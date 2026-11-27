@@ -66,7 +66,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
    * Pestañas de la ficha (v0.13.1). Navegación nativa de ApplicationV2: la plantilla
    * usa `data-action="tab"` y `.tab[data-group="primary"]`; `context.tabs` lo prepara
    * `ApplicationV2#_prepareContext` (una sola agrupación de pestañas).
-   * - `principal`: recursos, características, agotamiento, rasgos a mano, cartas y equipo.
+   * - `principal`: recursos, características, agotamiento, rasgos a mano y cartas.
+   * - `equipo` (v0.17.1): inventario de Objetos (equipar, editar, eliminar).
    * - `raza`: descripción completa de los rasgos raciales.
    * @override
    */
@@ -74,6 +75,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     primary: {
       tabs: [
         { id: "principal", icon: "fa-solid fa-id-card", label: "Principal" },
+        { id: "equipo", icon: "fa-solid fa-box-open", label: "Equipo" },
         { id: "raza", icon: "fa-solid fa-dna", label: "Raza" }
       ],
       initial: "principal"

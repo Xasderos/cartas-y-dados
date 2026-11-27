@@ -652,7 +652,8 @@ label.cyd-recurso-caja {
 
 /* Foundry oculta `.tab:not(.active)` en una capa CSS: el display propio solo
    se aplica a la pestaña activa para no anular ese ocultado. */
-.cyd-pestana-raza.active {
+.cyd-pestana-raza.active,
+.cyd-pestana-equipo.active {
   display: flex;
   flex-direction: column;
   gap: 8px;

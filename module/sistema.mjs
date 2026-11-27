@@ -14,6 +14,7 @@ import {
   HabilidadDataModel
 } from "./data/item-model.mjs";
 import { SistemaActor, registrarSocketAltaScentia } from "./documents/actor.mjs";
+import { fusionarCarpetasDuplicadas, obtenerOCrearCarpeta } from "./carpetas.mjs";
 import { SistemaCombat } from "./documents/combat.mjs";
 import { HojaPersonajeActor } from "./applications/actor-sheet.mjs";
 import { HojaItemSistema } from "./applications/item-sheet.mjs";
@@ -171,6 +172,19 @@ Hooks.once("ready", async () => {
     await game.settings.set("cartas-y-dados", "tamanoBase", leerTamanoBase());
   }
 
+  // (v0.17.1) Fusiona las carpetas duplicadas que crearon versiones anteriores
+  // ("Jugadores"/"PNJs" de Actores y la carpeta de Cartas de cada Actor).
+  if (game.users.activeGM?.isSelf) {
+    try {
+      const nombresActores = new Set(game.actors.map(a => a.name));
+      const fusionadas = await fusionarCarpetasDuplicadas("Actor", n => n === "Jugadores" || n === "PNJs")
+        + await fusionarCarpetasDuplicadas("Cards", n => nombresActores.has(n));
+      if (fusionadas) console.log(`Cartas y Dados | Fusionadas ${fusionadas} carpetas duplicadas.`);
+    } catch (err) {
+      console.warn("Cartas y Dados | Error fusionando carpetas duplicadas:", err);
+    }
+  }
+
   try {
     await sanearNombresCartasExistentes();
   } catch (err) {
@@ -240,12 +254,6 @@ Hooks.on("getSceneControlButtons", controls => {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Cuando se crea un Actor, lo mueve automáticamente a la carpeta correspondiente:
- *  - tipo "personaje"  → carpeta "Jugadores"
- *  - tipo "pnj"        → carpeta "PNJs"
- * Las carpetas se crean si aún no existen.
- */
-/**
  * Vinculación de Tokens por defecto (v0.12.0): los `personaje` nacen con "Link Actor Data"
  * activado (`prototypeToken.actorLink: true`) y los `pnj` desactivado, para que cada Token de
  * criatura sea independiente. Si los datos de creación ya traen `actorLink` (duplicado,
@@ -257,23 +265,26 @@ Hooks.on("preCreateActor", (actor, data) => {
   else if (actor.type === "pnj") actor.updateSource({ "prototypeToken.actorLink": false });
 });
 
+/**
+ * Cuando se crea un Actor, lo mueve automáticamente a la carpeta correspondiente:
+ *  - tipo "personaje"  → carpeta "Jugadores"
+ *  - tipo "pnj"        → carpeta "PNJs"
+ * Las carpetas se crean si aún no existen (v0.17.1: sin duplicados, ver `carpetas.mjs`).
+ */
 Hooks.on("createActor", async (actor) => {
-  if (!game.user?.isGM) return;
+  // (v0.17.1) Solo el Master activo: con varios Masters/pestañas conectados cada uno creaba su carpeta.
+  if (!game.users.activeGM?.isSelf) return;
 
   const folderName = actor.type === "personaje" ? "Jugadores" : "PNJs";
   const folderColor = actor.type === "personaje" ? "#2ecc71" : "#e74c3c";
 
-  let carpeta = game.folders.find(f => f.type === "Actor" && f.name === folderName);
-  if (!carpeta) {
-    carpeta = await Folder.create({
-      name: folderName,
-      type: "Actor",
-      color: folderColor
-    });
-  }
-
-  if (actor.folder !== carpeta.id) {
-    await actor.update({ folder: carpeta.id });
+  try {
+    const carpeta = await obtenerOCrearCarpeta("Actor", folderName, folderColor);
+    if (actor.folder?.id !== carpeta.id) {
+      await actor.update({ folder: carpeta.id });
+    }
+  } catch (err) {
+    console.warn(`Cartas y Dados | No se pudo mover "${actor.name}" a la carpeta ${folderName}:`, err);
   }
 });
 
@@ -710,4 +721,34 @@ Hooks.on("updateActor", (actor, changes, options, userId) => {
   if (nuevo === options.cydAgotamientoAnterior) return;
   actor._alCambiarAgotamiento(options.cydAgotamientoAnterior, nuevo)
     .catch(error => console.error("[Cartas y Dados] Error aplicando consecuencias de Agotamiento", error));
+});
+
+/* -------------------------------------------------------------------------- */
+/*  MUERTE POR SALUD 0 (v0.17.1)                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Tras actualizar un Actor (PJ o PNJ, también Actores sintéticos de Tokens no vinculados):
+ * si cambió `system.salud.value`, sincroniza el estado de derrota de Foundry
+ * (`CONFIG.specialStatusEffects.DEFEATED`, "dead" por defecto) con la Salud:
+ * - Salud ≤ 0 → aplica el estado (superpuesto al Token). El Combatiente queda derrotado
+ *   (`Combatant#isDefeated` lo lee de los estados del Actor).
+ * - Salud > 0 → lo retira, salvo que el Actor esté muerto por Agotamiento 8.
+ * Solo en el cliente que hizo el cambio, para no duplicar la operación.
+ */
+Hooks.on("updateActor", (actor, changes, options, userId) => {
+  if (userId !== game.user.id) return;
+  if (foundry.utils.getProperty(changes, "system.salud.value") === undefined) return;
+  if (!["personaje", "pnj"].includes(actor.type)) return;
+
+  const estadoMuerte = CONFIG.specialStatusEffects?.DEFEATED ?? "dead";
+  const salud = Number(actor.system.salud?.value) || 0;
+  const muerto = actor.statuses?.has(estadoMuerte) ?? false;
+  let activar = null;
+  if (salud <= 0 && !muerto) activar = true;
+  else if (salud > 0 && muerto && !actor.system.agotamiento?.muerto) activar = false;
+  if (activar === null) return;
+
+  actor.toggleStatusEffect(estadoMuerte, { active: activar, overlay: true })
+    .catch(error => console.warn("[Cartas y Dados] No se pudo sincronizar el estado de muerte con la Salud", error));
 });

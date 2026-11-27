@@ -14,6 +14,7 @@ import {
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 import { combinarTiradas, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
+import { obtenerOCrearCarpeta } from "../carpetas.mjs";
 
 export class SistemaActor extends Actor {
 
@@ -21,15 +22,26 @@ export class SistemaActor extends Actor {
   /*  1. INICIALIZACIÓN Y GENERADOR DE MAZO INICIAL                           */
   /* ======================================================================== */
 
+  /**
+   * Crea (si faltan) las 6 pilas de cartas del Actor dentro de una carpeta `Cards` con su nombre.
+   * (v0.17.1) Las llamadas simultáneas para el mismo Actor (doble clic, asistente + botón) esperan
+   * a la misma inicialización, y la carpeta se obtiene con `obtenerOCrearCarpeta` para no duplicarla.
+   * @returns {Promise<Object>} `system.pilasDocumentos` tras la inicialización.
+   */
   async inicializarPilasDeJugador() {
-    let carpeta = game.folders.find(f => f.type === "Cards" && f.name === this.name);
-    if (!carpeta) {
-      carpeta = await Folder.create({
-        name: this.name,
-        type: "Cards",
-        color: "#2b3a4a"
-      });
-    }
+    if (this._promesaInicializarPilas) return this._promesaInicializarPilas;
+    this._promesaInicializarPilas = this._inicializarPilasDeJugador()
+      .finally(() => { this._promesaInicializarPilas = null; });
+    return this._promesaInicializarPilas;
+  }
+
+  /**
+   * Implementación de `inicializarPilasDeJugador` (no llamar directamente).
+   * @returns {Promise<Object>}
+   * @private
+   */
+  async _inicializarPilasDeJugador() {
+    const carpeta = await obtenerOCrearCarpeta("Cards", this.name, "#2b3a4a");
 
     const definicionPilas = [
       { clave: "mazoId", nombre: `${this.name} - Mazo de Juego`, tipo: "deck", publico: false },

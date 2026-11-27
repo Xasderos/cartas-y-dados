@@ -1,5 +1,5 @@
 {{!--
-  Plantilla de la Hoja de Personaje ApplicationV2 con Raza, Origen, Clase, Equipo y Cartas.
+  Plantilla de la Hoja de Personaje ApplicationV2 con Raza, Origen, Clase, Cartas (pestaña Principal), Equipo y Raza (pestañas propias).
   Iconografía (v0.9.0): solo iconos Font Awesome y símbolos tipográficos, sin emojis.
   Características: FISC fa-hand-fist · CONS fa-eye · SOC fa-masks-theater · MIST fa-moon.
 --}}
@@ -67,6 +67,7 @@
   {{!-- Pestañas (v0.13.1): navegación nativa de ApplicationV2 (`static TABS`, acción "tab") --}}
   <nav class="sheet-tabs tabs cyd-pestanas" aria-roledescription="Pestañas de la ficha">
     <a data-action="tab" data-group="primary" data-tab="principal" class="{{tabs.principal.cssClass}}"><i class="fa-solid fa-id-card" inert></i> <span>Principal</span></a>
+    <a data-action="tab" data-group="primary" data-tab="equipo" class="{{tabs.equipo.cssClass}}"><i class="fa-solid fa-box-open" inert></i> <span>Equipo</span></a>
     <a data-action="tab" data-group="primary" data-tab="raza" class="{{tabs.raza.cssClass}}"><i class="fa-solid fa-dna" inert></i> <span>Raza</span></a>
   </nav>
 
@@ -523,46 +524,50 @@
         {{/if}}
       </section>
 
-      {{!-- ================= 7. EQUIPO (ancho completo; Habilidades va junto a Trinkets) ================= --}}
-      <section class="cyd-panel cyd-panel-equipo">
-        <div class="cyd-cabecera-seccion">
-          <h3><i class="fa-solid fa-box-open"></i> Equipo</h3>
-          {{#if esPropietario}}
-            <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="objeto"><i class="fa-solid fa-plus"></i> Objeto</button>
-          {{/if}}
-        </div>
-
-        {{#if objetos.length}}
-          <div class="cyd-lista-items">
-            {{#each objetos as |obj|}}
-              <div class="cyd-fila-item {{#if obj.system.equipado}}cyd-item-equipado{{/if}}" data-tooltip="{{obj.system.descripcion}}" data-tooltip-class="cyd-tooltip">
-                <div class="cyd-fila-item-info">
-                  <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-btn-equipar {{#if obj.system.equipado}}cyd-activo{{/if}}" data-action="alternarEquipado" data-item-id="{{obj.id}}" data-tooltip="{{#if obj.system.equipado}}Desequipar{{else}}Equipar{{/if}}">
-                    <i class="{{#if obj.system.equipado}}fa-solid fa-shield-halved{{else}}fa-regular fa-circle{{/if}}"></i>
-                  </button>
-                  <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{obj.id}}">{{obj.name}}</strong>
-                  <small class="cyd-detalle-item">
-                    {{#if obj.system.bonificadores.defensa}}<span><i class="fa-solid fa-shield-halved"></i> +{{obj.system.bonificadores.defensa}}</span>{{/if}}
-                    {{#if obj.system.bonificadores.limiteMano}}<span><i class="fa-solid fa-hand"></i> +{{obj.system.bonificadores.limiteMano}}</span>{{/if}}
-                  </small>
-                </div>
-                <div class="cyd-fila-item-acciones">
-                  <span class="cyd-tag-cantidad">×{{obj.system.cantidad}}</span>
-                  {{#if ../esPropietario}}
-                    <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{obj.id}}" data-tooltip="Eliminar"><i class="fa-solid fa-xmark"></i></button>
-                  {{/if}}
-                </div>
-              </div>
-            {{/each}}
-          </div>
-        {{else}}
-          <p class="cyd-texto-vacio">No tienes objetos en el inventario.</p>
-        {{/if}}
-      </section>
     {{/unless}}
     </section>
 
   </div>
+  </section>
+
+  {{!-- ================= PESTAÑA EQUIPO (v0.17.1): inventario de Objetos =================
+       Independiente de las pilas de cartas: se muestra aunque aún no estén inicializadas. --}}
+  <section class="tab cyd-pestana-equipo {{tabs.equipo.cssClass}}" data-group="primary" data-tab="equipo">
+    <section class="cyd-panel cyd-panel-equipo">
+      <div class="cyd-cabecera-seccion">
+        <h3><i class="fa-solid fa-box-open"></i> Equipo</h3>
+        {{#if esPropietario}}
+          <button type="button" class="cyd-btn-mini" data-action="crearItem" data-tipo="objeto"><i class="fa-solid fa-plus"></i> Objeto</button>
+        {{/if}}
+      </div>
+
+      {{#if objetos.length}}
+        <div class="cyd-lista-items">
+          {{#each objetos as |obj|}}
+            <div class="cyd-fila-item {{#if obj.system.equipado}}cyd-item-equipado{{/if}}" data-tooltip="{{obj.system.descripcion}}" data-tooltip-class="cyd-tooltip">
+              <div class="cyd-fila-item-info">
+                <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-btn-equipar {{#if obj.system.equipado}}cyd-activo{{/if}}" data-action="alternarEquipado" data-item-id="{{obj.id}}" data-tooltip="{{#if obj.system.equipado}}Desequipar{{else}}Equipar{{/if}}">
+                  <i class="{{#if obj.system.equipado}}fa-solid fa-shield-halved{{else}}fa-regular fa-circle{{/if}}"></i>
+                </button>
+                <strong class="cyd-link-item" data-action="editarItem" data-item-id="{{obj.id}}">{{obj.name}}</strong>
+                <small class="cyd-detalle-item">
+                  {{#if obj.system.bonificadores.defensa}}<span><i class="fa-solid fa-shield-halved"></i> +{{obj.system.bonificadores.defensa}}</span>{{/if}}
+                  {{#if obj.system.bonificadores.limiteMano}}<span><i class="fa-solid fa-hand"></i> +{{obj.system.bonificadores.limiteMano}}</span>{{/if}}
+                </small>
+              </div>
+              <div class="cyd-fila-item-acciones">
+                <span class="cyd-tag-cantidad">×{{obj.system.cantidad}}</span>
+                {{#if ../esPropietario}}
+                  <button type="button" class="cyd-btn-mini cyd-btn-icono cyd-peligro" data-action="eliminarItem" data-item-id="{{obj.id}}" data-tooltip="Eliminar"><i class="fa-solid fa-xmark"></i></button>
+                {{/if}}
+              </div>
+            </div>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="cyd-texto-vacio">No tienes objetos en el inventario.</p>
+      {{/if}}
+    </section>
   </section>
 
   {{!-- ================= PESTAÑA RAZA (v0.13.1): descripción completa de los rasgos raciales =================
