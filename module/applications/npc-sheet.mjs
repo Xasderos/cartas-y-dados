@@ -119,7 +119,7 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       system,
       estadoAcciones: actor.contextoAcciones(),
       esPropietario: actor.isOwner,
-      agotamiento: contextoAgotamiento(system.cansancio?.value),
+      agotamiento: contextoAgotamiento(system.cansancio?.value, system.agotamiento),
       barraSalud: contextoBarraSalud(system.salud?.value, system.salud?.maxTotal),
       habilidades,
       objetos,
@@ -141,6 +141,7 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
     else if (target.dataset.estado === "destinoSellado") await this.document.retirarDestinoSellado();
     else if (target.dataset.estado === "corazonDragon") await this.document.retirarCorazonDragon(); // (v0.18.0)
     else if (target.dataset.estado === "caleidoscopio") await this.document.retirarCaleidoscopio(); // (v0.19.0)
+    else if (target.dataset.estado === "corrupcionFisica") await this.document.retirarCorrupcionFisica(); // (v0.20.0)
   }
 
   /* ======================================================================== */

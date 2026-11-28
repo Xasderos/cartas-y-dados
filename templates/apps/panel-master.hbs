@@ -29,6 +29,18 @@
 
       <span class="cyd-gm-separador-vertical"></span>
 
+      {{!-- (v0.20.0) Nivel de peligro del encuentro: multiplica las tiradas con «Ritual de espíritu» (Brujo) --}}
+      <div class="cyd-gm-bloque" data-tooltip="Nivel de peligro del encuentro (0 = sin peligro). Multiplica las tiradas de quien tenga En Juego el abalorio «Ritual de espíritu»">
+        <span class="cyd-gm-etiqueta"><i class="fa-solid fa-skull"></i> Peligro</span>
+        <div class="cyd-gm-control-numero">
+          <button type="button" class="cyd-gm-btn-icono" data-action="ajustarPeligro" data-delta="-1" data-tooltip="Reducir"><i class="fa-solid fa-minus"></i></button>
+          <input type="number" class="cyd-gm-input-dificultad cyd-gm-input-peligro" value="{{nivelPeligro}}" min="0" />
+          <button type="button" class="cyd-gm-btn-icono" data-action="ajustarPeligro" data-delta="1" data-tooltip="Aumentar"><i class="fa-solid fa-plus"></i></button>
+        </div>
+      </div>
+
+      <span class="cyd-gm-separador-vertical"></span>
+
       <div class="cyd-gm-bloque">
         <span class="cyd-gm-etiqueta"><i class="fa-solid fa-users"></i> Grupo</span>
         <div class="cyd-gm-presets">

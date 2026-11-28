@@ -34,6 +34,7 @@ import { leerAjuste } from "./settings.mjs";
  * @property {boolean} esNegativo - El total es menor que 0 (fallo automático).
  * @property {boolean} mitadPorAgotamiento - Se aplicó la mitad por Agotamiento 6+ (nunca a un resultado negativo).
  * @property {number} totalSinAgotamiento - Total antes de la reducción por Agotamiento.
+ * @property {number} multiplicador - (v0.20.0, Ritual de espíritu) Factor aplicado al resultado (1 = ninguno).
  * @property {string} formula - Fórmula base legible ("3d6 + 2").
  * @property {number} cantidadDados - Nº de dados lanzados (para repetir la tirada, v0.13.0).
  * @property {string} tipoDado - Dado lanzado ("d6").
@@ -72,12 +73,14 @@ function valoresDados(roll) {
  * @param {number|null} [opciones.resultadoFijo=null] - (v0.17.0, Mal de ojo) Si se indica, no se lanzan
  *   dados: el resultado es automáticamente este valor (sin bono, Crítico, Pifia ni Agotamiento).
  * @param {string} [opciones.motivoFijo=""] - (v0.17.0) Texto del desglose para el resultado fijo.
+ * @param {number} [opciones.multiplicador=1] - (v0.20.0, Brujo · Ritual de espíritu) El resultado final
+ *   (tras la mitad por Agotamiento) se multiplica por este valor, también si es negativo. 0 o 1 = sin efecto.
  * @returns {Promise<ResultadoTiradaSistema>} En modo manual, no se resuelve hasta que se pulsan
  *   los botones de Crítico/Pifia de la tarjeta.
  */
 export async function tirarDadosSistema({
   cantidadDados, tipoDado, bono = 0, rollData = {}, mitadPorAgotamiento = false, parcial = false,
-  speaker = null, titulo = "", resultadoFijo = null, motivoFijo = ""
+  speaker = null, titulo = "", resultadoFijo = null, motivoFijo = "", multiplicador = 1
 }) {
   const n = Math.max(1, Math.floor(Number(cantidadDados) || 1));
   const caras = Math.max(2, Number(String(tipoDado ?? "d6").replace(/^d/i, "")) || 6);
@@ -141,7 +144,10 @@ export async function tirarDadosSistema({
   const totalSinAgotamiento = apuntado - sumaPifia;
   // Agotamiento 6+ (v0.14.0): un resultado negativo NO se divide (conserva toda su penalización).
   const aplicaMitad = Boolean(mitadPorAgotamiento) && totalSinAgotamiento > 0;
-  const total = aplicaMitad ? Math.ceil(totalSinAgotamiento / 2) : totalSinAgotamiento;
+  const totalTrasMitad = aplicaMitad ? Math.ceil(totalSinAgotamiento / 2) : totalSinAgotamiento;
+  // (v0.20.0) Ritual de espíritu: × Nivel de peligro (un factor 0 o 1 no cambia nada).
+  const factor = Math.floor(Number(multiplicador) || 1) || 1;
+  const total = totalTrasMitad * factor;
   const formula = bonoNum !== 0 ? `${n}d${caras} ${bonoNum > 0 ? "+" : "-"} ${Math.abs(bonoNum)}` : `${n}d${caras}`;
 
   const resultado = {
@@ -155,6 +161,8 @@ export async function tirarDadosSistema({
     esNegativo: total < 0,
     mitadPorAgotamiento: aplicaMitad,
     totalSinAgotamiento,
+    multiplicador: factor,
+    totalTrasMitad,
     formula,
     cantidadDados: n,
     tipoDado: `d${caras}`,
@@ -187,6 +195,8 @@ async function tiradaResultadoFijo(valor, { n, caras, motivo }) {
     esNegativo: valor < 0,
     mitadPorAgotamiento: false,
     totalSinAgotamiento: valor,
+    multiplicador: 1,
+    totalTrasMitad: valor,
     formula: String(valor),
     cantidadDados: n,
     tipoDado: `d${caras}`,
@@ -250,7 +260,11 @@ function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, s
     lineas.push(`<p class="cyd-tirada-pifia"><i class="fa-solid fa-skull-crossbones"></i> <strong>PIFIA</strong> · ${minimos} de ${n} dado(s) en 1; resultado apuntado ${apuntado}, se repiten: ${lista(t.resultadosPifia)} <strong>−${sumaPifia}</strong></p>`);
   }
   if (t.mitadPorAgotamiento) {
-    lineas.push(`<p class="cyd-tirada-agotamiento"><i class="fa-solid fa-hourglass-half"></i> <strong>AGOTAMIENTO</strong> · resultado a la mitad: ${t.totalSinAgotamiento} → <strong>${t.total}</strong></p>`);
+    lineas.push(`<p class="cyd-tirada-agotamiento"><i class="fa-solid fa-hourglass-half"></i> <strong>AGOTAMIENTO</strong> · resultado a la mitad: ${t.totalSinAgotamiento} → <strong>${t.totalTrasMitad}</strong></p>`);
+  }
+  if (t.multiplicador !== 1) {
+    // (v0.20.0) Brujo · Ritual de espíritu.
+    lineas.push(`<p class="cyd-tirada-agotamiento"><i class="fa-solid fa-skull"></i> <strong>RITUAL DE ESPÍRITU</strong> · resultado × Nivel de peligro ${t.multiplicador}: ${t.totalTrasMitad} → <strong>${t.total}</strong></p>`);
   }
   if (t.esNegativo && !parcial) {
     lineas.push(`<p class="cyd-tirada-negativa"><i class="fa-solid fa-circle-exclamation"></i> <strong>Resultado negativo (${t.total}):</strong> fallo automático. En una tirada enfrentada, el oponente suma <strong>+${Math.abs(t.total)}</strong> a su tirada.</p>`);
@@ -261,6 +275,7 @@ function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, s
   if (bonoNum !== 0) partes.push(`${bonoNum > 0 ? "+" : "−"} ${Math.abs(bonoNum)}`);
   if (t.esPifia) partes.push(`− ${sumaPifia}`);
   if (t.mitadPorAgotamiento) partes.push(`(${t.totalSinAgotamiento}) ÷ 2`);
+  if (t.multiplicador !== 1) partes.push(`× ${t.multiplicador}`);
 
   return `
     <div class="cyd-tirada-detalle">

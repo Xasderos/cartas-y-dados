@@ -497,6 +497,9 @@ function activarBotonEstadoAlterado(html) {
  * - `.cyd-btn-sellar-destino`: resuelve «Sellar destino» sobre el Actor con el palo `data-palo`.
  * - `.cyd-btn-perder-vida` (Ojo por ojo): resta `data-cantidad` de Salud a los Actores de `data-uuids`
  *   o, si no hay, a los Tokens que tenga marcados el Master. No es daño: no lo mitiga la Barrera.
+ * - (v0.20.0, Brujo) `.cyd-btn-corrupcion`: «Corrupción física» (desventajas del Agotamiento `data-nivel`
+ *   durante `data-turnos` turnos) sobre el Actor; `.cyd-btn-cerrar-destino`: resuelve «Cerrar destino» del Brujo `data-lanzador-uuid`
+ *   contra `data-objetivo-uuid`; `.cyd-btn-consumir` (Canibalizar): Salud 0 a los Actores de `data-uuids`.
  * @param {HTMLElement} html
  */
 function activarBotonesMasterPotens(html) {
@@ -513,6 +516,28 @@ function activarBotonesMasterPotens(html) {
       if (!actor?.aplicarCaleidoscopio) return false;
       await actor.aplicarCaleidoscopio(Number(b.dataset.turnos) || 1, b.dataset.origen ?? "");
       return `Caleidoscopio aplicado a ${b.dataset.nombre || actor.name}`;
+    },
+    // (v0.20.0) Potens Mystica · Brujo
+    ".cyd-btn-corrupcion": async b => {
+      const actor = await fromUuid(b.dataset.actorUuid);
+      if (!actor?.aplicarCorrupcionFisica) return false;
+      await actor.aplicarCorrupcionFisica(Number(b.dataset.nivel) || 0, {
+        turnos: Number(b.dataset.turnos) || 1, soloNivelActual: Boolean(b.dataset.solo), origen: b.dataset.origen ?? ""
+      });
+      return `Corrupción física aplicada a ${b.dataset.nombre || actor.name}`;
+    },
+    ".cyd-btn-cerrar-destino": async b => {
+      const lanzador = await fromUuid(b.dataset.lanzadorUuid);
+      if (!lanzador?.resolverCerrarDestino) return false;
+      if (!(await lanzador.resolverCerrarDestino(b.dataset.objetivoUuid))) return false;
+      return `Destino de ${b.dataset.nombre || "la criatura objetivo"} cerrado`;
+    },
+    ".cyd-btn-consumir": async b => {
+      const uuids = String(b.dataset.uuids ?? "").split(",").filter(Boolean);
+      const actores = (await Promise.all(uuids.map(u => fromUuid(u)))).filter(Boolean);
+      if (!actores.length) return false;
+      for (const actor of actores) await actor.update({ "system.salud.value": 0 });
+      return `Consumidas: ${b.dataset.nombres || actores.map(a => a.name).join(", ")}`;
     },
     ".cyd-btn-sellar-destino": async b => {
       const actor = await fromUuid(b.dataset.actorUuid);

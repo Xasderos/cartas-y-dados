@@ -217,7 +217,7 @@
                   data-tooltip="Nivel {{seg.nivel}}: {{seg.texto}}"></span>
           {{/each}}
         </div>
-        {{#if agotamiento.nivel}}
+        {{#if agotamiento.activos.length}}
           <ul class="cyd-lista-agotamiento">
             {{#each agotamiento.activos as |efecto|}}
               <li><i class="fa-solid {{efecto.icono}}"></i> <strong>{{efecto.nivel}}.</strong> {{efecto.texto}}</li>
@@ -226,6 +226,8 @@
         {{else}}
           <p class="cyd-agotamiento-vacio">Sin Agotamiento.</p>
         {{/if}}
+        {{!-- (v0.20.0) Brujo: Rendición de la carne / Corrupción física --}}
+        {{#if agotamiento.nota}}<p class="cyd-agotamiento-vacio"><i class="fa-solid fa-circle-info"></i> {{agotamiento.nota}}</p>{{/if}}
         {{!-- (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este Actor --}}
         {{#if estadosMisticos}}
           <div class="cyd-estado-acciones cyd-estados-misticos">
@@ -240,6 +242,12 @@
                 <i class="fa-solid fa-clone"></i> Caleidoscopio · {{estadosMisticos.caleidoscopio.turnos}} turno(s) · {{estadosMisticos.caleidoscopio.reflejos}} reflejo(s)
               </span>
               {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="caleidoscopio" data-tooltip="Retirar el Caleidoscopio"><i class="fa-solid fa-xmark"></i></button>{{/if}}
+            {{/if}}
+            {{#if estadosMisticos.corrupcionFisica}}
+              <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Corrupción física{{#if estadosMisticos.corrupcionFisica.origen}} de {{estadosMisticos.corrupcionFisica.origen}}{{/if}}: sufres las desventajas del Agotamiento {{estadosMisticos.corrupcionFisica.nivel}}{{#if estadosMisticos.corrupcionFisica.soloNivelActual}} (solo ese nivel){{/if}}, además de las tuyas. En combate pierde un turno al final de cada uno de tus turnos">
+                <i class="fa-solid fa-biohazard"></i> Corrupción física · Agot. {{estadosMisticos.corrupcionFisica.nivel}} · {{estadosMisticos.corrupcionFisica.turnos}} turno(s)
+              </span>
+              {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="corrupcionFisica" data-tooltip="Retirar la Corrupción física"><i class="fa-solid fa-xmark"></i></button>{{/if}}
             {{/if}}
             {{#if estadosMisticos.malDeOjo}}
               <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Mal de ojo{{#if estadosMisticos.malDeOjo.origen}} de {{estadosMisticos.malDeOjo.origen}}{{/if}}: tus cartas de Misticismo bajan una categoría de dado (una carta d4 da automáticamente 1). En combate pierde un turno al final de cada uno de tus turnos">

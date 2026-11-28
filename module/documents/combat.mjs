@@ -55,6 +55,7 @@ export class SistemaCombat extends Combat {
    * Fin del turno del combatiente activo (v0.17.0): su «Mal de ojo» (Potens Mystica), (v0.18.0) su
    * «Corazón del dragón» (Custodio) y (v0.19.0) su «Caleidoscopio» pierden un turno, y sus
    * «Pesadillas» desaparecen salvo que las haya mantenido con un hueco de ilusión (Ilusionista).
+   * (v0.20.0) Su «Corrupción física» (Brujo) también pierde un turno.
    */
   async #finTurnoCombatiente() {
     if (!this.started) return;
@@ -64,6 +65,7 @@ export class SistemaCombat extends Combat {
     await actor.avanzarCorazonDragon?.(); // (v0.18.0) Custodio
     await actor.avanzarPesadillas?.(); // (v0.19.0) Ilusionista
     await actor.avanzarCaleidoscopio?.(); // (v0.19.0) Ilusionista
+    await actor.avanzarCorrupcionFisica?.(); // (v0.20.0) Brujo
   }
 
   /**

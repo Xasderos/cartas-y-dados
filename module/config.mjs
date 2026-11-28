@@ -773,7 +773,7 @@ export const SISTEMA_CONFIG = {
             },
             {
               nombre: "Flagelar esencia", esAtaque: false, valorX: true, efectoX: "flagelarEsencia",
-              texto: "Realizas un ataque a la esencia del enemigo, haciendo X × nivel de agotamiento × nivel de peligro de daño. (X es el resultado de la tirada de misticismo)"
+              texto: "Realizas un ataque a la esencia del enemigo, haciendo X + nivel de agotamiento + nivel de peligro de daño. (X es el resultado de la tirada de misticismo)"
             }
           ],
           packs: [
@@ -785,8 +785,87 @@ export const SISTEMA_CONFIG = {
         3: {
           especializaciones: [
             {
+              // (v0.20.0) Brujo: progresión propia de Nv. 3 a 6 (se suma a la de la clase).
               clave: "brujo", nombre: "Brujo",
-              texto: "Especialización de Potens Mystica. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+              texto: "Especialización de Potens Mystica: rituales prohibidos que alteran el destino, la carne y la mente a cambio de un precio.",
+              tablaElecciones: [
+                { nivel: 3, beneficios: "Elección de característica · +1 Mano Máxima · Elección de abalorio · Ritual del renacer" },
+                { nivel: 4, beneficios: "Elección de habilidad · Elección de cartas" },
+                { nivel: 5, beneficios: "Elección de habilidad (pendiente de definir) · Elección de característica" },
+                { nivel: 6, beneficios: "Elección de abalorio · +1 Mano Máxima" }
+              ],
+              progresion: {
+                3: {
+                  caracteristica: true,
+                  manoMaxima: 1,
+                  abalorios: [
+                    {
+                      clave: "ritualSangre", nombre: "Ritual de sangre", icono: "fa-droplet",
+                      texto: "Siempre que quemes una carta recuperas 1 punto de salud. Cuando barajes el mazo, devuelve este abalorio al mazo de abalorios y pierdes salud igual a las cartas que tengas quemadas. Por este efecto tu salud no puede bajar a 0.",
+                      auto: "En Juego: cada carta que quemas te cura 1 de Salud (sin superar la Salud Máx.). Al agotar el Mazo y barajar el Descarte, el abalorio vuelve al Mazo de Trinkets y pierdes tanta Salud como cartas tengas en Quemadas (como mínimo te queda 1)."
+                    },
+                    {
+                      clave: "ritualEspiritu", nombre: "Ritual de espíritu", icono: "fa-skull",
+                      texto: "El resultado de todas tus tiradas será multiplicado por el nivel de peligro (siempre que el nivel de peligro sea distinto de 0).",
+                      auto: "En Juego: el resultado de todas tus tiradas se multiplica por el Nivel de peligro que fija el Master en su Panel (con Nivel de peligro 0 no tiene efecto)."
+                    },
+                    {
+                      clave: "ritualMente", nombre: "Ritual de mente", icono: "fa-brain",
+                      texto: "Tu mano máxima es ahora igual a la cantidad de cartas que hay en tu pila de cartas quemadas.",
+                      auto: "En Juego: tu Mano Máx. es igual al número de cartas de tu pila de Cartas Quemadas (nunca menos de 1); el Agotamiento la sigue reduciendo."
+                    }
+                  ],
+                  pasivas: [
+                    {
+                      clave: "ritualRenacer", nombre: "Ritual del renacer",
+                      texto: "Cuando eliges esta clase por primera vez eres capaz de someterte a un ritual místico que te alterará de forma innata. A través de este ritual, serás capaz de alterar tu destino más profundo y elegir las constelaciones que desees. Estas sustituirán a las que ya tenías antes y no podrás elegir más de las que ya tenías."
+                    }
+                  ]
+                },
+                4: {
+                  habilidades: [
+                    {
+                      nombre: "Canibalizar", esAtaque: false, valorX: true, efectoX: "canibalizar",
+                      texto: "Consumes hasta X criaturas que puedas ver, ganando 1 punto de vida por cada criatura consumida. (X es el resultado de la tirada de misticismo)"
+                    },
+                    {
+                      nombre: "Cerrar destino", esAtaque: false, requiereTirada: false, efectoX: "cerrarDestino",
+                      texto: "Todos queman una carta de su mano aleatoria, y usas esas cartas (con tus propias características correspondientes) y haces daño igual al resultado de la tirada de todas las cartas quemadas a la criatura objetivo que puedas ver."
+                    },
+                    {
+                      nombre: "Corrupción física", esAtaque: false, valorX: true, efectoX: "corrupcionFisica",
+                      texto: "Durante X turnos, la criatura objetivo tendrá las mismas desventajas que tengas tú con tu nivel de agotamiento actual. Aumentas tu agotamiento en 1. (X es el resultado de la tirada de misticismo)"
+                    }
+                  ],
+                  packs: [
+                    [{ palo: "oros", numero: 2 }, { palo: "copas", numero: 3 }],
+                    [{ palo: "bastos", numero: 2 }, { palo: "copas", numero: 3 }],
+                    [{ palo: "espadas", numero: 2 }, { palo: "copas", numero: 3 }]
+                  ]
+                },
+                5: {
+                  caracteristica: true,
+                  pendientes: ["Elección de habilidad"]
+                },
+                6: {
+                  manoMaxima: 1,
+                  abalorios: [
+                    {
+                      clave: "rendicionCarne", nombre: "Rendición de la carne", icono: "fa-person-falling",
+                      texto: "Solo te afecta el cansancio del nivel en el que te encuentres, los niveles anteriores no se acumulan.",
+                      auto: "En Juego: de la tabla de Agotamiento solo se aplica la consecuencia de tu nivel actual (el nivel 8 sigue siendo la muerte)."
+                    },
+                    {
+                      nombre: "Rendición del espíritu", icono: "fa-ghost",
+                      texto: "Pendiente de definir: el Master aplica su efecto mientras tanto."
+                    },
+                    {
+                      nombre: "Rendición de la mente", icono: "fa-head-side-virus",
+                      texto: "Pendiente de definir: el Master aplica su efecto mientras tanto."
+                    }
+                  ]
+                }
+              }
             }
           ]
         }
@@ -1048,7 +1127,7 @@ export const EFECTOS_VALOR_X = {
   tiempoEmbotellado: "Tiempo embotellado: guardar los dados para sustituirlos después",
   // (v0.17.0) Potens Mystica
   malDeOjo: "Mal de ojo: maldecir al objetivo X turnos (−1 categoría a sus dados MIST)",
-  flagelarEsencia: "Flagelar esencia: daño X × tu Agotamiento × Amenaza del objetivo",
+  flagelarEsencia: "Flagelar esencia: daño X + tu Agotamiento + Nivel de peligro",
   sellarDestino: "Sellar destino: descartar una carta y obligar al objetivo (sin tirada)",
   // (v0.18.0) Fortis Corpore · Custodio
   muroVoluntad: "Muro de voluntad: muro con 3 × X de vida",
@@ -1057,7 +1136,11 @@ export const EFECTOS_VALOR_X = {
   // (v0.19.0) Alta Scentia · Ilusionista
   pesadillas: "Pesadillas: invocar X pesadillas (1 de daño psíquico cada una)",
   pasoEnFalso: "Paso en falso: ilusión del terreno de X m de radio (tu nivel en turnos)",
-  caleidoscopio: "Caleidoscopio: prisma con 3 reflejos durante X turnos"
+  caleidoscopio: "Caleidoscopio: prisma con 3 reflejos durante X turnos",
+  // (v0.20.0) Potens Mystica · Brujo
+  canibalizar: "Canibalizar: consumir hasta X criaturas marcadas (+1 Salud por cada una)",
+  cerrarDestino: "Cerrar destino: todos queman una carta al azar y tiras con ellas (daño al objetivo, sin tirada)",
+  corrupcionFisica: "Corrupción física: el objetivo sufre tus desventajas de Agotamiento X turnos (+1 Agotamiento)"
 };
 
 /**
@@ -1126,31 +1209,54 @@ export function efectoPermanenteAbalorio(abalorio, claveArtilugio = null) {
 
 /**
  * Calcula el estado de Agotamiento de un nivel dado (v0.12.0).
+ * (v0.20.0, Brujo) Opciones:
+ * - `soloNivelActual` (abalorio «Rendición de la carne»): solo se aplica la consecuencia del nivel
+ *   actual; los niveles anteriores no se acumulan (el nivel 8 sigue siendo la muerte).
+ * - `corrupcion` (habilidad «Corrupción física»): desventajas ajenas que se suman a las propias,
+ *   `{nivel, soloNivelActual}` del Brujo que la lanzó. Nunca causa la muerte.
  * @param {number} valor - Puntos de Agotamiento (`system.cansancio.value`).
- * @returns {{nivel: number, maximo: number, efectos: Object<string, boolean>, activos: Object[], muerto: boolean}}
- *   `efectos.<clave>` es true si el nivel de esa consecuencia está alcanzado; `activos` lista
- *   las entradas de `AGOTAMIENTO_NIVELES` en vigor.
+ * @param {Object} [opciones]
+ * @param {boolean} [opciones.soloNivelActual=false]
+ * @param {{nivel: number, soloNivelActual?: boolean, origen?: string}|null} [opciones.corrupcion=null]
+ * @returns {{nivel: number, maximo: number, efectos: Object<string, boolean>, activos: Object[], muerto: boolean,
+ *   soloNivelActual: boolean, corrupcion: {nivel: number, soloNivelActual: boolean, origen: string}|null}}
+ *   `efectos.<clave>` es true si esa consecuencia está en vigor; `activos` lista las entradas de
+ *   `AGOTAMIENTO_NIVELES` en vigor.
  */
-export function estadoAgotamiento(valor) {
+export function estadoAgotamiento(valor, { soloNivelActual = false, corrupcion = null } = {}) {
   const maximo = SISTEMA_CONFIG.AGOTAMIENTO_MAXIMO;
-  const nivel = Math.max(0, Math.min(maximo, Math.floor(Number(valor) || 0)));
+  const limitar = v => Math.max(0, Math.min(maximo, Math.floor(Number(v) || 0)));
+  const nivel = limitar(valor);
+  const nivelCorrupcion = corrupcion ? limitar(corrupcion.nivel) : 0;
+  const soloCorrupcion = Boolean(corrupcion?.soloNivelActual);
   const efectos = {};
   const activos = [];
   for (const entrada of SISTEMA_CONFIG.AGOTAMIENTO_NIVELES) {
-    efectos[entrada.clave] = nivel >= entrada.nivel;
+    const esMuerte = entrada.clave === "muerte";
+    const propio = soloNivelActual && !esMuerte ? nivel === entrada.nivel : nivel >= entrada.nivel;
+    const ajeno = !esMuerte && nivelCorrupcion > 0
+      && (soloCorrupcion ? nivelCorrupcion === entrada.nivel : nivelCorrupcion >= entrada.nivel);
+    efectos[entrada.clave] = propio || ajeno;
     if (efectos[entrada.clave]) activos.push(entrada);
   }
-  return { nivel, maximo, efectos, activos, muerto: efectos.muerte };
+  return {
+    nivel, maximo, efectos, activos, muerto: efectos.muerte,
+    soloNivelActual: Boolean(soloNivelActual),
+    corrupcion: nivelCorrupcion > 0
+      ? { nivel: nivelCorrupcion, soloNivelActual: soloCorrupcion, origen: String(corrupcion?.origen ?? "") }
+      : null
+  };
 }
 
 /**
  * Lista de niveles de Agotamiento lista para plantillas, marcando los activos.
  * @param {number} valor - Puntos de Agotamiento actuales.
+ * @param {Object} [opciones] - (v0.20.0) Las de `estadoAgotamiento` (Rendición de la carne, Corrupción física).
  * @returns {Array<{nivel: number, icono: string, texto: string, activo: boolean}>}
  */
-export function tablaAgotamiento(valor) {
-  const { nivel } = estadoAgotamiento(valor);
-  return SISTEMA_CONFIG.AGOTAMIENTO_NIVELES.map(e => ({ ...e, activo: nivel >= e.nivel }));
+export function tablaAgotamiento(valor, opciones = {}) {
+  const { efectos } = estadoAgotamiento(valor, opciones);
+  return SISTEMA_CONFIG.AGOTAMIENTO_NIVELES.map(e => ({ ...e, activo: Boolean(efectos[e.clave]) }));
 }
 
 /**
@@ -1175,20 +1281,30 @@ export function contextoBarraSalud(valor, maximo) {
 
 /**
  * Datos de Agotamiento para las fichas de Actor (v0.12.0).
+ * (v0.20.0) Con `estado` (`system.agotamiento`) respeta «Rendición de la carne» y «Corrupción física»:
+ * `activos` son las consecuencias realmente en vigor y `nota` explica el motivo.
  * @param {number} valor - Puntos de Agotamiento actuales (`system.cansancio.value`).
- * @returns {{nivel: number, maximo: number, muerto: boolean, activos: Object[], segmentos: Object[], tooltipHtml: string}}
+ * @param {{soloNivelActual?: boolean, corrupcion?: object|null}|null} [estado=null] - `system.agotamiento` del Actor.
+ * @returns {{nivel: number, maximo: number, muerto: boolean, activos: Object[], segmentos: Object[], tooltipHtml: string, nota: string}}
  *   `segmentos` alimenta la barra de la ficha; `activos` son las consecuencias en vigor; `tooltipHtml` es la tabla completa con las activas marcadas.
  */
-export function contextoAgotamiento(valor) {
-  const { nivel, maximo, muerto } = estadoAgotamiento(valor);
-  const tabla = tablaAgotamiento(nivel);
+export function contextoAgotamiento(valor, estado = null) {
+  const opciones = { soloNivelActual: Boolean(estado?.soloNivelActual), corrupcion: estado?.corrupcion ?? null };
+  const { nivel, maximo, muerto, corrupcion } = estadoAgotamiento(valor, opciones);
+  const tabla = tablaAgotamiento(nivel, opciones);
   const filas = tabla
     .map(e => `<p class='${e.activo ? "cyd-agot-activo" : "cyd-agot-inactivo"}'><strong>${e.nivel}.</strong> ${e.texto}</p>`)
     .join("");
-  const tooltipHtml = `<div class='cyd-tooltip-contenido'><strong>Agotamiento ${nivel}/${maximo}</strong> <em>(acumulativo)</em><hr/>${filas}<hr/><p>+1 al agotar el Mazo y barajar el Descarte. −1 por descanso cómodo y seguro (máx. 1 por día).</p></div>`;
+  const notas = [
+    opciones.soloNivelActual ? "Rendición de la carne: solo se aplica la consecuencia de tu nivel actual." : "",
+    corrupcion ? `Corrupción física${corrupcion.origen ? ` de ${corrupcion.origen}` : ""}: sufre las desventajas del Agotamiento ${corrupcion.nivel}${corrupcion.soloNivelActual ? " (solo ese nivel)" : ""}.` : ""
+  ].filter(Boolean);
+  const nota = notas.join(" ");
+  const modo = opciones.soloNivelActual ? "solo el nivel actual" : "acumulativo";
+  const tooltipHtml = `<div class='cyd-tooltip-contenido'><strong>Agotamiento ${nivel}/${maximo}</strong> <em>(${modo})</em><hr/>${filas}<hr/>${nota ? `<p>${foundry.utils.escapeHTML(nota)}</p>` : ""}<p>+1 al agotar el Mazo y barajar el Descarte. −1 por descanso cómodo y seguro (máx. 1 por día).</p></div>`;
   // Segmentos de la barra (uno por nivel, 1..maximo); `activo` = nivel alcanzado.
-  const segmentos = tabla.map(e => ({ nivel: e.nivel, texto: e.texto, activo: e.activo, esMuerte: e.nivel === maximo }));
-  return { nivel, maximo, muerto, activos: tabla.filter(e => e.activo), segmentos, tooltipHtml };
+  const segmentos = SISTEMA_CONFIG.AGOTAMIENTO_NIVELES.map(e => ({ nivel: e.nivel, texto: e.texto, activo: nivel >= e.nivel, esMuerte: e.nivel === maximo }));
+  return { nivel, maximo, muerto, activos: tabla.filter(e => e.activo), segmentos, tooltipHtml, nota };
 }
 
 /**

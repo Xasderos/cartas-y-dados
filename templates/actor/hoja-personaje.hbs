@@ -101,12 +101,12 @@
           </div>
         </div>
 
-        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.manoMitad}} cyd-afectado-agotamiento{{/if}}{{#if system.manoMitadPorSangreFria}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Mano Máx. · Base: {{system.manoConfig.base}} | Nivel Clase: +{{system.manoConfig.bonificadorClase}} | Raza/Origen/Equipo: +{{system.manoConfig.bonificadorObjetos}}{{#if system.agotamiento.efectos.manoMitad}} | Agotamiento: {{system.limiteManoSinAgotamiento}} ÷ 2{{/if}}{{#if system.manoMitadPorSangreFria}} | Sangre fría: ÷ 2{{/if}}">
+        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.manoMitad}} cyd-afectado-agotamiento{{/if}}{{#if system.manoMitadPorSangreFria}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Mano Máx. · Base: {{system.manoConfig.base}} | Nivel Clase: +{{system.manoConfig.bonificadorClase}} | Raza/Origen/Equipo: +{{system.manoConfig.bonificadorObjetos}}{{#if system.manoRitualMente}} | Ritual de mente: Mano Máx. = Cartas Quemadas ({{system.limiteManoSinAgotamiento}}){{/if}}{{#if system.agotamiento.efectos.manoMitad}} | Agotamiento: {{system.limiteManoSinAgotamiento}} ÷ 2{{/if}}{{#if system.manoMitadPorSangreFria}} | Sangre fría: ÷ 2{{/if}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-hand"></i> Mano</span>
           <div class="cyd-recurso-inputs">
             <span class="cyd-valor-grande">{{#if contadoresPilas}}{{contadoresPilas.manoActual}}{{else}}0{{/if}}</span>
             <span class="cyd-valor-sep">/</span>
-            <span class="cyd-valor-grande">{{system.limiteMano}}</span>{{#if system.agotamiento.efectos.manoMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}{{#if system.manoMitadPorSangreFria}} <i class="fa-solid fa-temperature-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Sangre fría (expuesta a los elementos)"></i>{{/if}}
+            <span class="cyd-valor-grande">{{system.limiteMano}}</span>{{#if system.manoRitualMente}} <i class="fa-solid fa-brain cyd-icono-agotamiento" data-tooltip="Ritual de mente: igual al número de Cartas Quemadas"></i>{{/if}}{{#if system.agotamiento.efectos.manoMitad}} <i class="fa-solid fa-hourglass-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Agotamiento"></i>{{/if}}{{#if system.manoMitadPorSangreFria}} <i class="fa-solid fa-temperature-half cyd-icono-agotamiento" data-tooltip="Reducido a la mitad por Sangre fría (expuesta a los elementos)"></i>{{/if}}
           </div>
         </div>
       </div>
@@ -199,7 +199,7 @@
                   data-tooltip="Nivel {{seg.nivel}}: {{seg.texto}}"></span>
           {{/each}}
         </div>
-        {{#if agotamiento.nivel}}
+        {{#if agotamiento.activos.length}}
           <ul class="cyd-lista-agotamiento">
             {{#each agotamiento.activos as |efecto|}}
               <li><i class="fa-solid {{efecto.icono}}"></i> <strong>{{efecto.nivel}}.</strong> {{efecto.texto}}</li>
@@ -208,6 +208,8 @@
         {{else}}
           <p class="cyd-agotamiento-vacio">Sin Agotamiento.</p>
         {{/if}}
+        {{!-- (v0.20.0) Brujo: Rendición de la carne / Corrupción física --}}
+        {{#if agotamiento.nota}}<p class="cyd-agotamiento-vacio"><i class="fa-solid fa-circle-info"></i> {{agotamiento.nota}}</p>{{/if}}
         {{!-- (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este Actor --}}
         {{#if estadosMisticos}}
           <div class="cyd-estado-acciones cyd-estados-misticos">
@@ -222,6 +224,12 @@
                 <i class="fa-solid fa-clone"></i> Caleidoscopio · {{estadosMisticos.caleidoscopio.turnos}} turno(s) · {{estadosMisticos.caleidoscopio.reflejos}} reflejo(s)
               </span>
               {{#if esPropietario}}{{#if estadosMisticos.caleidoscopio.reflejos}}<button type="button" class="cyd-btn-mini" data-action="sacrificarReflejo" data-tooltip="Sacrifica un reflejo: +3 a la Defensa solo durante esta defensa"><i class="fa-solid fa-shield-halved"></i> +3 Def.</button>{{/if}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="caleidoscopio" data-tooltip="Retirar el Caleidoscopio"><i class="fa-solid fa-xmark"></i></button>{{/if}}
+            {{/if}}
+            {{#if estadosMisticos.corrupcionFisica}}
+              <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Corrupción física{{#if estadosMisticos.corrupcionFisica.origen}} de {{estadosMisticos.corrupcionFisica.origen}}{{/if}}: sufres las desventajas del Agotamiento {{estadosMisticos.corrupcionFisica.nivel}}{{#if estadosMisticos.corrupcionFisica.soloNivelActual}} (solo ese nivel){{/if}}, además de las tuyas. En combate pierde un turno al final de cada uno de tus turnos">
+                <i class="fa-solid fa-biohazard"></i> Corrupción física · Agot. {{estadosMisticos.corrupcionFisica.nivel}} · {{estadosMisticos.corrupcionFisica.turnos}} turno(s)
+              </span>
+              {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="corrupcionFisica" data-tooltip="Retirar la Corrupción física"><i class="fa-solid fa-xmark"></i></button>{{/if}}
             {{/if}}
             {{#if estadosMisticos.malDeOjo}}
               <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Mal de ojo{{#if estadosMisticos.malDeOjo.origen}} de {{estadosMisticos.malDeOjo.origen}}{{/if}}: tus cartas de Misticismo bajan una categoría de dado (una carta d4 da automáticamente 1). En combate pierde un turno al final de cada uno de tus turnos">

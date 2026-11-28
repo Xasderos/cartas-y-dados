@@ -67,6 +67,18 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
     onChange: onUpdateCallback
   });
 
+  // 1b. (v0.20.0) Nivel de peligro del encuentro (Panel del Master). Lo usa el abalorio «Ritual de
+  // espíritu» (Brujo): multiplica todas las tiradas de su portador; 0 = sin efecto.
+  game.settings.register(SYSTEM_ID, "nivelPeligro", {
+    name: "Nivel de Peligro",
+    hint: "Peligro del encuentro actual (0 = sin peligro). El abalorio «Ritual de espíritu» multiplica por este valor las tiradas de su portador.",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 0,
+    onChange: onUpdateCallback
+  });
+
   // 2. Salud Máxima Base
   game.settings.register(SYSTEM_ID, "saludBase", {
     name: "Salud Máxima Base",

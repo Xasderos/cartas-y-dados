@@ -43,6 +43,7 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
     actions: {
       ajustarDificultad: PanelMasterApp.#onAjustarDificultad,
       fijarDificultad: PanelMasterApp.#onFijarDificultad,
+      ajustarPeligro: PanelMasterApp.#onAjustarPeligro, // (v0.20.0)
       abrirFichaActor: PanelMasterApp.#onAbrirFichaActor,
       abrirPilaActor: PanelMasterApp.#onAbrirPilaActor,
       ajustarCansancio: PanelMasterApp.#onAjustarCansancio,
@@ -64,6 +65,8 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const dificultadActual = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
+    // (v0.20.0) Nivel de peligro del encuentro (Brujo · Ritual de espíritu).
+    const nivelPeligro = game.settings.get("cartas-y-dados", "nivelPeligro") || 0;
     const presetsDificultad = PanelMasterApp.#leerPresetsDificultad().map((valor, indice) => ({
       valor,
       indice,
@@ -113,6 +116,7 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
       ...context,
       dificultadActual,
       presetsDificultad,
+      nivelPeligro,
       personajes,
       pnjs
     };
@@ -215,6 +219,14 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
         this.render();
       });
     }
+    // (v0.20.0) Nivel de peligro escrito a mano.
+    const inputPeligro = this.element.querySelector(".cyd-gm-input-peligro");
+    if (inputPeligro) {
+      inputPeligro.addEventListener("change", async ev => {
+        await game.settings.set("cartas-y-dados", "nivelPeligro", Math.max(0, Math.floor(Number(ev.target.value) || 0)));
+        this.render();
+      });
+    }
   }
 
   /* ======================================================================== */
@@ -225,6 +237,19 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
     const delta = Number(target.dataset.delta) || 0;
     const actual = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
     await game.settings.set("cartas-y-dados", "dificultadMaster", Math.max(0, actual + delta));
+    this.render();
+  }
+
+  /**
+   * (v0.20.0) Sube o baja el Nivel de peligro del encuentro (`data-delta`), mínimo 0. Lo usa el
+   * abalorio «Ritual de espíritu» (Brujo) para multiplicar las tiradas de su portador.
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onAjustarPeligro(event, target) {
+    const delta = Number(target.dataset.delta) || 0;
+    const actual = game.settings.get("cartas-y-dados", "nivelPeligro") || 0;
+    await game.settings.set("cartas-y-dados", "nivelPeligro", Math.max(0, actual + delta));
     this.render();
   }
 

@@ -16,6 +16,7 @@ import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 import { abrirDialogoAccion } from "../applications/dialogo-accion.mjs";
 import { combinarTiradas, enviarMensajeSoloMaster, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 import { obtenerOCrearCarpeta } from "../carpetas.mjs";
+import { leerAjuste } from "../settings.mjs";
 
 export class SistemaActor extends Actor {
 
@@ -517,6 +518,8 @@ export class SistemaActor extends Actor {
     }
 
     this.prepareData();
+    // (v0.20.0) Brujo · Ritual de sangre: cartas quemadas directamente desde el Mazo (Barrera...).
+    if (creadas.length && pilaDestino.id === this.system.pilas?.quemadasId) await this._alQuemarCartas(creadas.length);
     return creadas;
   }
 
@@ -539,12 +542,22 @@ export class SistemaActor extends Actor {
     const datosCopia = carta.toObject();
     delete datosCopia._id;
     datosCopia.drawn = false;
+    // (v0.20.0) Ritual de sangre: abalorios En Juego en el momento de quemar (incluye el que se quema).
+    const quemaCarta = pilaDestino.id === this.system.pilas?.quemadasId && pilaOrigen.id !== pilaDestino.id;
+    const abaloriosAntes = quemaCarta ? this.abaloriosActivos() : null;
+    // (v0.20.0) Un Trinket que entra o sale de En Juego puede cambiar la Salud Máx. (Rendición de la
+    // carne, Corrupción...): la Salud actual sigue el cambio como en v0.18.1.
+    const idEnJuego = this.system.pilas?.enJuegoId;
+    const tocaEnJuego = carta.type === "trinket" && [pilaOrigen.id, pilaDestino.id].includes(idEnJuego);
+    const saludMaxAntes = Number(this.system.salud?.maxTotal) || 0;
 
     const [cartaCreada] = await pilaDestino.createEmbeddedDocuments("Card", [this._normalizarPayloadCarta(datosCopia)]);
     await pilaOrigen.deleteEmbeddedDocuments("Card", [carta.id]);
 
     // Recalcular inmediatamente las propiedades derivadas del Actor (ej. Defensa por Trinkets en juego)
     this.prepareData();
+    if (tocaEnJuego) await this._ajustarSaludTrasCambioMaximo(saludMaxAntes);
+    if (quemaCarta) await this._alQuemarCartas(1, abaloriosAntes);
     return cartaCreada;
   }
 
@@ -781,6 +794,101 @@ export class SistemaActor extends Actor {
 
     // Las consecuencias del nuevo nivel las anuncia/aplica `_alCambiarAgotamiento` (hook updateActor).
     await this.cambiarAgotamiento(1);
+    // (v0.20.0) Brujo · Ritual de sangre: el abalorio vuelve al Mazo de Trinkets y se paga el precio.
+    await this._ritualSangreAlBarajar();
+  }
+
+  /**
+   * (v0.20.0) Ajusta la Salud actual tras un cambio de la Salud Máx. que no pasa por `_preUpdate`
+   * (Trinkets que entran o salen de En Juego, flags como «Corrupción física»), con la regla de v0.18.1
+   * (`saludTrasCambioMaximo`).
+   * @param {number} saludMaxAntes - Salud Máx. total antes del cambio.
+   * @returns {Promise<void>}
+   */
+  async _ajustarSaludTrasCambioMaximo(saludMaxAntes) {
+    if (!["personaje", "pnj"].includes(this.type) || !this.isOwner) return;
+    const nueva = SistemaActor.saludTrasCambioMaximo(this.system.salud?.value, saludMaxAntes, this.system.salud?.maxTotal);
+    if (nueva !== null) await this.update({ "system.salud.value": nueva }, { cydSinAjusteSalud: true });
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*  (v0.20.0) POTENS MYSTICA · BRUJO: RITUAL DE SANGRE                      */
+  /* ------------------------------------------------------------------------ */
+
+  /**
+   * Ritual de sangre: cada carta que el Actor quema le cura 1 de Salud (sin superar la Salud Máx.).
+   * Lo llaman `_moverCartaEntrePilas` y `_extraerCartasDeMazo` al mover cartas a Quemadas.
+   * @param {number} cantidad - Cartas quemadas.
+   * @param {Set<string>|null} [abalorios=null] - Abalorios En Juego al quemar (por defecto, los actuales).
+   * @returns {Promise<void>}
+   */
+  async _alQuemarCartas(cantidad, abalorios = null) {
+    if (!(cantidad > 0) || !this.isOwner || !(abalorios ?? this.abaloriosActivos()).has("ritualSangre")) return;
+    const antes = Number(this.system.salud?.value) || 0;
+    const maximo = Number(this.system.salud?.maxTotal) || 0;
+    const despues = Math.min(maximo, antes + cantidad);
+    if (despues <= antes) return;
+    await this.update({ "system.salud.value": despues }, { cydSinAjusteSalud: true });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-droplet"></i><p><strong>Ritual de sangre:</strong> ${foundry.utils.escapeHTML(this.name)} quema ${cantidad} carta(s) y recupera <strong>${despues - antes}</strong> de Salud (${despues}/${maximo}).</p></div>`
+    });
+  }
+
+  /**
+   * Ritual de sangre al barajar el Mazo (`barajarDescarteEnMazo`): el abalorio vuelve de En Juego al
+   * Mazo de Trinkets y el Actor pierde tanta Salud como cartas tenga en Quemadas; por este efecto la
+   * Salud no baja de 1 (si ya estaba a 0 o menos, no cambia).
+   * @returns {Promise<void>}
+   */
+  async _ritualSangreAlBarajar() {
+    const { enJuego, trinkets, quemadas } = this.system.pilasDocumentos ?? {};
+    if (!enJuego || !trinkets) return;
+    const claveClase = claveClaseDeItem(this.items.find(i => i.type === "clase"));
+    const rituales = enJuego.cards.filter(c => abalorioDeTrinket(c, claveClase) === "ritualSangre");
+    if (!rituales.length) return;
+    for (const ritual of rituales) await this._devolverTrinketAlMazo(ritual.id);
+    const perdida = Number(quemadas?.cards.size) || 0;
+    const antes = Number(this.system.salud?.value) || 0;
+    const despues = antes > 1 ? Math.max(1, antes - perdida) : antes;
+    if (despues !== antes) await this.update({ "system.salud.value": despues }, { cydSinAjusteSalud: true });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-alerta-cansancio">
+          <h4><i class="fa-solid fa-droplet"></i> Ritual de sangre</h4>
+          <p>Al barajar su Mazo, el abalorio de <strong>${foundry.utils.escapeHTML(this.name)}</strong> vuelve al Mazo de Trinkets y paga el precio: <strong>−${antes - despues}</strong> de Salud por sus ${perdida} carta(s) quemada(s)${antes - despues < perdida && antes > 1 ? " (la Salud no baja de 1 por este efecto)" : ""}.</p>
+        </div>`
+    });
+  }
+
+  /**
+   * Devuelve un único Trinket de En Juego a su Mazo de Trinkets (desmarca su original por
+   * `sourceCardId` y baraja), como hace `_devolverCartasASuMazoOriginal` con una pila entera.
+   * @param {string} cartaId - Id de la carta dentro de la pila En Juego.
+   * @returns {Promise<void>}
+   */
+  async _devolverTrinketAlMazo(cartaId) {
+    const { enJuego, trinkets } = this.system.pilasDocumentos ?? {};
+    const carta = enJuego?.cards.get(cartaId);
+    if (!carta || !trinkets) return;
+    const saludMaxAntes = Number(this.system.salud?.maxTotal) || 0;
+    const sourceId = carta.getFlag("cartas-y-dados", "sourceCardId");
+    const original = (sourceId ? trinkets.cards.get(sourceId) : null)
+      ?? trinkets.cards.find(c => c.drawn && c.name === carta.name && c.type === carta.type);
+    if (original) {
+      await trinkets.updateEmbeddedDocuments("Card", [{ _id: original.id, drawn: false }]);
+    } else {
+      const datos = carta.toObject();
+      delete datos._id;
+      datos.drawn = false;
+      datos.origin = null;
+      await trinkets.createEmbeddedDocuments("Card", [this._normalizarPayloadCarta(datos)]);
+    }
+    await enJuego.deleteEmbeddedDocuments("Card", [carta.id]);
+    await trinkets.shuffle({ chatNotification: false });
+    this.prepareData();
+    await this._ajustarSaludTrasCambioMaximo(saludMaxAntes);
   }
 
   /* ======================================================================== */
@@ -1034,7 +1142,7 @@ export class SistemaActor extends Actor {
           tipoDado: malDeOjo?.tipoDado ?? c.system.tipoDado ?? "d6",
           bono: Number(c.system.automatizacion?.bonoTirada) || 0,
           rollData: this.getRollData(),
-          mitadPorAgotamiento,
+          mitadPorAgotamiento, multiplicador: this._multiplicadorTiradas(),
           parcial: hayPartes,
           speaker: ChatMessage.getSpeaker({ actor: this }),
           titulo: `${configAccion ? `${configAccion.nombre} · ` : ""}${nombreVisibleCarta(c)}`,
@@ -2050,7 +2158,7 @@ export class SistemaActor extends Actor {
     const tirada = await tirarDadosSistema({
       cantidadDados: dadosCons, tipoDado: cartaCons.system.tipoDado ?? "d6",
       bono: Number(cartaCons.system.automatizacion?.bonoTirada) || 0, rollData: this.getRollData(),
-      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
+      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(), multiplicador: this._multiplicadorTiradas(),
       speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `Preservación espiritual · ${nombreVisibleCarta(cartaCons)}`
     });
     const exito = !tirada.esNegativo && tirada.total >= objetivo;
@@ -2996,6 +3104,249 @@ export class SistemaActor extends Actor {
     if (this.sheet?.rendered) this.sheet.render();
   }
 
+  /* ------------------------------------------------------------------------ */
+  /*  (v0.20.0) POTENS MYSTICA · BRUJO: HABILIDADES DE NV. 4                  */
+  /* ------------------------------------------------------------------------ */
+
+  /**
+   * Corrupción física recibida (`flags.cartas-y-dados.corrupcionFisica`): desventajas de Agotamiento
+   * de otro Actor que se suman a las propias (ver `estadoAgotamiento`) durante `turnos` turnos.
+   * @returns {{nivel: number, turnos: number, soloNivelActual: boolean, origen: string}|null}
+   */
+  corrupcionFisica() {
+    const datos = this.getFlag("cartas-y-dados", "corrupcionFisica");
+    return Number(datos?.nivel) > 0
+      ? {
+        nivel: Number(datos.nivel), turnos: Math.max(1, Number(datos.turnos) || 1),
+        soloNivelActual: Boolean(datos.soloNivelActual), origen: datos.origen ?? ""
+      }
+      : null;
+  }
+
+  /**
+   * Aplica «Corrupción física» a este Actor (botón del Master): durante `turnos` turnos (X de la tirada
+   * de Misticismo) sufre las desventajas del nivel de Agotamiento `nivel` del Brujo (solo ese nivel si
+   * el Brujo tenía «Rendición de la carne»). La Salud actual sigue a la Salud Máx. (Agotamiento 3) y,
+   * con el nivel 5, solo conserva un Trinket En Juego. En combate pierde un turno al final de cada
+   * turno del Actor (`avanzarCorrupcionFisica`); fuera de combate se retira desde la ficha.
+   * @param {number} nivel - Agotamiento del Brujo al lanzarla.
+   * @param {{turnos?: number, soloNivelActual?: boolean, origen?: string}} [opciones]
+   * @returns {Promise<void>}
+   */
+  async aplicarCorrupcionFisica(nivel, { turnos = 1, soloNivelActual = false, origen = "" } = {}) {
+    const n = SistemaActor.limitarAgotamiento(Number(nivel) || 0);
+    if (n <= 0) return;
+    const duracion = Math.max(1, Math.floor(Number(turnos) || 1));
+    const saludMaxAntes = Number(this.system.salud?.maxTotal) || 0;
+    await this.setFlag("cartas-y-dados", "corrupcionFisica", {
+      nivel: n, turnos: duracion, soloNivelActual: Boolean(soloNivelActual), origen: String(origen ?? "")
+    });
+    this.prepareData();
+    await this._ajustarSaludTrasCambioMaximo(saludMaxAntes);
+    if (this.system.agotamiento?.efectos?.unTrinket) await this._reducirTrinketsPorAgotamiento();
+    const lista = (this.system.agotamiento?.activos ?? [])
+      .map(e => `<li><i class="fa-solid ${e.icono}"></i> <strong>Nv. ${e.nivel}:</strong> ${e.texto}</li>`).join("");
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-alerta-cansancio">
+          <h4><i class="fa-solid fa-biohazard"></i> Corrupción física</h4>
+          <p><strong>${foundry.utils.escapeHTML(this.name)}</strong> sufre durante <strong>${duracion} turno(s)</strong> las desventajas del Agotamiento ${n}${soloNivelActual ? " (solo ese nivel)" : ""}${origen ? ` de ${foundry.utils.escapeHTML(origen)}` : ""}:</p>
+          <ul>${lista}</ul>
+        </div>`
+    });
+    if (this.sheet?.rendered) this.sheet.render();
+  }
+
+  /**
+   * Retira la «Corrupción física» (ficha o fin de su duración); la Salud actual sigue a la Salud Máx.
+   * @returns {Promise<void>}
+   */
+  async retirarCorrupcionFisica() {
+    if (!this.getFlag("cartas-y-dados", "corrupcionFisica")) return;
+    const saludMaxAntes = Number(this.system.salud?.maxTotal) || 0;
+    await this.unsetFlag("cartas-y-dados", "corrupcionFisica");
+    this.prepareData();
+    await this._ajustarSaludTrasCambioMaximo(saludMaxAntes);
+  }
+
+  /**
+   * Fin de turno en combate (`SistemaCombat`): la Corrupción física pierde un turno y, al agotarse,
+   * desaparece.
+   * @returns {Promise<void>}
+   */
+  async avanzarCorrupcionFisica() {
+    const datos = this.corrupcionFisica();
+    if (!datos || !this.isOwner) return;
+    const turnos = datos.turnos - 1;
+    if (turnos > 0) {
+      await this.setFlag("cartas-y-dados", "corrupcionFisica", { ...datos, turnos });
+      return;
+    }
+    await this.retirarCorrupcionFisica();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-biohazard"></i><p>La <strong>Corrupción física</strong> de <strong>${foundry.utils.escapeHTML(this.name)}</strong> desaparece.</p></div>`
+    });
+  }
+
+  /**
+   * Corrupción física (valor X = turnos): bloque del chat con el botón del Master (`.cyd-btn-corrupcion`)
+   * que copia en el objetivo las desventajas del Agotamiento del Brujo AL USARLA durante X turnos.
+   * El +1 de Agotamiento del Brujo lo aplica `usarHabilidad` después de la tirada.
+   * @param {Actor} objetivo - Actor del Token objetivo (distinto del Brujo).
+   * @param {string} nombre - Nombre ya escapado del objetivo.
+   * @param {number} turnos - X.
+   * @param {number|null} [nivelAgotamiento=null] - Agotamiento del Brujo al usarla (la repetición de
+   *   «Espera un momento» lo conserva); por defecto, el actual.
+   * @returns {string} HTML.
+   */
+  _htmlCorrupcionFisica(objetivo, nombre, turnos, nivelAgotamiento = null) {
+    const escapar = foundry.utils.escapeHTML;
+    const soloNivelActual = Boolean(this.system.agotamiento?.soloNivelActual);
+    const estado = estadoAgotamiento(nivelAgotamiento ?? this.system.cansancio?.value, { soloNivelActual });
+    const nivel = Number(estado.nivel) || 0;
+    if (nivel <= 0) {
+      return `<p><i class="fa-solid fa-biohazard"></i> ${escapar(this.name)} no tiene Agotamiento: <strong>${nombre}</strong> no recibe ninguna desventaja.</p>`;
+    }
+    const desventajas = estado.activos.filter(e => e.clave !== "muerte")
+      .map(e => `<li><i class="fa-solid ${e.icono}"></i> <strong>Nv. ${e.nivel}:</strong> ${e.texto}</li>`).join("");
+    return `
+      <p><i class="fa-solid fa-biohazard"></i> Durante <strong>${turnos} turno(s)</strong>, <strong>${nombre}</strong> sufre las mismas desventajas que ${escapar(this.name)} con su Agotamiento ${nivel}${soloNivelActual ? " (Rendición de la carne: solo ese nivel)" : ""}:</p>
+      <ul>${desventajas}</ul>
+      <button type="button" class="cyd-btn-corrupcion" data-actor-uuid="${objetivo.uuid}" data-nivel="${nivel}" data-turnos="${turnos}" data-solo="${soloNivelActual ? "1" : ""}" data-origen="${escapar(this.name)}" data-nombre="${nombre}">
+        <i class="fa-solid fa-biohazard"></i> Corromper a ${nombre} (Agotamiento ${nivel}, ${turnos} turnos)
+      </button>`;
+  }
+
+  /**
+   * Cerrar destino (habilidad sin tirada): exige un Token objetivo (T) distinto del Brujo. Devuelve el
+   * HTML del chat con el botón del Master (`.cyd-btn-cerrar-destino`) que resuelve el efecto con
+   * `resolverCerrarDestino` (el Master puede quemar cartas de todas las criaturas).
+   * @returns {{html: string}|null} null si no hay objetivo (no se gasta nada).
+   */
+  _prepararCerrarDestino() {
+    const token = game.user.targets.first() ?? null;
+    const objetivo = token?.actor && token.actor.id !== this.id ? token.actor : null;
+    if (!objetivo) {
+      ui.notifications.warn("Cerrar destino: marca con T el Token de la criatura objetivo (no puedes ser tú).");
+      return null;
+    }
+    const escapar = foundry.utils.escapeHTML;
+    const nombre = escapar(token.name ?? objetivo.name);
+    const html = `
+      <div class="cyd-resolucion-caja">
+        <p><i class="fa-solid fa-hourglass-end"></i> Todos queman una carta al azar de su mano; ${escapar(this.name)} tira con esas cartas usando sus propias características y <strong>${nombre}</strong> recibe tanto daño como el resultado total.</p>
+        <button type="button" class="cyd-btn-cerrar-destino" data-lanzador-uuid="${this.uuid}" data-objetivo-uuid="${objetivo.uuid}" data-nombre="${nombre}">
+          <i class="fa-solid fa-hourglass-end"></i> Cerrar el destino de ${nombre}
+        </button>
+      </div>`;
+    return { html };
+  }
+
+  /**
+   * Criaturas que participan en «Cerrar destino»: los combatientes del combate en curso o, fuera de
+   * combate, los Actores de los Tokens de la escena, más el propio Brujo. Se descartan las que
+   * comparten mano (Tokens sin vincular del mismo Actor) y las que no tienen mano con cartas.
+   * @returns {Actor[]}
+   */
+  _participantesCerrarDestino() {
+    const fuentes = game.combat?.started
+      ? game.combat.combatants.map(c => c.actor)
+      : (canvas?.scene?.tokens ?? []).map(t => t.actor);
+    const porMano = new Map();
+    for (const actor of [this, ...fuentes]) {
+      const mano = actor?.system?.pilasDocumentos?.mano;
+      if (!mano || porMano.has(mano.id)) continue;
+      if (!mano.cards.some(c => c.type === "accion")) continue;
+      porMano.set(mano.id, actor);
+    }
+    return [...porMano.values()];
+  }
+
+  /**
+   * Resuelve «Cerrar destino» (lo ejecuta el Master desde el botón del chat): cada participante quema
+   * una Carta de Acción al azar de su mano; el Brujo tira con todas ellas (sus propios dados de la
+   * característica de cada palo) y el total es el daño al objetivo. La tirada es pública; el botón
+   * para aplicar el daño (`.cyd-btn-aplicar-dano`) solo lo ve el Master.
+   * @param {string} objetivoUuid - Actor objetivo.
+   * @returns {Promise<boolean>}
+   */
+  async resolverCerrarDestino(objetivoUuid) {
+    const objetivo = await fromUuid(objetivoUuid);
+    if (!objetivo) {
+      ui.notifications.warn("Cerrar destino: no se encontró la criatura objetivo.");
+      return false;
+    }
+    const escapar = foundry.utils.escapeHTML;
+    const quemadas = [];
+    for (const actor of this._participantesCerrarDestino()) {
+      const { mano, quemadas: pilaQuemadas } = actor.system.pilasDocumentos ?? {};
+      const cartas = (mano?.cards.contents ?? []).filter(c => c.type === "accion");
+      if (!cartas.length || !pilaQuemadas) continue;
+      const carta = cartas[Math.floor(Math.random() * cartas.length)];
+      const datos = { dueno: actor.name, palo: carta.system.palo, tipoDado: carta.system.tipoDado ?? "d6", nombre: nombreVisibleCarta(carta) };
+      await actor._moverCartaEntrePilas(mano, pilaQuemadas, carta.id);
+      quemadas.push(datos);
+    }
+    if (!quemadas.length) {
+      ui.notifications.warn("Cerrar destino: ninguna criatura tiene cartas en la mano.");
+      return false;
+    }
+    const speaker = ChatMessage.getSpeaker({ actor: this });
+    const partes = [];
+    for (const c of quemadas) {
+      const caract = SISTEMA_CONFIG.palosCartas[c.palo]?.caracteristicaAsociada ?? "fisico";
+      const malDeOjo = c.palo === "copas" ? this._ajusteMalDeOjo(c.tipoDado) : null;
+      partes.push({
+        tirada: await tirarDadosSistema({
+          cantidadDados: this._dadosDeCaracteristica(caract), tipoDado: malDeOjo?.tipoDado ?? c.tipoDado,
+          rollData: this.getRollData(), mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
+          multiplicador: this._multiplicadorTiradas(), parcial: quemadas.length > 1, speaker,
+          titulo: `Cerrar destino · ${c.nombre}`,
+          resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
+        }),
+        etiqueta: `${c.nombre} de ${c.dueno} (${abreviadoPalo(c.palo)} ${c.tipoDado})`
+      });
+    }
+    const tirada = combinarTiradas(partes);
+    const dano = tirada.esNegativo ? 0 : Math.max(0, Number(tirada.total) || 0);
+    const nombre = escapar(objetivo.name);
+    const lista = quemadas.map(c => `<li>${escapar(c.dueno)}: <strong>${escapar(c.nombre)}</strong> · ${abreviadoPalo(c.palo)} ${c.tipoDado}</li>`).join("");
+    await publicarTirada(tirada, {
+      speaker,
+      flavor: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-hourglass-end"></i> Cerrar destino</h3>
+          <p>Cartas quemadas al azar:</p>
+          <ul>${lista}</ul>
+          <p><strong>Tirada:</strong> ${escapar(this.name)} usa esas cartas con sus propias características.</p>
+          ${tirada.html}
+          <div class="cyd-resolucion-caja ${dano > 0 ? "cyd-exito" : "cyd-fallo"}">
+            <p><i class="fa-solid fa-crosshairs"></i> El destino de <strong>${nombre}</strong> se cierra: recibe el resultado de la tirada como daño. <small><i class="fa-solid fa-eye-slash"></i> Lo aplica el Master.</small></p>
+          </div>
+        </div>`,
+      htmlMaster: dano > 0 ? `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-hourglass-end"></i> Cerrar destino <small>(solo Master)</small></h3>
+          <p><strong>${escapar(this.name)}</strong> → <strong>${nombre}</strong>: <strong>${dano}</strong> de daño.</p>
+          <button type="button" class="cyd-btn-aplicar-dano" data-actor-uuid="${objetivo.uuid}" data-dano="${dano}" data-atacante-uuid="${this.uuid}">
+            <i class="fa-solid fa-droplet"></i> Aplicar ${dano} de Daño a ${nombre}
+          </button>
+        </div>` : ""
+    });
+    return true;
+  }
+
+  /**
+   * Canibalizar: criaturas que consume el Brujo (Tokens marcados con T que no son él), como mucho X.
+   * @param {number} valor - X (resultado de la tirada de Misticismo).
+   * @returns {Token[]}
+   */
+  _objetivosCanibalizar(valor) {
+    return [...game.user.targets].filter(t => t.actor && t.actor.id !== this.id).slice(0, Math.max(0, valor));
+  }
+
   /**
    * Estados de Potens Mystica sobre este Actor para las fichas de PJ y PNJ (v0.17.0).
    * @returns {{malDeOjo: object|null, destinoSellado: object|null}|null} null si no hay ninguno.
@@ -3005,10 +3356,12 @@ export class SistemaActor extends Actor {
     const destino = this.destinoSellado();
     const dragon = this.corazonDragon(); // (v0.18.0) Custodio
     const prisma = this.caleidoscopio(); // (v0.19.0) Ilusionista
-    if (!mal && !destino && !dragon && !prisma) return null;
+    const corrupcion = this.corrupcionFisica(); // (v0.20.0) Brujo
+    if (!mal && !destino && !dragon && !prisma && !corrupcion) return null;
     return {
       corazonDragon: dragon ? { turnos: Number(dragon.turnos) } : null,
       caleidoscopio: prisma,
+      corrupcionFisica: corrupcion,
       malDeOjo: mal ? { turnos: Number(mal.turnos), origen: mal.origen ?? "" } : null,
       destinoSellado: destino ? {
         palo: abreviadoPalo(destino.palo),
@@ -3553,6 +3906,17 @@ export class SistemaActor extends Actor {
   }
 
   /**
+   * (v0.20.0) Brujo · Ritual de espíritu: con el abalorio En Juego, el resultado de todas las tiradas
+   * se multiplica por el Nivel de peligro del Master (ajuste de mundo `nivelPeligro`, Panel del Master).
+   * @returns {number} Factor de las tiradas (1 si no aplica o el Nivel de peligro es 0).
+   */
+  _multiplicadorTiradas() {
+    if (!this.abaloriosActivos().has("ritualEspiritu")) return 1;
+    const peligro = Math.floor(Number(leerAjuste("nivelPeligro", 0)) || 0);
+    return peligro > 0 ? peligro : 1;
+  }
+
+  /**
    * Reacciona a un cambio de nivel de Agotamiento (llamado desde el hook `updateActor`
    * solo en el cliente que hizo el cambio):
    * - Al subir: anuncia en el chat las consecuencias nuevas.
@@ -3565,17 +3929,23 @@ export class SistemaActor extends Actor {
    */
   async _alCambiarAgotamiento(anterior, nuevo) {
     this.prepareData();
-    const estado = estadoAgotamiento(nuevo);
+    // (v0.20.0) El estado preparado respeta «Rendición de la carne» y «Corrupción física».
+    const estado = this.system.agotamiento?.nivel === nuevo ? this.system.agotamiento : estadoAgotamiento(nuevo);
 
     if (nuevo > anterior) {
-      const nuevas = SISTEMA_CONFIG.AGOTAMIENTO_NIVELES.filter(e => e.nivel > anterior && e.nivel <= nuevo);
+      // Rendición de la carne: solo cuenta la consecuencia del nivel actual (no se acumulan).
+      const nuevas = estado.soloNivelActual
+        ? SISTEMA_CONFIG.AGOTAMIENTO_NIVELES.filter(e => e.nivel === nuevo)
+        : SISTEMA_CONFIG.AGOTAMIENTO_NIVELES.filter(e => e.nivel > anterior && e.nivel <= nuevo);
       const lista = nuevas.map(e => `<li><i class="fa-solid ${e.icono}"></i> <strong>Nv. ${e.nivel}:</strong> ${e.texto}</li>`).join("");
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this }),
         content: `
           <div class="cyd-alerta-cansancio">
             <h4><i class="fa-solid fa-hourglass-half"></i> Agotamiento ${estado.nivel}/${estado.maximo}</h4>
-            <p><strong>${this.name}</strong> sufre nuevas consecuencias (acumulativas):</p>
+            <p><strong>${this.name}</strong> ${estado.soloNivelActual
+              ? "sufre la consecuencia de su nivel actual (Rendición de la carne: los niveles anteriores no se acumulan):"
+              : "sufre nuevas consecuencias (acumulativas):"}</p>
             <ul>${lista}</ul>
           </div>
         `
@@ -3757,6 +4127,8 @@ export class SistemaActor extends Actor {
       valorX: Boolean(valorX),
       efectoX: efectoX ?? null,
       numeroCarta: numeroCarta ?? null, // (v0.16.0) Manifestar arma
+      // (v0.20.0) Corrupción física: Agotamiento al usarla (antes de su +1).
+      nivelAgotamiento: Number(this.system.agotamiento?.nivel ?? this.system.cansancio?.value) || 0,
       // (v0.17.0) Mal de ojo sobre una carta d4: la repetición vuelve a dar el resultado fijo.
       resultadoFijo: tirada.resultadosBase?.length === 0 && !tirada.combinada ? tirada.total : null,
       totalAnterior: tirada.total
@@ -3789,7 +4161,7 @@ export class SistemaActor extends Actor {
 
     const tirada = await tirarDadosSistema({
       cantidadDados: datos.cantidadDados, tipoDado: datos.tipoDado, bono: datos.bono,
-      rollData: this.getRollData(), mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
+      rollData: this.getRollData(), mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(), multiplicador: this._multiplicadorTiradas(),
       speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `Espera un momento · ${datos.titulo}`,
       resultadoFijo: datos.resultadoFijo ?? null, motivoFijo: "Mal de ojo (carta d4)"
     });
@@ -3813,7 +4185,10 @@ export class SistemaActor extends Actor {
     }
     const resolucion = datos.valorX
       ? {
-        publico: this._htmlValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo, numeroCarta: datos.numeroCarta ?? null }),
+        publico: this._htmlValorX(tirada, {
+          efectoX: datos.efectoX ?? null, tokenObjetivo, numeroCarta: datos.numeroCarta ?? null,
+          nivelAgotamiento: datos.nivelAgotamiento ?? null
+        }),
         master: this._htmlMasterValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo })
       }
       : this._htmlResolucionTirada(tirada, datos.esAtaque, datos.etiquetaDificultad, { tokenObjetivo });
@@ -3958,7 +4333,7 @@ export class SistemaActor extends Actor {
     const malDeOjo = caracteristica === "misticismo" ? this._ajusteMalDeOjo(tipoDado) : null;
     const tirada = await tirarDadosSistema({
       cantidadDados, tipoDado: malDeOjo?.tipoDado ?? tipoDado, bono, rollData: this.getRollData(),
-      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
+      mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(), multiplicador: this._multiplicadorTiradas(),
       speaker: ChatMessage.getSpeaker({ actor: this }), titulo,
       resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
     });
@@ -4101,13 +4476,17 @@ export class SistemaActor extends Actor {
         ? await this._prepararSellarDestino(item, cartaElegida)
         : null;
       if (item.getFlag("cartas-y-dados", "efectoX") === "sellarDestino" && !sellar) return null;
+      // (v0.20.0) Brujo · Cerrar destino: exige un objetivo (cancelar no gasta nada).
+      const efectoSinTirada = item.getFlag("cartas-y-dados", "efectoX") ?? null;
+      const brujo = efectoSinTirada === "cerrarDestino" ? this._prepararCerrarDestino() : null;
+      if (efectoSinTirada === "cerrarDestino" && !brujo) return null;
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this }),
         content: `
           <div class="cyd-carta-jugada">
             <h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3>
             ${lineaCartaUsada}
-            ${sellar?.html ?? "<p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>"}
+            ${sellar?.html ?? brujo?.html ?? "<p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>"}
             ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
             ${lineaQuemada}
           </div>
@@ -4134,7 +4513,7 @@ export class SistemaActor extends Actor {
     const partes = [{
       tirada: await tirarDadosSistema({
         cantidadDados: cantidadDados + (amistad ? 1 : 0), tipoDado, bono, rollData: this.getRollData(),
-        mitadPorAgotamiento, parcial: hayPartes,
+        mitadPorAgotamiento, multiplicador: this._multiplicadorTiradas(), parcial: hayPartes,
         speaker: ChatMessage.getSpeaker({ actor: this }), titulo: item.name,
         resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
       }),
@@ -4146,7 +4525,7 @@ export class SistemaActor extends Actor {
         tirada: await tirarDadosSistema({
           cantidadDados: this._dadosDeCaracteristica("consciencia"), tipoDado: c.system.tipoDado ?? "d6",
           bono: Number(c.system.automatizacion?.bonoTirada) || 0, rollData: this.getRollData(),
-          mitadPorAgotamiento, parcial: true,
+          mitadPorAgotamiento, multiplicador: this._multiplicadorTiradas(), parcial: true,
           speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `${item.name} · ${nombreVisibleCarta(c)}`
         }),
         etiqueta: `${nombreVisibleCarta(c)} (Consciencia)`
@@ -4243,6 +4622,8 @@ export class SistemaActor extends Actor {
 
     // Automatización (curación, cambio de cansancio y robo de cartas) si está configurada.
     await this._aplicarAutomatizacionHabilidad(item);
+    // (v0.20.0) Brujo · Corrupción física: +1 Agotamiento al usarla (después de fijar el nivel copiado).
+    if (efectoX === "corrupcionFisica") await this.cambiarAgotamiento(1);
 
     if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
     await this._registrarUltimaCaracteristica("misticismo"); // (v0.15.0) abalorio Amistad
@@ -4269,7 +4650,7 @@ export class SistemaActor extends Actor {
    * @param {number|null} [opciones.numeroCarta=null] - (v0.16.0) Número (1–5) de la carta MIST usada.
    * @returns {string} HTML público.
    */
-  _htmlValorX(tirada, { efectoX = null, tokenObjetivo = null, numeroCarta = null } = {}) {
+  _htmlValorX(tirada, { efectoX = null, tokenObjetivo = null, numeroCarta = null, nivelAgotamiento = null } = {}) {
     const valor = Math.max(0, Number(tirada.total) || 0);
     const exito = !tirada.esNegativo && valor > 0;
     // (v0.16.0) Tiempo embotellado: no hay valor X, se apuntan los dados.
@@ -4309,6 +4690,17 @@ export class SistemaActor extends Actor {
         ${actorDestino.id !== this.id ? `<button type="button" class="cyd-btn-caleidoscopio" data-actor-uuid="${actorDestino.uuid}" data-turnos="${valor}" data-origen="${escapar(this.name)}" data-nombre="${nombre}">
           <i class="fa-solid fa-clone"></i> Aplicar Caleidoscopio a ${nombre} (${valor} turnos)
         </button>` : ""}`;
+    } else if (exito && efectoX === "canibalizar") {
+      // (v0.20.0) Brujo · Canibalizar: hasta X criaturas marcadas con T; +1 Salud por cada una.
+      const escapar = foundry.utils.escapeHTML;
+      const consumidas = this._objetivosCanibalizar(valor);
+      htmlEfecto = consumidas.length
+        ? `
+          <p><i class="fa-solid fa-tooth"></i> Consume a ${consumidas.map(t => `<strong>${escapar(t.name)}</strong>`).join(", ")} (${consumidas.length} de ${valor} como máximo) y recupera <strong>${consumidas.length}</strong> de Salud.</p>
+          <button type="button" class="cyd-btn-aplicar-curacion" data-actor-uuid="${this.uuid}" data-curacion="${consumidas.length}">
+            <i class="fa-solid fa-heart-pulse"></i> Aplicar ${consumidas.length} de Curación a ${escapar(this.name)}
+          </button>`
+        : `<p class="hint"><i class="fa-solid fa-crosshairs"></i> Puedes consumir hasta <strong>${valor}</strong> criatura(s): márcalas con <strong>T</strong> antes de usar la habilidad para automatizar la curación (+1 Salud por cada una).</p>`;
     } else if (exito && efectoX === "manifestarArma") {
       const categorias = Math.min(5, Math.max(1, Number(numeroCarta) || 1));
       htmlEfecto = `<p><i class="fa-solid fa-khanda"></i> Arma manifestada de <strong>${categorias} categoría(s)</strong> (carta ${SISTEMA_CONFIG.dadoPorNumeroCarta[categorias] ?? ""}) durante <strong>${valor} turno(s)</strong>.</p>`;
@@ -4339,10 +4731,13 @@ export class SistemaActor extends Actor {
           <button type="button" class="cyd-btn-mal-de-ojo" data-actor-uuid="${actorObjetivo.uuid}" data-turnos="${valor}" data-origen="${escapar(this.name)}" data-nombre="${nombre}">
             <i class="fa-solid fa-eye-slash"></i> Aplicar Mal de ojo a ${nombre} (${valor} turnos)
           </button>`;
+      } else if (efectoX === "corrupcionFisica") {
+        // (v0.20.0) Brujo · Corrupción física: X turnos con las desventajas de Agotamiento del Brujo.
+        htmlEfecto = this._htmlCorrupcionFisica(actorObjetivo, escapar(tokenObjetivo.name ?? actorObjetivo.name), valor, nivelAgotamiento);
       } else if (efectoX === "flagelarEsencia") {
         // (v0.17.0) Potens Mystica · Flagelar esencia: el daño solo lo ve el Master (`_htmlMasterValorX`).
         const nombre = escapar(tokenObjetivo.name ?? actorObjetivo.name);
-        htmlEfecto = `<p><i class="fa-solid fa-crosshairs"></i> Ataque a la esencia de <strong>${nombre}</strong>: X × Agotamiento de ${escapar(this.name)} × nivel de peligro. <small><i class="fa-solid fa-eye-slash"></i> El daño solo lo ve el Master.</small></p>`;
+        htmlEfecto = `<p><i class="fa-solid fa-crosshairs"></i> Ataque a la esencia de <strong>${nombre}</strong>: X + Agotamiento de ${escapar(this.name)} + nivel de peligro. <small><i class="fa-solid fa-eye-slash"></i> El daño solo lo ve el Master.</small></p>`;
       }
     }
     return `
@@ -4355,8 +4750,8 @@ export class SistemaActor extends Actor {
 
   /**
    * Bloque solo para el Master del valor X de una habilidad (v0.17.0). Hoy solo lo usa «Flagelar
-   * esencia» (Potens Mystica): daño = X × Agotamiento del lanzador × nivel de peligro del objetivo
-   * (Amenaza si es un PNJ; su nivel si es un PJ), con el botón para aplicarlo (`.cyd-btn-aplicar-dano`,
+   * esencia» (Potens Mystica): daño (v0.20.0) = X + Agotamiento del lanzador + Nivel de peligro del Master
+   * (ajuste `nivelPeligro`), con el botón para aplicarlo (`.cyd-btn-aplicar-dano`,
    * que respeta la Barrera espiritual del objetivo).
    * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
    * @param {Object} [opciones]
@@ -4366,6 +4761,7 @@ export class SistemaActor extends Actor {
    */
   _htmlMasterValorX(tirada, { efectoX = null, tokenObjetivo = null } = {}) {
     if (efectoX === "rencor") return this._htmlMasterRencor(tirada, tokenObjetivo);
+    if (efectoX === "canibalizar") return this._htmlMasterCanibalizar(tirada);
     if (efectoX !== "flagelarEsencia") return "";
     const valor = Math.max(0, Number(tirada.total) || 0);
     const actorObjetivo = tokenObjetivo?.actor ?? null;
@@ -4373,24 +4769,45 @@ export class SistemaActor extends Actor {
     const escapar = foundry.utils.escapeHTML;
     const nombre = escapar(tokenObjetivo.name ?? actorObjetivo.name);
     const agotamiento = Number(this.system.agotamiento?.nivel ?? this.system.cansancio?.value) || 0;
-    const peligro = actorObjetivo.type === "pnj"
-      ? Math.max(1, Number(actorObjetivo.system.amenaza) || 1)
-      : Math.max(1, Number(actorObjetivo.system.nivelEfectivo) || 1);
-    const etiquetaPeligro = actorObjetivo.type === "pnj" ? "Amenaza" : "Nivel";
-    const dano = valor * agotamiento * peligro;
-    const detalle = dano > 0
-      ? `<p><i class="fa-solid fa-burst"></i> <strong>Daño ${dano}</strong> <small>(X ${valor} × Agotamiento ${agotamiento} × ${etiquetaPeligro} ${peligro})</small></p>
+    // (v0.20.0) Nivel de peligro del encuentro (ajuste `nivelPeligro`, Panel del Master).
+    const peligro = Math.max(0, Math.floor(Number(leerAjuste("nivelPeligro", 0)) || 0));
+    const etiquetaPeligro = "Nivel de peligro";
+    // (v0.20.0) Nueva fórmula: X + Agotamiento del lanzador + Nivel de peligro.
+    const dano = valor + agotamiento + peligro;
+    const detalle = `<p><i class="fa-solid fa-burst"></i> <strong>Daño ${dano}</strong> <small>(X ${valor} + Agotamiento ${agotamiento} + ${etiquetaPeligro} ${peligro})</small></p>
          <button type="button" class="cyd-btn-aplicar-dano" data-actor-uuid="${actorObjetivo.uuid}" data-dano="${dano}">
            <i class="fa-solid fa-droplet"></i> Aplicar ${dano} de Daño a ${nombre}
-         </button>`
-      : `<p><i class="fa-solid fa-shield-halved"></i> <strong>0 Daño:</strong> ${escapar(this.name)} no tiene Agotamiento (X ${valor} × 0 × ${etiquetaPeligro} ${peligro}).</p>`;
+         </button>`;
     return `
       <div class="cyd-carta-jugada">
         <h3><i class="fa-solid fa-eye-slash"></i> Flagelar esencia <small>(solo Master)</small></h3>
-        <div class="cyd-resolucion-caja ${dano > 0 ? "cyd-exito" : "cyd-fallo"}">
+        <div class="cyd-resolucion-caja cyd-exito">
           <p><i class="fa-solid fa-crosshairs"></i> <strong>${escapar(this.name)}</strong> → <strong>${nombre}</strong></p>
           ${detalle}
         </div>
+      </div>`;
+  }
+
+  /**
+   * Bloque solo para el Master de «Canibalizar» (v0.20.0, Brujo): botón opcional (`.cyd-btn-consumir`)
+   * que deja a 0 la Salud de las criaturas consumidas (el Master decide si el consumo las elimina).
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
+   * @returns {string} HTML ("" si la tirada falla o no hay criaturas marcadas).
+   */
+  _htmlMasterCanibalizar(tirada) {
+    const valor = Math.max(0, Number(tirada.total) || 0);
+    if (tirada.esNegativo || valor <= 0) return "";
+    const consumidas = this._objetivosCanibalizar(valor);
+    if (!consumidas.length) return "";
+    const escapar = foundry.utils.escapeHTML;
+    const nombres = consumidas.map(t => escapar(t.name)).join(", ");
+    return `
+      <div class="cyd-carta-jugada">
+        <h3><i class="fa-solid fa-tooth"></i> Canibalizar <small>(solo Master)</small></h3>
+        <p><strong>${escapar(this.name)}</strong> consume a ${nombres}.</p>
+        <button type="button" class="cyd-btn-consumir" data-uuids="${consumidas.map(t => t.actor.uuid).join(",")}" data-nombres="${nombres}">
+          <i class="fa-solid fa-skull"></i> Dejar a 0 la Salud de las criaturas consumidas
+        </button>
       </div>`;
   }
 

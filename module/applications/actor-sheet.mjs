@@ -180,7 +180,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       actor,
       system,
       esPropietario: actor.isOwner,
-      agotamiento: contextoAgotamiento(system.cansancio?.value),
+      agotamiento: contextoAgotamiento(system.cansancio?.value, system.agotamiento),
       barraSalud: contextoBarraSalud(system.salud?.value, system.salud?.maxTotal),
       rasgosRaza: contextoRasgosRaza(system.razaBase),
       pilasInicializadas,
@@ -559,6 +559,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     else if (target.dataset.estado === "destinoSellado") await this.document.retirarDestinoSellado();
     else if (target.dataset.estado === "corazonDragon") await this.document.retirarCorazonDragon(); // (v0.18.0)
     else if (target.dataset.estado === "caleidoscopio") await this.document.retirarCaleidoscopio(); // (v0.19.0)
+    else if (target.dataset.estado === "corrupcionFisica") await this.document.retirarCorrupcionFisica(); // (v0.20.0)
     else if (target.dataset.estado === "pesadillas") await this.document.retirarPesadillas(); // (v0.19.0)
   }
 

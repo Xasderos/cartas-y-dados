@@ -5,7 +5,7 @@
  * - Añade dados configurables por característica de forma individual para los PNJs.
  */
 
-import { SISTEMA_CONFIG, estadoAgotamiento, razaBaseDeActor } from "../config.mjs";
+import { SISTEMA_CONFIG, abalorioDeTrinket, claveClaseDeItem, estadoAgotamiento, razaBaseDeActor } from "../config.mjs";
 import { CATEGORIAS_TAMANO, leerAjuste, leerTamanoBase } from "../settings.mjs";
 
 const { TypeDataModel } = foundry.abstract;
@@ -215,6 +215,12 @@ export class BaseActorDataModel extends TypeDataModel {
       }
     }
 
+    // (v0.20.0) Abalorios de Brujo En Juego que cambian valores derivados (Ritual de mente y
+    // Rendición de la carne). `abalorioDeTrinket` también reconoce los Trinkets por nombre.
+    const claveClaseAbalorios = claveClaseDeItem(this.itemClase);
+    const abaloriosEnJuego = new Set((this.pilasDocumentos?.enJuego?.cards?.contents ?? [])
+      .map(c => abalorioDeTrinket(c, claveClaseAbalorios)).filter(Boolean));
+
     // Garantizar siempre un objeto de pilas aunque `game.cards` aún no esté hidratado
     // (al recargar el mundo, prepareDerivedData puede ejecutarse antes de que las
     // colecciones de Foundry estén disponibles; nunca debe quedar undefined).
@@ -237,24 +243,31 @@ export class BaseActorDataModel extends TypeDataModel {
     this.manoConfig.bonificadorObjetos = bonoManoItems;
 
     // Agotamiento (v0.12.0): consecuencias acumulativas por nivel (ver SISTEMA_CONFIG.AGOTAMIENTO_NIVELES).
-    const agotamiento = estadoAgotamiento(this.cansancio.value);
+    // (v0.20.0) Brujo: «Rendición de la carne» (solo el nivel actual) y «Corrupción física» recibida
+    // (`flags.cartas-y-dados.corrupcionFisica`: desventajas de Agotamiento de otro Actor).
+    const agotamiento = estadoAgotamiento(this.cansancio.value, {
+      soloNivelActual: abaloriosEnJuego.has("rendicionCarne"),
+      corrupcion: this.parent?.flags?.["cartas-y-dados"]?.corrupcionFisica ?? null
+    });
     this.agotamiento = agotamiento;
     this.cansancio.max = agotamiento.maximo;
     this.cansancio.maxTotal = agotamiento.maximo;
 
     const { base, bonificadorClase, bonificadorObjetos, bonificadorAtributos } = this.manoConfig;
-    this.limiteManoSinAgotamiento = Math.max(
-      1,
-      base + bonificadorClase + bonificadorObjetos + bonificadorAtributos
-    );
+    // (v0.20.0) Brujo · Ritual de mente: la Mano Máx. es el nº de cartas Quemadas (mínimo 1).
+    this.manoRitualMente = abaloriosEnJuego.has("ritualMente");
+    const minimoMano = 1;
+    this.limiteManoSinAgotamiento = Math.max(minimoMano, this.manoRitualMente
+      ? Number(this.pilasDocumentos?.quemadas?.cards?.size) || 0
+      : base + bonificadorClase + bonificadorObjetos + bonificadorAtributos);
     // Agotamiento 1: mano máxima a la mitad (hacia arriba).
     this.limiteMano = agotamiento.efectos.manoMitad
-      ? Math.max(1, Math.ceil(this.limiteManoSinAgotamiento / 2))
+      ? Math.max(minimoMano, Math.ceil(this.limiteManoSinAgotamiento / 2))
       : this.limiteManoSinAgotamiento;
     // Sierpes · Sangre fría (v0.13.0): expuesta a los elementos → Mano Máx. a la mitad
     // (se acumula con la reducción por Agotamiento).
     this.manoMitadPorSangreFria = this.razaBase === "sierpes" && Boolean(this.rasgosRaza?.expuestoElementos);
-    if (this.manoMitadPorSangreFria) this.limiteMano = Math.max(1, Math.ceil(this.limiteMano / 2));
+    if (this.manoMitadPorSangreFria) this.limiteMano = Math.max(minimoMano, Math.ceil(this.limiteMano / 2));
 
     // Movimiento máximo = Base editable (ajuste world "movimientoBase") + (Físico Total * 5) metros.
     // El campo `value` se sincroniza con `max` por compatibilidad con datos antiguos;
