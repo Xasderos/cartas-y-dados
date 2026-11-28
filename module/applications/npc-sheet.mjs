@@ -139,6 +139,7 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
   static async #onRetirarEstadoMistico(event, target) {
     if (target.dataset.estado === "malDeOjo") await this.document.retirarMalDeOjo();
     else if (target.dataset.estado === "destinoSellado") await this.document.retirarDestinoSellado();
+    else if (target.dataset.estado === "corazonDragon") await this.document.retirarCorazonDragon(); // (v0.18.0)
   }
 
   /* ======================================================================== */

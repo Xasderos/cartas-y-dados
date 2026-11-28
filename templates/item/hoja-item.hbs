@@ -121,8 +121,9 @@
           {{#each system.historialNiveles as |entrada|}}
             <div class="cyd-fila-item">
               <div class="cyd-fila-item-info">
-                <strong>Nv. {{entrada.nivel}}{{#if entrada.habilidad}} · {{entrada.habilidad}}{{/if}}{{#if entrada.especializacion}} · {{entrada.especializacion}}{{/if}}</strong>
+                <strong>Nv. {{entrada.nivel}}{{#if entrada.habilidad}} · {{entrada.habilidad}}{{/if}}{{#if entrada.especializacion}} · {{entrada.especializacion}}{{/if}}{{#if entrada.abalorio}} · {{entrada.abalorio}}{{/if}}</strong>
                 {{#if entrada.cartas}}<small>{{entrada.cartas}}</small>{{/if}}
+                {{#if entrada.otros}}<small>{{entrada.otros}}</small>{{/if}}
               </div>
             </div>
           {{/each}}
@@ -158,6 +159,32 @@
             </li>
           {{/each}}
         </ul>
+      {{/each}}
+      {{!-- (v0.18.0) Progresión propia de cada especialización (Custodio...) --}}
+      {{#each progresionClase.especializaciones as |esp|}}
+        <div class="cyd-cabecera-seccion">
+          <h3><i class="fa-solid fa-award"></i> Especialización · {{esp.nombre}}</h3>
+        </div>
+        {{#if esp.texto}}<p class="cyd-rasgo-texto">{{esp.texto}}</p>{{/if}}
+        {{#if esp.tabla.length}}
+          <ul class="cyd-lista-rasgos">
+            {{#each esp.tabla as |fila|}}
+              <li class="cyd-rasgo"><div class="cyd-rasgo-cabecera"><strong>Nv. {{fila.nivel}}</strong></div><p class="cyd-rasgo-texto">{{fila.beneficios}}</p></li>
+            {{/each}}
+          </ul>
+        {{/if}}
+        {{#each esp.grupos as |grupo|}}
+          <h4><i class="fa-solid {{grupo.icono}}"></i> {{grupo.titulo}} <small>(Nv. {{grupo.nivel}})</small></h4>
+          <ul class="cyd-lista-rasgos">
+            {{#each grupo.opciones as |opcion|}}
+              <li class="cyd-rasgo">
+                <div class="cyd-rasgo-cabecera"><strong>{{#if opcion.icono}}<i class="fa-solid {{opcion.icono}}"></i> {{/if}}{{opcion.nombre}}</strong></div>
+                {{#if opcion.texto}}<p class="cyd-rasgo-texto">{{opcion.texto}}</p>{{/if}}
+                {{#if opcion.auto}}<p class="cyd-rasgo-auto"><i class="fa-solid fa-gears"></i> {{opcion.auto}}</p>{{/if}}
+              </li>
+            {{/each}}
+          </ul>
+        {{/each}}
       {{/each}}
     </section>
   {{/if}}

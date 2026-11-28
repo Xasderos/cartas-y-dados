@@ -229,6 +229,12 @@
         {{!-- (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este Actor --}}
         {{#if estadosMisticos}}
           <div class="cyd-estado-acciones cyd-estados-misticos">
+            {{#if estadosMisticos.corazonDragon}}
+              <span class="cyd-chip-estado cyd-activo" data-tooltip="Corazón del dragón: solo puedes recibir 1 de daño como máximo y cada vez que lo recibes ganas 1 de Agotamiento. En combate pierde un turno al final de cada uno de tus turnos">
+                <i class="fa-solid fa-dragon"></i> Corazón del dragón · {{estadosMisticos.corazonDragon.turnos}} turno(s)
+              </span>
+              {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="corazonDragon" data-tooltip="Retirar el Corazón del dragón"><i class="fa-solid fa-xmark"></i></button>{{/if}}
+            {{/if}}
             {{#if estadosMisticos.malDeOjo}}
               <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Mal de ojo{{#if estadosMisticos.malDeOjo.origen}} de {{estadosMisticos.malDeOjo.origen}}{{/if}}: tus cartas de Misticismo bajan una categoría de dado (una carta d4 da automáticamente 1). En combate pierde un turno al final de cada uno de tus turnos">
                 <i class="fa-solid fa-eye-slash"></i> Mal de ojo · {{estadosMisticos.malDeOjo.turnos}} turno(s)

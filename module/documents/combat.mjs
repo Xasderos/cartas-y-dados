@@ -52,12 +52,15 @@ export class SistemaCombat extends Combat {
   }
 
   /**
-   * Fin del turno del combatiente activo (v0.17.0): su «Mal de ojo» (Potens Mystica) pierde un turno.
+   * Fin del turno del combatiente activo (v0.17.0): su «Mal de ojo» (Potens Mystica) y (v0.18.0) su
+   * «Corazón del dragón» (Custodio) pierden un turno.
    */
   async #finTurnoCombatiente() {
     if (!this.started) return;
     const actor = this.combatant?.actor;
-    if (actor?.isOwner) await actor.avanzarMalDeOjo?.();
+    if (!actor?.isOwner) return;
+    await actor.avanzarMalDeOjo?.();
+    await actor.avanzarCorazonDragon?.(); // (v0.18.0) Custodio
   }
 
   /**

@@ -354,8 +354,13 @@ export const SISTEMA_CONFIG = {
    *     `flags.cartas-y-dados.elemento`: potenciar con cartas CONS y aplicar el estado alterado.
    *   · `packs`: lista de packs de cartas; sus cartas `{ palo, numero }` (numero 1 = d4, 2 = d6...)
    *     se añaden al Mazo de Juego con nombre místico.
-   *   · `especializaciones` (v0.15.0): `{ clave, nombre, texto }`; se guarda en
-   *     `system.especializacion` del Item de Clase y se crea como Habilidad pasiva.
+   *   · `especializaciones` (v0.15.0): `{ clave, nombre, texto, tablaElecciones?, progresion? }`; se guarda
+   *     en `system.especializacion` del Item de Clase y se crea como Habilidad pasiva. (v0.18.0) Su
+   *     `progresion` (mismo formato, desde el nivel en que se elige) se suma a la de la clase.
+   *   · (v0.18.0) `caracteristica: true` → +1 a la característica base elegida; `manoMaxima: N` → +N
+   *     al bonificador `limiteMano` del Item de Clase; `abalorios` (formato de `trinkets`) → se elige
+   *     uno y se crea como Trinket en el Mazo de Trinkets; `pasivas: [{clave, nombre, texto}]` → se
+   *     crean como Habilidades pasivas; `pendientes: [texto]` → beneficios aún sin definir (los aplica el Master).
    *   Sin entrada para el nivel siguiente → la subida de nivel no está disponible.
    */
   /**
@@ -399,7 +404,7 @@ export const SISTEMA_CONFIG = {
       tablaElecciones: [
         { nivel: 1, beneficios: "Mazo Inicial (Físico) · Elección de abalorio" },
         { nivel: 2, beneficios: "Elección de habilidad · Elección de cartas" },
-        { nivel: 3, beneficios: "Elección de especialización" }
+        { nivel: 3, beneficios: "Elección de especialización (Custodio) · beneficios de la especialización" }
       ],
       trinkets: [
         {
@@ -442,8 +447,72 @@ export const SISTEMA_CONFIG = {
         3: {
           especializaciones: [
             {
+              // (v0.18.0) Custodio: progresión propia de Nv. 3 a 6 (se suma a la de la clase).
               clave: "custodio", nombre: "Custodio",
-              texto: "Especialización de Fortis Corpore. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+              texto: "Especialización de Fortis Corpore: el guardián que protege a sus aliados a costa de sí mismo.",
+              tablaElecciones: [
+                { nivel: 3, beneficios: "Elección de característica · +1 Mano Máxima · Elección de abalorio · Siempre presente" },
+                { nivel: 4, beneficios: "Elección de habilidad · Elección de cartas" },
+                { nivel: 5, beneficios: "Elección de habilidad (pendiente de definir) · Elección de característica" },
+                { nivel: 6, beneficios: "Elección de abalorio (pendiente de definir) · +1 Mano Máxima" }
+              ],
+              progresion: {
+                3: {
+                  caracteristica: true,
+                  manoMaxima: 1,
+                  abalorios: [
+                    {
+                      clave: "ultimoAliento", nombre: "Último aliento", icono: "fa-heart-crack",
+                      texto: "Si fueras a caer en combate por daño, en vez de eso, quema este abalorio, sin perder la vida que fueras a perder.",
+                      auto: "En Juego: si el daño aplicado por el Master te dejaría a 0 de Salud, se ofrece quemar el abalorio y no perder la vida."
+                    },
+                    {
+                      clave: "martir", nombre: "Mártir", icono: "fa-hand-holding-heart",
+                      texto: "Reduce el daño que reciben todos tus aliados en tu rango de visión a la mitad, pero duplicas el daño que recibes tú de todas las fuentes de daño. Puedes usar una carta de consciencia para quemar este abalorio como reacción gratuíta después de recibir daño.",
+                      auto: "En Juego: el daño que te aplica el Master se duplica; el de cada aliado (PJ) se reduce a la mitad (↑) si el Master confirma que está en tu rango de visión. Tras recibir daño, botón en el chat para quemarlo usando una carta CONS de tu mano."
+                    },
+                    {
+                      clave: "corazonEspinas", nombre: "Corazón de espinas", icono: "fa-seedling",
+                      texto: "Siempre que recibas daño de una criatura que se encuentre a distancia de cuerpo a cuerpo, esta recibirá daño igual a tu puntuación de físico.",
+                      auto: "En Juego: al recibir daño de un ataque, el Master tiene un botón para aplicar al atacante tanto daño como tu Físico total (si estaba cuerpo a cuerpo)."
+                    }
+                  ],
+                  pasivas: [
+                    {
+                      clave: "siemprePresente", nombre: "Siempre presente",
+                      texto: "Tienes una intuición excepcional para saber si tus aliados o personas que te importan están en peligro. Incluso en algunas ocasiones siendo capaz de predecir que algo malo le va a pasar a un aliado antes de que suceda... aunque la mayoría de veces no sepas realmente de que se trata."
+                    }
+                  ]
+                },
+                4: {
+                  habilidades: [
+                    {
+                      nombre: "Muro de voluntad", esAtaque: false, valorX: true, efectoX: "muroVoluntad",
+                      texto: "Levantas un bastión de pura voluntad para proteger una zona, ninguna criatura o ataque que tu elijas puede pasar mientras mantengas la concentración, el muro tiene una cantidad de vida igual a 3 * X (donde X es el resultado de la tirada de misticismo)."
+                    },
+                    {
+                      nombre: "Corazón del dragón", esAtaque: false, valorX: true, efectoX: "corazonDragon",
+                      texto: "Durante los siguientes X turnos (donde X es el resultado de la tirada de misticismo), solo puedes recibir 1 de daño como máximo. Siempre que recibas daño ganas un punto de agotamiento."
+                    },
+                    {
+                      nombre: "Rencor", esAtaque: false, valorX: true, efectoX: "rencor",
+                      texto: "Si acabas de mitigar por completo el daño (te han hecho un ataque pero no has recibido daño) de un enemigo, puedes devolverle esa cantidad de daño más la tirada de misticismo."
+                    }
+                  ],
+                  packs: [
+                    [{ palo: "oros", numero: 2 }, { palo: "espadas", numero: 3 }],
+                    [{ palo: "bastos", numero: 2 }, { palo: "espadas", numero: 3 }]
+                  ]
+                },
+                5: {
+                  caracteristica: true,
+                  pendientes: ["Elección de habilidad"]
+                },
+                6: {
+                  manoMaxima: 1,
+                  pendientes: ["Elección de abalorio"]
+                }
+              }
             }
           ]
         }
@@ -715,6 +784,44 @@ export function opcionesTrinketsClase(configClase) {
 }
 
 /**
+ * Especializaciones definidas en la progresión de una Clase base (v0.18.0), con el nivel en que se eligen.
+ * @param {object|null} configClase - Entrada de `SISTEMA_CONFIG.CLASES_BASE`.
+ * @returns {Array<object & {nivelEleccion: number}>}
+ */
+export function especializacionesClase(configClase) {
+  const lista = [];
+  for (const [nivel, recompensas] of Object.entries(configClase?.progresion ?? {})) {
+    for (const e of recompensas.especializaciones ?? []) lista.push({ ...e, nivelEleccion: Number(nivel) });
+  }
+  return lista;
+}
+
+/**
+ * Especialización ya elegida en un Item de Clase (v0.18.0): busca `system.especializacion` (nombre o
+ * clave, sin distinguir mayúsculas) entre las especializaciones de su Clase base.
+ * @param {Item|null} itemClase
+ * @param {object|null} configClase - Entrada de `SISTEMA_CONFIG.CLASES_BASE`.
+ * @returns {object|null} Configuración de la especialización o null si no hay ninguna elegida.
+ */
+export function especializacionDeClase(itemClase, configClase) {
+  const guardada = String(itemClase?.system?.especializacion ?? "").trim().toLowerCase();
+  if (!guardada) return null;
+  return especializacionesClase(configClase)
+    .find(e => e.nombre.toLowerCase() === guardada || e.clave?.toLowerCase() === guardada) ?? null;
+}
+
+/**
+ * Abalorios que se obtienen al subir de nivel dentro de las especializaciones de una clase (v0.18.0),
+ * normalizados como `opcionesTrinketsClase`.
+ * @param {object|null} configClase
+ * @returns {object[]}
+ */
+export function abaloriosEspecializacionesClase(configClase) {
+  return especializacionesClase(configClase).flatMap(e =>
+    Object.values(e.progresion ?? {}).flatMap(r => opcionesTrinketsClase({ trinkets: r.abalorios ?? [] })));
+}
+
+/**
  * ¿Es la carta un Abalorio Eterno (v0.15.0)? Solo puede estar En Juego o en Cartas Quemadas.
  * Se reconoce por la clave de abalorio (`abalorioDeTrinket`) entre los abalorios con `eterno: true`
  * de cualquier clase base.
@@ -750,7 +857,36 @@ export function contextoProgresionClase(claveClase) {
   if (abalorios.some(a => a.artilugios)) {
     grupos.push({ titulo: "Artilugio de primera: objeto mágico", icono: "fa-toolbox", nivel: 1, opciones: opcionesArtilugio() });
   }
-  for (const [nivel, recompensas] of Object.entries(cfg.progresion ?? {})) {
+  grupos.push(...gruposProgresion(cfg.progresion));
+  // (v0.18.0) Progresión propia de cada especialización.
+  const especializaciones = especializacionesClase(cfg)
+    .filter(e => e.tablaElecciones?.length || e.progresion)
+    .map(e => ({ nombre: e.nombre, texto: e.texto ?? "", tabla: e.tablaElecciones ?? [], grupos: gruposProgresion(e.progresion) }));
+  return { nombre: cfg.nombre, tabla: cfg.tablaElecciones ?? [], grupos, especializaciones };
+}
+
+/**
+ * Grupos de opciones de solo lectura de una tabla de progresión (v0.18.0, extraído de
+ * `contextoProgresionClase`): habilidades, packs, especializaciones, características, abalorios,
+ * pasivas y beneficios pendientes de cada nivel.
+ * @param {object} [progresion={}]
+ * @returns {Array<{titulo: string, icono: string, nivel: number, opciones: object[]}>}
+ */
+function gruposProgresion(progresion = {}) {
+  const grupos = [];
+  for (const [nivel, recompensas] of Object.entries(progresion ?? {})) {
+    if (recompensas.caracteristica) {
+      grupos.push({
+        titulo: "Elección de característica", icono: "fa-arrow-up-1-9", nivel: Number(nivel),
+        opciones: [{ nombre: "+1 característica", texto: "Subes en 1 punto cualquiera de tus características." }]
+      });
+    }
+    if (recompensas.abalorios?.length) {
+      grupos.push({
+        titulo: "Elección de abalorio", icono: "fa-gem", nivel: Number(nivel),
+        opciones: opcionesTrinketsClase({ trinkets: recompensas.abalorios })
+      });
+    }
     if (recompensas.habilidades?.length) {
       grupos.push({
         titulo: "Elección de habilidad", icono: "fa-wand-magic-sparkles", nivel: Number(nivel),
@@ -769,8 +905,20 @@ export function contextoProgresionClase(claveClase) {
         opciones: recompensas.especializaciones.map(e => ({ nombre: e.nombre, texto: e.texto ?? "" }))
       });
     }
+    if (recompensas.pasivas?.length) {
+      grupos.push({
+        titulo: "Otros bonus", icono: "fa-star", nivel: Number(nivel),
+        opciones: recompensas.pasivas.map(p => ({ nombre: p.nombre, texto: p.texto ?? "" }))
+      });
+    }
+    if (recompensas.pendientes?.length) {
+      grupos.push({
+        titulo: "Pendiente de definir", icono: "fa-hourglass-half", nivel: Number(nivel),
+        opciones: recompensas.pendientes.map(p => ({ nombre: p, texto: "Aún sin definir: el Master lo aplica mientras tanto." }))
+      });
+    }
   }
-  return { nombre: cfg.nombre, tabla: cfg.tablaElecciones ?? [], grupos };
+  return grupos;
 }
 
 /**
@@ -800,7 +948,8 @@ export function abalorioDeTrinket(carta, claveClase = null) {
 export function catalogoAbalorios() {
   const catalogo = [];
   for (const cfg of Object.values(SISTEMA_CONFIG.CLASES_BASE)) {
-    for (const o of opcionesTrinketsClase(cfg)) {
+    // (v0.18.0) También los abalorios de las especializaciones (Custodio...).
+    for (const o of [...opcionesTrinketsClase(cfg), ...abaloriosEspecializacionesClase(cfg)]) {
       if (o.clave && !catalogo.some(c => c.clave === o.clave)) {
         catalogo.push({ clave: o.clave, nombre: o.nombre, clase: cfg.nombre, eterno: o.eterno, auto: o.auto });
       }
@@ -824,7 +973,11 @@ export const EFECTOS_VALOR_X = {
   // (v0.17.0) Potens Mystica
   malDeOjo: "Mal de ojo: maldecir al objetivo X turnos (−1 categoría a sus dados MIST)",
   flagelarEsencia: "Flagelar esencia: daño X × tu Agotamiento × Amenaza del objetivo",
-  sellarDestino: "Sellar destino: descartar una carta y obligar al objetivo (sin tirada)"
+  sellarDestino: "Sellar destino: descartar una carta y obligar al objetivo (sin tirada)",
+  // (v0.18.0) Fortis Corpore · Custodio
+  muroVoluntad: "Muro de voluntad: muro con 3 × X de vida",
+  corazonDragon: "Corazón del dragón: X turnos con daño máximo 1 (+1 Agotamiento al recibirlo)",
+  rencor: "Rencor: devolver el daño mitigado + X al atacante"
 };
 
 /**

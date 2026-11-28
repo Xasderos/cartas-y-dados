@@ -22,7 +22,7 @@ import { HojaCartaSistema } from "./applications/card-sheet.mjs";
 import { PanelMasterApp } from "./applications/gm-panel.mjs";
 import { HojaPnjActor } from "./applications/npc-sheet.mjs";
 import { personalizarBannerPausa } from "./applications/game-pause.mjs";
-import { registrarReajusteEnResize } from "./applications/ventana-dinamica.mjs";
+import { opcionesDialogoSistema, registrarReajusteEnResize } from "./applications/ventana-dinamica.mjs";
 import { activarBotonesTiradaPendiente, registrarSocketDados } from "./dados.mjs";
 import { leerTamanoBase, registrarAjustesDelSistema } from "./settings.mjs";
 import { limpiarNombreCarta, nombreVisibleCarta, tieneRasgoRacial } from "./config.mjs";
@@ -359,6 +359,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   activarBotonesMendacium(message, html);
   activarBotonEstadoAlterado(html);
   activarBotonesMasterPotens(html);
+  activarBotonRencor(html);
 
   const btnDano = html.querySelector(".cyd-btn-aplicar-dano");
   if (!btnDano) return;
@@ -371,6 +372,8 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   btnDano.addEventListener("click", async ev => {
     ev.preventDefault();
     const uuid = btnDano.dataset.actorUuid;
+    // (v0.18.0) Atacante (Corazón de espinas del objetivo).
+    const atacanteUuid = btnDano.dataset.atacanteUuid || null;
     const dano = Number(btnDano.dataset.dano) || 0;
 
     const actorObjetivo = await fromUuid(uuid);
@@ -387,7 +390,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
     // (v0.17.0) `aplicarDano` gestiona la Barrera espiritual (Potens Mystica) del objetivo.
     btnDano.disabled = true;
     const resultado = typeof actorObjetivo.aplicarDano === "function"
-      ? await actorObjetivo.aplicarDano(dano)
+      ? await actorObjetivo.aplicarDano(dano, { atacanteUuid })
       : null;
     if (!resultado) {
       btnDano.disabled = false;
@@ -547,9 +550,74 @@ function activarBotonesMasterPotens(html) {
 }
 
 /**
+ * Custodio · Rencor (v0.18.0): botón del Master (`.cyd-btn-rencor`). Busca en el chat el último ataque
+ * BLOQUEADO contra el Custodio (`.cyd-registro-bloqueo`, que deja `SistemaActor#_htmlResolucionTirada`)
+ * y propone aplicar al atacante (o al Token objetivo marcado al usar la habilidad) el daño mitigado + X;
+ * el Master puede corregir la cantidad antes de aplicarlo con `aplicarDano`.
+ * @param {HTMLElement} html
+ */
+function activarBotonRencor(html) {
+  for (const boton of html.querySelectorAll(".cyd-btn-rencor")) {
+    if (!game.user.isGM) {
+      boton.remove();
+      continue;
+    }
+    boton.addEventListener("click", async ev => {
+      ev.preventDefault();
+      const escapar = foundry.utils.escapeHTML;
+      const custodio = await fromUuid(boton.dataset.actorUuid);
+      const x = Math.max(0, Number(boton.dataset.x) || 0);
+      if (!custodio) return;
+      // Último bloqueo registrado contra el Custodio (del mensaje más reciente al más antiguo).
+      let registro = null;
+      for (const mensaje of [...game.messages.contents].reverse()) {
+        if (!String(mensaje.content ?? "").includes("cyd-registro-bloqueo")) continue;
+        const plantilla = document.createElement("template");
+        plantilla.innerHTML = mensaje.content;
+        const marca = [...plantilla.content.querySelectorAll(".cyd-registro-bloqueo")]
+          .find(m => m.dataset.objetivoUuid === custodio.uuid);
+        if (marca) {
+          registro = { ...marca.dataset };
+          break;
+        }
+      }
+      const objetivoUuid = registro?.atacanteUuid || boton.dataset.objetivoUuid || "";
+      const objetivo = objetivoUuid ? await fromUuid(objetivoUuid) : null;
+      if (!objetivo) {
+        ui.notifications.warn("No hay ningún ataque bloqueado registrado contra este Custodio ni un objetivo marcado al usar Rencor.");
+        return;
+      }
+      const mitigado = Math.max(0, Number(registro?.cantidad) || 0);
+      const cantidad = await foundry.applications.api.DialogV2.prompt({
+        ...opcionesDialogoSistema({ width: 420 }),
+        window: { title: "Rencor", icon: "fa-solid fa-person-burst" },
+        content: `<p><strong>${escapar(custodio.name)}</strong> devuelve a <strong>${escapar(objetivo.name)}</strong> el daño mitigado + ${x}.</p>
+          ${registro ? "" : '<p class="hint">No hay ningún ataque bloqueado registrado: indica el daño mitigado.</p>'}
+          <div class="form-group"><label>Daño mitigado</label><input type="number" name="cydMitigado" value="${mitigado}" min="0" step="1" /></div>`,
+        ok: {
+          label: "Aplicar daño",
+          icon: "fa-solid fa-droplet",
+          callback: (event, b) => Math.max(0, Number(b.form.elements.cydMitigado.value) || 0) + x
+        },
+        rejectClose: false
+      });
+      if (cantidad === null || cantidad === undefined) return;
+      boton.disabled = true;
+      const resultado = await objetivo.aplicarDano?.(cantidad, { atacanteUuid: custodio.uuid });
+      if (!resultado) {
+        boton.disabled = false;
+        return;
+      }
+      boton.innerHTML = `<i class="fa-solid fa-check"></i> ${resultado.aplicado} de Daño a ${escapar(objetivo.name)} (Salud: ${resultado.salud})`;
+    });
+  }
+}
+
+/**
  * Mendacium Charisma (v0.15.0): botones «Robar carta (Empatía)» y «Elegir carta (Promesa)».
  * (v0.16.0) También «Descartar la primera carta del Mazo» (Visión del futuro, Alta Scentia).
  * (v0.17.0) También «Ojo por ojo» y «Preservación espiritual» (Potens Mystica).
+ * (v0.18.0) También «Quemar Mártir» (Custodio).
  * Solo los ve y usa el propietario del Actor indicado en `data-actor-uuid`; cada mensaje se
  * usa una sola vez por Actor (`flags.cartas-y-dados.ultimaEmpatia` / `ultimaPromesa`).
  * @param {ChatMessage} message
@@ -568,7 +636,10 @@ function activarBotonesMendacium(message, html) {
     { selector: ".cyd-btn-ojo-por-ojo", flag: "ultimaOjoPorOjo",
       usar: (actor, b) => actor.usarOjoPorOjo(Number(b.dataset.valor) || 0) },
     { selector: ".cyd-btn-preservacion", flag: "ultimaPreservacion",
-      usar: (actor, b) => actor.usarPreservacionEspiritual(b.dataset.cartaId) }
+      usar: (actor, b) => actor.usarPreservacionEspiritual(b.dataset.cartaId) },
+    // (v0.18.0) Fortis Corpore · Custodio: quemar Mártir con una carta CONS tras recibir daño.
+    { selector: ".cyd-btn-quemar-martir", flag: "ultimoMartir",
+      usar: actor => actor.quemarMartir() }
   ];
   for (const { selector, flag, usar } of botones) {
     for (const boton of html.querySelectorAll(selector)) {

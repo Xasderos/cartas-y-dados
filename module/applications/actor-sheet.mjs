@@ -8,7 +8,7 @@ import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica
 import { RetratoFichaMixin } from "./retrato-ficha.mjs";
 import { abrirDialogoAccion } from "./dialogo-accion.mjs";
 
-import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud, contextoRasgosRaza, opcionesArtilugio, opcionesTrinketsClase } from "../config.mjs";
+import { SISTEMA_CONFIG, abreviadoPalo, describirPackCartas, generarNombreUnico, nombreCaracteristica, nombreVisibleCarta, contextoAgotamiento, contextoBarraSalud, contextoRasgosRaza, opcionesArtilugio, opcionesTrinketsClase } from "../config.mjs";
 import { preguntarTipoDescanso } from "../documents/actor.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -364,30 +364,72 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
 
   /**
    * Diálogo de Subida de Nivel (v0.10.0), solo `DialogV2`:
+   * - Paso 0 (v0.18.0, solo si el nivel ofrece varias especializaciones con progresión propia):
+   *   elegir la especialización, porque sus recompensas cambian el resto del diálogo.
    * - Paso 1 (`DialogV2.prompt`): radios `cydHabilidadNivel` (una habilidad) y `cydPackNivel`
    *   (un pack de cartas) y, desde v0.15.0, `cydEspecializacionNivel`, solo para las listas que
    *   ofrezca `progresion[nivelDestino]` de la clase (con el texto de reglas de cada opción).
+   *   (v0.18.0) También `cydCaracteristicaNivel` (+1 característica) y `cydAbalorioNivel` (abalorio),
+   *   e informa de la Mano Máxima, las pasivas y los beneficios pendientes de definir.
    * - Paso 2 (`DialogV2.confirm`): resumen de la elección; la subida no se puede deshacer.
    * Cancelar en cualquier paso sale sin cambios. Aplica con `SistemaActor#subirDeNivel`.
    */
   async abrirSubidaNivel() {
     const actor = this.document;
-    const opciones = actor.obtenerOpcionesSubidaNivel();
+    let opciones = actor.obtenerOpcionesSubidaNivel();
     if (!opciones) {
       ui.notifications.warn("No hay una subida de nivel disponible para esta Clase.");
       return;
     }
-    const { configClase, nivelActual, nivelDestino, habilidades, packs, especializaciones, artilugio } = opciones;
     const escapar = foundry.utils.escapeHTML;
 
-    /** Radio con nombre y, si lo hay, texto de reglas debajo (v0.15.0). */
-    const radio = (nombreCampo, i, nombre, texto) => `
+    /** Radio con nombre y, si lo hay, texto de reglas debajo (v0.15.0; v0.18.0 icono y texto automatizado). */
+    const radio = (nombreCampo, valor, nombre, texto, { marcado = false, icono = "", auto = "" } = {}) => `
       <label class="cyd-opcion-radio">
-        <input type="radio" name="${nombreCampo}" value="${i}" ${i === 0 ? "checked" : ""} />
-        <span><strong>${escapar(nombre)}</strong>${texto ? `<br><small>${escapar(texto)}</small>` : ""}</span>
+        <input type="radio" name="${nombreCampo}" value="${valor}" ${marcado ? "checked" : ""} />
+        <span>${icono ? `<i class="fa-solid ${icono}"></i> ` : ""}<strong>${escapar(nombre)}</strong>${texto ? `<br><small>${escapar(texto)}</small>` : ""}${auto ? `<br><small><em>${escapar(auto)}</em></small>` : ""}</span>
       </label>`;
-    const radiosHabilidades = habilidades.map((h, i) => radio("cydHabilidadNivel", i, h.nombre, h.texto)).join("");
-    const radiosEspecializaciones = especializaciones.map((e, i) => radio("cydEspecializacionNivel", i, e.nombre, e.texto)).join("");
+
+    // Paso 0 (v0.18.0): varias especializaciones con progresión propia → elegirla antes.
+    let claveEspecializacion = null;
+    if (opciones.especializaciones.length > 1 && opciones.especializaciones.some(e => e.progresion)) {
+      claveEspecializacion = await DialogV2.prompt({
+        ...opcionesDialogoSistema({ width: 460 }),
+        window: { title: `${actor.name} — Especialización` },
+        content: `<p>Elige tu especialización: cada una tiene sus propios beneficios a partir de este nivel.</p>
+          <fieldset><legend><i class="fa-solid fa-award"></i> Elige una especialización</legend>
+          ${opciones.especializaciones.map((e, i) => radio("cydEspecializacionPrevia", e.clave, e.nombre, e.texto, { marcado: i === 0 })).join("")}
+          </fieldset>`,
+        ok: {
+          label: "Continuar",
+          icon: "fa-solid fa-award",
+          callback: (event, button) => button.form.elements.cydEspecializacionPrevia.value
+        },
+        rejectClose: false
+      });
+      if (!claveEspecializacion) return;
+      opciones = actor.obtenerOpcionesSubidaNivel({ especializacion: claveEspecializacion }) ?? opciones;
+    }
+
+    const {
+      configClase, nivelActual, nivelDestino, habilidades, packs, especializaciones, artilugio,
+      caracteristica, manoMaxima, abalorios, pasivas, pendientes
+    } = opciones;
+    const especializacionesVisibles = claveEspecializacion
+      ? especializaciones.filter(e => e.clave === claveEspecializacion)
+      : especializaciones;
+
+    const radiosHabilidades = habilidades.map((h, i) => radio("cydHabilidadNivel", i, h.nombre, h.texto, { marcado: i === 0 })).join("");
+    const radiosEspecializaciones = especializacionesVisibles.map((e, i) =>
+      radio("cydEspecializacionNivel", especializaciones.indexOf(e), e.nombre, e.texto, { marcado: i === 0 })).join("");
+    // (v0.18.0) Elección de característica: +1 a la base (máx. 10).
+    const radiosCaracteristicas = caracteristica
+      ? Object.keys(SISTEMA_CONFIG.caracteristicas).map((clave, i) => {
+        const base = Number(actor.system.caracteristicas?.[clave]) || 1;
+        return radio("cydCaracteristicaNivel", clave, `${nombreCaracteristica(clave)} (${base} → ${Math.min(10, base + 1)})`, "", { marcado: i === 0 });
+      }).join("")
+      : "";
+    const radiosAbalorios = abalorios.map((a, i) => radio("cydAbalorioNivel", i, a.nombre, a.texto, { marcado: i === 0, icono: a.icono, auto: a.auto })).join("");
     // (v0.16.0) Artilugio de primera: se puede cambiar una vez por subida de nivel.
     const radiosArtilugio = artilugio
       ? artilugio.opciones.map((a, i) => `
@@ -401,15 +443,24 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
         <input type="radio" name="cydPackNivel" value="${i}" ${i === 0 ? "checked" : ""} />
         Pack ${i + 1}: ${escapar(describirPackCartas(p))}
       </label>`).join("");
+    // (v0.18.0) Beneficios fijos del nivel (sin elección).
+    const fijos = [
+      manoMaxima ? `<p><i class="fa-solid fa-hand"></i> +${manoMaxima} Mano Máxima</p>` : "",
+      ...pasivas.map(p => `<p><i class="fa-solid fa-star"></i> <strong>${escapar(p.nombre)}</strong><br><small>${escapar(p.texto ?? "")}</small></p>`),
+      ...pendientes.map(p => `<p><i class="fa-solid fa-hourglass-half"></i> ${escapar(p)}: <em>pendiente de definir, lo aplica el Master</em></p>`)
+    ].join("");
 
     const eleccion = await DialogV2.prompt({
-      ...opcionesDialogoSistema({ width: 460 }),
+      ...opcionesDialogoSistema({ width: 480 }),
       window: { title: `${actor.name} — Subida a Nivel ${nivelDestino}` },
       content: `
-        <p><strong>${escapar(configClase.nombre)}</strong> · Nivel ${nivelActual} → ${nivelDestino}</p>
+        <p><strong>${escapar(configClase.nombre)}</strong>${opciones.especializacionActual ? ` · ${escapar(opciones.especializacionActual.nombre)}` : ""} · Nivel ${nivelActual} → ${nivelDestino}</p>
+        ${especializacionesVisibles.length ? `<fieldset><legend><i class="fa-solid fa-award"></i> ${especializacionesVisibles.length > 1 ? "Elige una especialización" : "Especialización"}</legend>${radiosEspecializaciones}</fieldset>` : ""}
+        ${caracteristica ? `<fieldset><legend><i class="fa-solid fa-arrow-up-1-9"></i> Elige una característica (+1)</legend>${radiosCaracteristicas}</fieldset>` : ""}
+        ${abalorios.length ? `<fieldset><legend><i class="fa-solid fa-gem"></i> Elige un abalorio</legend>${radiosAbalorios}</fieldset>` : ""}
         ${habilidades.length ? `<fieldset><legend><i class="fa-solid fa-wand-magic-sparkles"></i> Elige una habilidad</legend>${radiosHabilidades}</fieldset>` : ""}
         ${packs.length ? `<fieldset><legend><i class="fa-solid fa-layer-group"></i> Elige un pack de cartas</legend>${radiosPacks}</fieldset>` : ""}
-        ${especializaciones.length ? `<fieldset><legend><i class="fa-solid fa-award"></i> Elige una especialización</legend>${radiosEspecializaciones}</fieldset>` : ""}
+        ${fijos ? `<fieldset><legend><i class="fa-solid fa-gift"></i> Además obtienes</legend>${fijos}</fieldset>` : ""}
         ${artilugio ? `<fieldset><legend><i class="fa-solid fa-toolbox"></i> Artilugio de primera (puedes cambiarlo)</legend>${radiosArtilugio}</fieldset>` : ""}
       `,
       ok: {
@@ -421,6 +472,9 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
             indiceHabilidad: Number(f.cydHabilidadNivel?.value ?? 0),
             indicePack: Number(f.cydPackNivel?.value ?? 0),
             indiceEspecializacion: Number(f.cydEspecializacionNivel?.value ?? 0),
+            especializacion: claveEspecializacion,
+            caracteristica: f.cydCaracteristicaNivel?.value || null,
+            indiceAbalorio: Number(f.cydAbalorioNivel?.value ?? 0),
             artilugio: f.cydArtilugioNivel?.value || null
           };
         }
@@ -432,14 +486,19 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     const habilidad = habilidades[eleccion.indiceHabilidad] ?? null;
     const pack = packs[eleccion.indicePack] ?? null;
     const especializacion = especializaciones[eleccion.indiceEspecializacion] ?? null;
+    const abalorio = abalorios[eleccion.indiceAbalorio] ?? null;
     const confirmado = await DialogV2.confirm({
       ...opcionesDialogoSistema(),
       window: { title: "Confirmar Subida de Nivel" },
       content: `
         <p>${escapar(actor.name)} subirá a <strong>Nivel ${nivelDestino}</strong> y obtendrá:</p>
+        ${especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${escapar(especializacion.nombre)}</strong></p>` : ""}
+        ${caracteristica && eleccion.caracteristica ? `<p><i class="fa-solid fa-arrow-up-1-9"></i> +1 <strong>${escapar(nombreCaracteristica(eleccion.caracteristica))}</strong></p>` : ""}
+        ${abalorio ? `<p><i class="fa-solid ${abalorio.icono}"></i> Abalorio: <strong>${escapar(abalorio.nombre)}</strong></p>` : ""}
         ${habilidad ? `<p><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidad: <strong>${escapar(habilidad.nombre)}</strong></p>` : ""}
         ${pack ? `<p><i class="fa-solid fa-layer-group"></i> Cartas: ${escapar(describirPackCartas(pack))}</p>` : ""}
-        ${especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${escapar(especializacion.nombre)}</strong></p>` : ""}
+        ${manoMaxima ? `<p><i class="fa-solid fa-hand"></i> +${manoMaxima} Mano Máxima</p>` : ""}
+        ${pasivas.map(p => `<p><i class="fa-solid fa-star"></i> ${escapar(p.nombre)}</p>`).join("")}
         ${artilugio && eleccion.artilugio && eleccion.artilugio !== artilugio.actual
           ? `<p><i class="fa-solid fa-toolbox"></i> Artilugio de primera: <strong>${escapar(SISTEMA_CONFIG.ARTILUGIOS[eleccion.artilugio]?.nombre ?? "")}</strong></p>` : ""}
         <p>Esta elección no se puede deshacer. ¿Continuar?</p>
@@ -490,6 +549,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
   static async #onRetirarEstadoMistico(event, target) {
     if (target.dataset.estado === "malDeOjo") await this.document.retirarMalDeOjo();
     else if (target.dataset.estado === "destinoSellado") await this.document.retirarDestinoSellado();
+    else if (target.dataset.estado === "corazonDragon") await this.document.retirarCorazonDragon(); // (v0.18.0)
   }
 
   static async #onDescartarTiempoEmbotellado() {

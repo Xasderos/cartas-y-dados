@@ -68,6 +68,8 @@ export class OrigenDataModel extends TypeDataModel {
  * - `nivel`: nivel actual (lo sube `SistemaActor#subirDeNivel`).
  * - `historialNiveles`: una entrada por subida con la habilidad, el pack y (v0.15.0) la especialización elegidos.
  * - `especializacion` (v0.15.0): nombre de la especialización elegida (vacío hasta elegirla).
+ *   (v0.18.0) Su progresión propia (`progresion` de la especialización) se suma a la de la clase.
+ * - (v0.18.0) `bonificadores.limiteMano` acumula los «+1 Mano Máxima» de la progresión.
  * Los `bonificadores` se conservan por compatibilidad, pero las clases base no aportan ninguno.
  */
 export class ClaseDataModel extends TypeDataModel {
@@ -79,7 +81,10 @@ export class ClaseDataModel extends TypeDataModel {
         nivel: new NumberField({ required: true, integer: true, min: 2 }),
         habilidad: new StringField({ required: true, blank: true, initial: "" }),
         cartas: new StringField({ required: true, blank: true, initial: "" }),
-        especializacion: new StringField({ required: false, blank: true, initial: "" })
+        especializacion: new StringField({ required: false, blank: true, initial: "" }),
+        // (v0.18.0) Abalorio obtenido y resto de beneficios (característica, Mano Máx., pasivas).
+        abalorio: new StringField({ required: false, blank: true, initial: "" }),
+        otros: new StringField({ required: false, blank: true, initial: "" })
       })),
       especializacion: new StringField({ required: false, blank: true, initial: "" }),
       nivel: new NumberField({ required: true, integer: true, initial: 1, min: 1, max: 20 }),

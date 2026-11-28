@@ -8,12 +8,12 @@
 
 import {
   SISTEMA_CONFIG, abalorioDeTrinket, abreviadoPalo, claveClaseDeItem, dadoReducidoMalDeOjo, describirPackCartas,
-  efectoPermanenteAbalorio, esAbalorioEterno, estadoAgotamiento, generarNombreMisticoUnico, nombreCaracteristica,
+  efectoPermanenteAbalorio, esAbalorioEterno, especializacionDeClase, estadoAgotamiento, generarNombreMisticoUnico, nombreCaracteristica,
   nombreEstadoElemento, nombreVisibleCarta, opcionesArtilugio, opcionesTrinketsClase, razaBaseDeActor, tieneRasgoRacial,
   valorCarta
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
-import { combinarTiradas, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
+import { combinarTiradas, enviarMensajeSoloMaster, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 import { obtenerOCrearCarpeta } from "../carpetas.mjs";
 
 export class SistemaActor extends Actor {
@@ -209,25 +209,47 @@ export class SistemaActor extends Actor {
    * `SISTEMA_CONFIG.CLASES_BASE.<clave>.progresion[nivelDestino]`.
    * (v0.16.0) `artilugio`: si el personaje tiene el «Artilugio de primera», `{actual, opciones}` para
    * cambiar su objeto mágico (una vez por subida de nivel); null si no lo tiene.
+   * (v0.18.0) Se suman las recompensas de la `progresion` de la especialización: la ya elegida o, en el
+   * nivel en que se elige, la indicada (o la única que haya). Nuevas recompensas: `caracteristica`,
+   * `manoMaxima`, `abalorios`, `pasivas` y `pendientes` (ver `SISTEMA_CONFIG.CLASES_BASE`).
+   * @param {Object} [opciones]
+   * @param {string|null} [opciones.especializacion=null] - Clave de la especialización a elegir en este nivel.
    * @returns {{itemClase: Item, claveClase: string, configClase: object, nivelActual: number,
    *   nivelDestino: number, habilidades: object[], packs: object[][], especializaciones: object[],
+   *   especializacionActual: object|null, especializacionRecompensas: object|null,
+   *   caracteristica: boolean, manoMaxima: number, abalorios: object[], pasivas: object[], pendientes: string[],
    *   artilugio: {actual: string|null, opciones: object[]}|null}|null}
    *   null si el Actor no tiene Clase base reconocida o no hay progresión definida para el siguiente nivel.
    */
-  obtenerOpcionesSubidaNivel() {
+  obtenerOpcionesSubidaNivel({ especializacion = null } = {}) {
     const itemClase = this.items.find(i => i.type === "clase");
     const claveClase = claveClaseDeItem(itemClase);
     const configClase = claveClase ? SISTEMA_CONFIG.CLASES_BASE[claveClase] : null;
     if (!configClase) return null;
     const nivelActual = Number(itemClase.system.nivel) || 1;
     const nivelDestino = nivelActual + 1;
-    const recompensas = configClase.progresion?.[nivelDestino];
-    if (!recompensas) return null;
+    const recompensasClase = configClase.progresion?.[nivelDestino] ?? null;
+    const especializaciones = recompensasClase?.especializaciones ?? [];
+    const especializacionActual = especializacionDeClase(itemClase, configClase);
+    // Especialización cuyas recompensas se suman: la elegida antes o la que se elige ahora.
+    const especializacionRecompensas = especializacionActual
+      ?? especializaciones.find(e => e.clave === especializacion)
+      ?? (especializaciones.length === 1 ? especializaciones[0] : null);
+    const recompensasEsp = especializacionRecompensas?.progresion?.[nivelDestino] ?? null;
+    if (!recompensasClase && !recompensasEsp) return null;
+    const lista = campo => [...(recompensasClase?.[campo] ?? []), ...(recompensasEsp?.[campo] ?? [])];
     return {
       itemClase, claveClase, configClase, nivelActual, nivelDestino,
-      habilidades: recompensas.habilidades ?? [],
-      packs: recompensas.packs ?? [],
-      especializaciones: recompensas.especializaciones ?? [],
+      habilidades: lista("habilidades"),
+      packs: lista("packs"),
+      especializaciones,
+      especializacionActual,
+      especializacionRecompensas,
+      caracteristica: Boolean(recompensasClase?.caracteristica || recompensasEsp?.caracteristica),
+      manoMaxima: (Number(recompensasClase?.manoMaxima) || 0) + (Number(recompensasEsp?.manoMaxima) || 0),
+      abalorios: opcionesTrinketsClase({ trinkets: lista("abalorios") }),
+      pasivas: lista("pasivas"),
+      pendientes: lista("pendientes"),
       artilugio: this._cartasDeAbalorio("artilugio").length
         ? { actual: this.artilugioActual(), opciones: opcionesArtilugio(this.artilugioActual()) }
         : null
@@ -241,26 +263,45 @@ export class SistemaActor extends Actor {
    *    clase y sus marcas `valorX`/`sinAccion`.
    * 2. Añade las cartas del pack elegido al Mazo de Juego con nombres místicos únicos y baraja.
    * 3. (v0.15.0) Especialización: se guarda en `system.especializacion` y se crea como Habilidad pasiva.
+   * 3b. (v0.18.0) +1 a la característica base elegida, +N Mano Máxima (bonificador `limiteMano` del
+   *    Item de Clase), abalorio elegido (Trinket en el Mazo de Trinkets) y Habilidades pasivas.
    * 4. Sube `system.nivel` del Item de Clase y registra la elección en `system.historialNiveles`.
-   * 5. Anuncia la subida en el chat.
+   * 5. Anuncia la subida en el chat (con los beneficios pendientes de definir, que aplica el Master).
    * La confirmación del jugador se pide en la ficha (`HojaPersonajeActor#abrirSubidaNivel`).
    * 6. (v0.16.0) Si se indica `artilugio` distinto del actual, cambia el objeto del «Artilugio de primera».
-   * @param {{indiceHabilidad?: number, indicePack?: number, indiceEspecializacion?: number, artilugio?: string|null}} eleccion
+   * @param {{indiceHabilidad?: number, indicePack?: number, indiceEspecializacion?: number,
+   *   especializacion?: string|null, caracteristica?: string|null, indiceAbalorio?: number,
+   *   artilugio?: string|null}} eleccion
    *   Índices dentro de las opciones (solo se exigen los de las listas que el nivel ofrece).
+   *   `especializacion` (v0.18.0): clave de la especialización (alternativa a `indiceEspecializacion`).
+   *   `caracteristica` (v0.18.0): clave (`fisico`, `consciencia`, `social`, `misticismo`) que sube +1.
    * @returns {Promise<boolean>} true si se aplicó la subida.
    */
-  async subirDeNivel({ indiceHabilidad, indicePack, indiceEspecializacion, artilugio = null } = {}) {
-    const opciones = this.obtenerOpcionesSubidaNivel();
-    if (!opciones) {
+  async subirDeNivel({
+    indiceHabilidad, indicePack, indiceEspecializacion, especializacion: claveEspecializacion = null,
+    caracteristica: claveCaracteristica = null, indiceAbalorio, artilugio = null
+  } = {}) {
+    const previas = this.obtenerOpcionesSubidaNivel();
+    if (!previas) {
       ui.notifications.warn(`${this.name} no tiene una subida de nivel disponible.`);
       return false;
     }
+    const especializacion = previas.especializaciones.length
+      ? (previas.especializaciones.find(e => e.clave === claveEspecializacion)
+        ?? previas.especializaciones[indiceEspecializacion] ?? null)
+      : null;
+    // (v0.18.0) Con la especialización elegida, sus recompensas del nivel se suman a las de la clase.
+    const opciones = especializacion
+      ? this.obtenerOpcionesSubidaNivel({ especializacion: especializacion.clave })
+      : previas;
     const habilidad = opciones.habilidades.length ? opciones.habilidades[indiceHabilidad] ?? null : null;
     const pack = opciones.packs.length ? opciones.packs[indicePack] ?? null : null;
-    const especializacion = opciones.especializaciones.length
-      ? opciones.especializaciones[indiceEspecializacion] ?? null : null;
+    const abalorio = opciones.abalorios.length ? opciones.abalorios[indiceAbalorio] ?? null : null;
+    const caracteristica = opciones.caracteristica && ["fisico", "consciencia", "social", "misticismo"].includes(claveCaracteristica)
+      ? claveCaracteristica : null;
     if ((opciones.habilidades.length && !habilidad) || (opciones.packs.length && !pack)
-        || (opciones.especializaciones.length && !especializacion)) {
+        || (opciones.especializaciones.length && !especializacion)
+        || (opciones.abalorios.length && !abalorio) || (opciones.caracteristica && !caracteristica)) {
       ui.notifications.warn("Debes elegir una opción de cada recompensa del nivel.");
       return false;
     }
@@ -335,6 +376,43 @@ export class SistemaActor extends Actor {
       }]);
     }
 
+    // 3b. (v0.18.0) Característica, Mano Máxima, abalorio y Habilidades pasivas
+    const otros = [];
+    if (caracteristica) {
+      const actual = Number(this.system.caracteristicas?.[caracteristica]) || 1;
+      await this.update({ [`system.caracteristicas.${caracteristica}`]: Math.min(10, actual + 1) });
+      otros.push(`+1 ${nombreCaracteristica(caracteristica)}`);
+    }
+    if (opciones.manoMaxima) otros.push(`+${opciones.manoMaxima} Mano Máxima`);
+    if (abalorio) {
+      if (!this.system.pilasDocumentos?.trinkets) await this.inicializarPilasDeJugador();
+      const trinkets = this.system.pilasDocumentos?.trinkets;
+      if (trinkets) {
+        await trinkets.createEmbeddedDocuments("Card", [this._normalizarPayloadCarta({
+          name: abalorio.nombre,
+          type: "trinket",
+          system: {
+            nivel: nivelDestino, realizaTirada: false, esAtaque: false, bonoDefensaEnJuego: 0,
+            efectoPermanente: efectoPermanenteAbalorio(abalorio)
+          },
+          ...(abalorio.clave ? { flags: { "cartas-y-dados": { abalorio: abalorio.clave } } } : {})
+        })]);
+        await trinkets.shuffle({ chatNotification: false });
+      }
+    }
+    if (opciones.pasivas.length) {
+      await this.createEmbeddedDocuments("Item", opciones.pasivas.map(p => ({
+        name: p.nombre,
+        type: "habilidad",
+        system: {
+          origenHabilidad: "clase", esActivable: false, requiereTirada: false, esAtaque: false,
+          caracteristica: "misticismo", descripcion: `<p>${p.texto ?? ""}</p>`
+        },
+        flags: { "cartas-y-dados": { habilidadDeClase: opciones.claveClase, nivelObtenida: nivelDestino, pasiva: p.clave ?? "" } }
+      })));
+      otros.push(...opciones.pasivas.map(p => p.nombre));
+    }
+
     // 4. Nivel e historial en el Item de Clase
     const datosClase = {
       "system.claveClase": opciones.claveClase,
@@ -345,11 +423,16 @@ export class SistemaActor extends Actor {
           nivel: nivelDestino,
           habilidad: habilidad?.nombre ?? "",
           cartas: descripcionPack,
-          especializacion: especializacion?.nombre ?? ""
+          especializacion: especializacion?.nombre ?? "",
+          abalorio: abalorio?.nombre ?? "",
+          otros: otros.join(" · ")
         }
       ]
     };
     if (especializacion) datosClase["system.especializacion"] = especializacion.nombre;
+    if (opciones.manoMaxima) {
+      datosClase["system.bonificadores.limiteMano"] = (Number(itemClase.system.bonificadores?.limiteMano) || 0) + opciones.manoMaxima;
+    }
     await itemClase.update(datosClase);
 
     // 6. (v0.16.0) Cambio del objeto del Artilugio de primera (una vez por subida de nivel)
@@ -364,6 +447,11 @@ export class SistemaActor extends Actor {
       habilidad ? `<p><i class="fa-solid fa-wand-magic-sparkles"></i> Nueva habilidad: <strong>${habilidad.nombre}</strong></p>` : "",
       pack ? `<p><i class="fa-solid fa-layer-group"></i> Cartas añadidas al Mazo: ${descripcionPack}</p>` : "",
       especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${especializacion.nombre}</strong></p>` : "",
+      caracteristica ? `<p><i class="fa-solid fa-arrow-up-1-9"></i> +1 <strong>${nombreCaracteristica(caracteristica)}</strong></p>` : "",
+      opciones.manoMaxima ? `<p><i class="fa-solid fa-hand"></i> +${opciones.manoMaxima} Mano Máxima</p>` : "",
+      abalorio ? `<p><i class="fa-solid ${abalorio.icono}"></i> Nuevo abalorio en el Mazo de Trinkets: <strong>${abalorio.nombre}</strong></p>` : "",
+      opciones.pasivas.map(p => `<p><i class="fa-solid fa-star"></i> ${p.nombre}</p>`).join(""),
+      opciones.pendientes.map(p => `<p><i class="fa-solid fa-hourglass-half"></i> ${p}: <em>pendiente de definir, lo aplica el Master</em></p>`).join(""),
       cambiaArtilugio ? `<p><i class="fa-solid fa-toolbox"></i> Artilugio de primera: <strong>${SISTEMA_CONFIG.ARTILUGIOS[artilugio].nombre}</strong>${artilugioAnterior ? ` (antes: ${SISTEMA_CONFIG.ARTILUGIOS[artilugioAnterior]?.nombre ?? artilugioAnterior})` : ""}</p>` : ""
     ].join("");
     await ChatMessage.create({
@@ -729,6 +817,8 @@ export class SistemaActor extends Actor {
    *   de tirada); si no se indica, se usa el objetivo marcado por el usuario (`T`).
    * @returns {{publico: string, master: string}} HTML público y HTML solo para el Master ("" si no aplica).
    */
+  // (v0.18.0) Un ataque BLOQUEADO deja en el mensaje del Master un `.cyd-registro-bloqueo` oculto
+  // (objetivo, atacante y daño mitigado por completo) que usa la habilidad Rencor (Custodio).
   _htmlResolucionTirada(tirada, esAtaque, etiquetaDificultad = "Dificultad del Master", { tokenObjetivo: objetivoExplicito } = {}) {
     if (!esAtaque) return { publico: htmlResolucionDificultad(tirada, etiquetaDificultad), master: "" };
 
@@ -772,12 +862,15 @@ export class SistemaActor extends Actor {
       ? `<p><i class="fa-solid fa-burst"></i> <span class="cyd-resultado-exito">IMPACTO</span> · <strong>Daño ${danoCalculado}</strong> <small>(${tirada.total} Ataque - ${defensaObjetivo} Defensa)</small></p>
           <button type="button" class="cyd-btn-aplicar-dano"
                   data-actor-uuid="${actorObjetivo.uuid}"
+                  data-atacante-uuid="${this.uuid}"
                   data-dano="${danoCalculado}">
             <i class="fa-solid fa-droplet"></i> Aplicar ${danoCalculado} de Daño a ${tokenObjetivo.name}
           </button>`
       : tirada.esNegativo
         ? `<p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">FALLO AUTOMÁTICO</span> · <strong>0 Daño:</strong> resultado negativo (${tirada.total}) por Pifia.</p>`
-        : `<p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${tirada.total}) no superó la Defensa (${defensaObjetivo}).</p>`;
+        : `<p><i class="fa-solid fa-shield-halved"></i> <span class="cyd-resultado-fallo">BLOQUEADO</span> · <strong>0 Daño:</strong> La tirada (${tirada.total}) no superó la Defensa (${defensaObjetivo}).</p>
+           <span class="cyd-registro-bloqueo" hidden data-objetivo-uuid="${actorObjetivo.uuid}" data-atacante-uuid="${this.uuid}"
+                 data-atacante-nombre="${foundry.utils.escapeHTML(this.name)}" data-cantidad="${Math.max(0, tirada.total)}"></span>`;
     const master = `
       <div class="cyd-carta-jugada">
         <h3><i class="fa-solid fa-eye-slash"></i> Resolución de ataque <small>(solo Master)</small></h3>
@@ -2045,12 +2138,49 @@ export class SistemaActor extends Actor {
    * Aplica daño a la Salud del Actor (v0.17.0; botón «Aplicar daño» del Master). Con la Barrera
    * espiritual En Juego y cartas en el Mazo pregunta antes si se usa (excepción) y publica, en privado
    * para el Master y los dueños, las cartas quemadas y el daño mitigado.
+   * (v0.18.0) Fortis Corpore · Custodio, en este orden:
+   * 1. Mártir: el daño del Custodio se duplica; el de un aliado PJ se reduce a la mitad (↑) si el
+   *    Master confirma que está en el rango de visión de un Custodio con Mártir En Juego.
+   * 2. Barrera espiritual (Potens Mystica).
+   * 3. Corazón del dragón: el daño queda en 1 como máximo; al recibirlo, +1 Agotamiento.
+   * 4. Último aliento: si el daño dejaría la Salud a 0, se ofrece quemar el abalorio y no perder vida.
+   * Tras recibir daño: Corazón de espinas (botón del Master para devolver el Físico al atacante) y
+   * Mártir (botón del dueño para quemarlo con una carta CONS).
    * @param {number} dano
+   * @param {Object} [opciones]
+   * @param {string|null} [opciones.atacanteUuid=null] - (v0.18.0) Actor que causa el daño, si se conoce.
    * @returns {Promise<{aplicado: number, mitigado: number, salud: number}|null>} null si se cancela.
    */
-  async aplicarDano(dano) {
+  async aplicarDano(dano, { atacanteUuid = null } = {}) {
     let restante = Math.max(0, Number(dano) || 0);
     let mitigado = 0;
+    const escaparHtml = foundry.utils.escapeHTML;
+    const abalorios = this.abaloriosActivos();
+    const notas = [];
+    // 1. (v0.18.0) Mártir: propio (×2) o de un aliado Custodio en rango de visión (÷2, hacia arriba).
+    if (restante > 0 && abalorios.has("martir")) {
+      notas.push(`<i class="fa-solid fa-hand-holding-heart"></i> Mártir: daño duplicado (${restante} → ${restante * 2})`);
+      restante *= 2;
+    } else if (restante > 0 && this.type === "personaje") {
+      const martires = game.actors.filter(a => a.type === "personaje" && a.id !== this.id
+        && typeof a.abaloriosActivos === "function" && a.abaloriosActivos().has("martir"));
+      for (const martir of martires) {
+        const enVision = await foundry.applications.api.DialogV2.confirm({
+          ...opcionesDialogoSistema({ width: 420 }),
+          window: { title: "Mártir", icon: "fa-solid fa-hand-holding-heart" },
+          content: `<p><strong>${escaparHtml(martir.name)}</strong> tiene el abalorio <strong>Mártir</strong> En Juego. ¿Está <strong>${escaparHtml(this.name)}</strong> en su rango de visión?</p><p class="hint">Si es así, el daño se reduce a la mitad (${restante} → ${Math.ceil(restante / 2)}).</p>`,
+          yes: { label: "Sí, reducir a la mitad", icon: "fa-solid fa-hand-holding-heart" },
+          no: { label: "No" },
+          rejectClose: false
+        });
+        if (enVision) {
+          notas.push(`<i class="fa-solid fa-hand-holding-heart"></i> Mártir de ${escaparHtml(martir.name)}: daño a la mitad (${restante} → ${Math.ceil(restante / 2)})`);
+          mitigado += restante - Math.ceil(restante / 2);
+          restante = Math.ceil(restante / 2);
+          break;
+        }
+      }
+    }
     const mazo = this.system.pilasDocumentos?.mazo;
     if (restante > 0 && this.abaloriosActivos().has("barrera") && mazo?.availableCards.length) {
       const usar = await foundry.applications.api.DialogV2.wait({
@@ -2085,11 +2215,181 @@ export class SistemaActor extends Actor {
         });
       }
     }
+    // 3. (v0.18.0) Corazón del dragón: como máximo 1 de daño.
+    const corazonDragon = this.corazonDragon();
+    if (corazonDragon && restante > 1) {
+      notas.push(`<i class="fa-solid fa-dragon"></i> Corazón del dragón: daño limitado a 1 (${restante} → 1)`);
+      mitigado += restante - 1;
+      restante = 1;
+    }
     const antes = Number(this.system.salud?.value) || 0;
+    // 4. (v0.18.0) Último aliento: caer por daño → se quema el abalorio y no se pierde la vida.
+    if (restante > 0 && antes - restante <= 0 && abalorios.has("ultimoAliento")) {
+      const usar = await foundry.applications.api.DialogV2.wait({
+        ...opcionesDialogoSistema({ width: 420 }),
+        window: { title: "Último aliento", icon: "fa-solid fa-heart-crack" },
+        content: `<p><strong>${escaparHtml(this.name)}</strong> caería con <strong>${restante}</strong> de daño (Salud ${antes}). Tiene <strong>Último aliento</strong> En Juego: quémalo y no pierde la vida.</p><p class="hint">Solo se aplica al caer en combate por daño.</p>`,
+        buttons: [
+          { action: "aliento", label: "Quemar Último aliento", icon: "fa-solid fa-heart-crack", default: true, callback: () => "aliento" },
+          { action: "dano", label: "Recibir el daño", icon: "fa-solid fa-droplet", callback: () => "dano" },
+          { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => null }
+        ],
+        rejectClose: false
+      });
+      if (!usar) return null;
+      if (usar === "aliento") {
+        const trinket = this._cartasDeAbalorio("ultimoAliento").find(c => c.parent?.id === this.system.pilasDocumentos?.enJuego?.id);
+        if (trinket) await this.retirarTrinketEnJuego(trinket.id, { quemar: true });
+        notas.push(`<i class="fa-solid fa-heart-crack"></i> Último aliento: quema el abalorio y no pierde los ${restante} de vida`);
+        mitigado += restante;
+        restante = 0;
+      }
+    }
     const salud = Math.max(0, antes - restante);
     if (salud !== antes) await this.update({ "system.salud.value": salud });
+    if (notas.length) {
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        whisper: this._destinatariosPrivados(),
+        content: `<div class="cyd-carta-jugada"><h3><i class="fa-solid fa-shield-heart"></i> Daño a ${escaparHtml(this.name)}</h3>${notas.map(n => `<p>${n}</p>`).join("")}<p>Recibe <strong>${restante}</strong> de daño.</p></div>`
+      });
+    }
+    if (restante > 0) await this._trasRecibirDano(restante, { atacanteUuid, corazonDragon: Boolean(corazonDragon), abalorios });
     this.prepareData();
     return { aplicado: restante, mitigado, salud };
+  }
+
+  /**
+   * Efectos de Custodio tras recibir daño (v0.18.0, lo ejecuta el Master desde `aplicarDano`):
+   * - Corazón del dragón: +1 Agotamiento.
+   * - Corazón de espinas: mensaje para el Master con el botón para aplicar al atacante tanto daño como
+   *   el Físico total del Custodio (solo si estaba a distancia cuerpo a cuerpo).
+   * - Mártir: mensaje para el dueño con el botón para quemarlo con una carta CONS (reacción gratuita).
+   * @param {number} recibido - Daño recibido.
+   * @param {{atacanteUuid: string|null, corazonDragon: boolean, abalorios: Set<string>}} contexto
+   * @returns {Promise<void>}
+   */
+  async _trasRecibirDano(recibido, { atacanteUuid, corazonDragon, abalorios }) {
+    const escapar = foundry.utils.escapeHTML;
+    if (corazonDragon) {
+      await this.cambiarAgotamiento(1);
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-dragon"></i><p><strong>${escapar(this.name)}</strong> recibe daño con el <strong>Corazón del dragón</strong>: +1 Agotamiento.</p></div>`
+      });
+    }
+    if (abalorios.has("corazonEspinas")) {
+      const atacante = atacanteUuid ? await fromUuid(atacanteUuid) : null;
+      const fisico = Number(this.system.caracteristicasTotales?.fisico) || 0;
+      const boton = atacante && atacante.id !== this.id
+        ? `<button type="button" class="cyd-btn-aplicar-dano" data-actor-uuid="${atacante.uuid}" data-dano="${fisico}">
+             <i class="fa-solid fa-seedling"></i> Aplicar ${fisico} de Daño a ${escapar(atacante.name)}
+           </button>`
+        : `<p class="hint">No se conoce al atacante: aplica el daño a mano a la criatura que estaba cuerpo a cuerpo.</p>`;
+      await enviarMensajeSoloMaster({
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        content: `
+          <div class="cyd-carta-jugada">
+            <h3><i class="fa-solid fa-seedling"></i> Corazón de espinas <small>(solo Master)</small></h3>
+            <p>Si el atacante${atacante ? ` (<strong>${escapar(atacante.name)}</strong>)` : ""} estaba a distancia cuerpo a cuerpo, recibe <strong>${fisico}</strong> de daño (Físico de ${escapar(this.name)}).</p>
+            ${boton}
+          </div>`
+      });
+    }
+    if (abalorios.has("martir")) {
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        whisper: this._destinatariosPrivados(),
+        content: `
+          <div class="cyd-carta-jugada">
+            <h3><i class="fa-solid fa-hand-holding-heart"></i> Mártir</h3>
+            <p>Tras recibir daño, ${escapar(this.name)} puede usar una carta de Consciencia de su mano para quemar el abalorio (reacción gratuita).</p>
+            <button type="button" class="cyd-btn-quemar-martir" data-actor-uuid="${this.uuid}">
+              <i class="fa-solid fa-fire"></i> Quemar Mártir (carta CONS)
+            </button>
+          </div>`
+      });
+    }
+  }
+
+  /**
+   * Mártir (v0.18.0): reacción gratuita tras recibir daño. Usa una carta CONS de la mano (al Descarte, o
+   * a Quemadas con Agotamiento 7+) y quema el abalorio.
+   * @returns {Promise<boolean>} true si se ha quemado.
+   */
+  async quemarMartir() {
+    const trinket = this._cartasDeAbalorio("martir").find(c => c.parent?.id === this.system.pilasDocumentos?.enJuego?.id);
+    if (!trinket) {
+      ui.notifications.warn(`${this.name} no tiene el abalorio Mártir En Juego.`);
+      return false;
+    }
+    const { mano, descarte, quemadas } = this.system.pilasDocumentos ?? {};
+    const cartasCons = (mano?.cards.contents ?? []).filter(c => c.type === "accion" && c.system.palo === "bastos");
+    if (!cartasCons.length) {
+      ui.notifications.warn("Necesitas una carta de Consciencia (Bastos) en la mano para quemar Mártir.");
+      return false;
+    }
+    const cartaId = await this._elegirCartaDeMano(cartasCons, {
+      titulo: "Mártir", icono: "fa-solid fa-hand-holding-heart", texto: "Elige la carta de Consciencia con la que quemas el abalorio Mártir."
+    });
+    const carta = cartaId ? mano.cards.get(cartaId) : null;
+    if (!carta) return false;
+    const quemarCarta = Boolean(carta.system.seQuema || this.system.agotamiento?.efectos?.quemarAlUsar);
+    await this._moverCartaEntrePilas(mano, quemarCarta ? quemadas : descarte, carta.id);
+    await this.retirarTrinketEnJuego(trinket.id, { quemar: true });
+    this.prepareData();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-carta-jugada"><h3><i class="fa-solid fa-hand-holding-heart"></i> Mártir</h3>${this._lineaCartaUsada(carta, "Quema el abalorio", quemarCarta ? "Carta Quemada" : "Descarte")}</div>`
+    });
+    if (this.sheet?.rendered) this.sheet.render();
+    return true;
+  }
+
+  /**
+   * Corazón del dragón activo (v0.18.0, `flags.cartas-y-dados.corazonDragon`).
+   * @returns {{turnos: number}|null}
+   */
+  corazonDragon() {
+    const datos = this.getFlag("cartas-y-dados", "corazonDragon");
+    return Number(datos?.turnos) > 0 ? datos : null;
+  }
+
+  /**
+   * Activa (o renueva) el Corazón del dragón durante `turnos` turnos (v0.18.0, al usar la habilidad).
+   * @param {number} turnos
+   * @returns {Promise<void>}
+   */
+  async activarCorazonDragon(turnos) {
+    const n = Math.max(1, Math.floor(Number(turnos) || 1));
+    await this.setFlag("cartas-y-dados", "corazonDragon", { turnos: n });
+  }
+
+  /**
+   * Retira el Corazón del dragón (ficha o fin de su duración).
+   * @returns {Promise<void>}
+   */
+  async retirarCorazonDragon() {
+    if (this.getFlag("cartas-y-dados", "corazonDragon")) await this.unsetFlag("cartas-y-dados", "corazonDragon");
+  }
+
+  /**
+   * Fin de turno en combate (`SistemaCombat`, v0.18.0): el Corazón del dragón pierde un turno.
+   * @returns {Promise<void>}
+   */
+  async avanzarCorazonDragon() {
+    const datos = this.corazonDragon();
+    if (!datos || !this.isOwner) return;
+    const turnos = Number(datos.turnos) - 1;
+    if (turnos > 0) {
+      await this.setFlag("cartas-y-dados", "corazonDragon", { ...datos, turnos });
+      return;
+    }
+    await this.retirarCorazonDragon();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-dragon"></i><p>El <strong>Corazón del dragón</strong> de <strong>${foundry.utils.escapeHTML(this.name)}</strong> se apaga.</p></div>`
+    });
   }
 
   /**
@@ -2283,8 +2583,10 @@ export class SistemaActor extends Actor {
   contextoEstadosMisticos() {
     const mal = this.malDeOjo();
     const destino = this.destinoSellado();
-    if (!mal && !destino) return null;
+    const dragon = this.corazonDragon(); // (v0.18.0) Custodio
+    if (!mal && !destino && !dragon) return null;
     return {
+      corazonDragon: dragon ? { turnos: Number(dragon.turnos) } : null,
       malDeOjo: mal ? { turnos: Number(mal.turnos), origen: mal.origen ?? "" } : null,
       destinoSellado: destino ? {
         palo: abreviadoPalo(destino.palo),
@@ -2951,6 +3253,11 @@ export class SistemaActor extends Actor {
     const tokenObjetivo = datos.objetivoTokenUuid ? (fromUuidSync(datos.objetivoTokenUuid) ?? null) : null;
     // (v0.16.0) Tiempo embotellado: la nueva tirada sustituye a los dados apuntados.
     if (datos.efectoX === "tiempoEmbotellado") await this._guardarTiempoEmbotellado(tirada);
+    // (v0.18.0) Corazón del dragón: la repetición fija la nueva duración (o lo retira si falla).
+    if (datos.efectoX === "corazonDragon") {
+      if (!tirada.esNegativo && Number(tirada.total) > 0) await this.activarCorazonDragon(Number(tirada.total));
+      else await this.retirarCorazonDragon();
+    }
     const resolucion = datos.valorX
       ? {
         publico: this._htmlValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo, numeroCarta: datos.numeroCarta ?? null }),
@@ -3316,6 +3623,10 @@ export class SistemaActor extends Actor {
     }
     // (v0.16.0) Tiempo embotellado: se apuntan los dados para sustituirlos en otras tiradas.
     if (efectoX === "tiempoEmbotellado") await this._guardarTiempoEmbotellado(tirada);
+    // (v0.18.0) Custodio · Corazón del dragón: X turnos con daño máximo 1.
+    if (efectoX === "corazonDragon" && !tirada.esNegativo && Number(tirada.total) > 0) {
+      await this.activarCorazonDragon(Number(tirada.total));
+    }
     const bloqueResolucionHtml = resolucion.publico;
     const htmlMaster = resolucion.master;
 
@@ -3411,7 +3722,16 @@ export class SistemaActor extends Actor {
         </div>`;
     }
     let htmlEfecto = "";
-    if (exito && efectoX === "manifestarArma") {
+    if (exito && efectoX === "muroVoluntad") {
+      // (v0.18.0) Custodio · Muro de voluntad: vida del muro = 3 × X.
+      htmlEfecto = `<p><i class="fa-solid fa-dungeon"></i> Muro de voluntad con <strong>${valor * 3} de vida</strong> (3 × X) mientras mantengas la concentración.</p>`;
+    } else if (exito && efectoX === "corazonDragon") {
+      // (v0.18.0) Custodio · Corazón del dragón: se activa en el propio Actor (`usarHabilidad`).
+      htmlEfecto = `<p><i class="fa-solid fa-dragon"></i> Durante <strong>${valor} turno(s)</strong> solo puedes recibir 1 de daño como máximo; cada vez que lo recibas ganas 1 de Agotamiento.</p>`;
+    } else if (exito && efectoX === "rencor") {
+      // (v0.18.0) Custodio · Rencor: el daño (mitigado + X) lo aplica el Master (`_htmlMasterValorX`).
+      htmlEfecto = `<p><i class="fa-solid fa-person-burst"></i> Devuelve al enemigo el daño que acabas de mitigar por completo <strong>+ ${valor}</strong>. <small><i class="fa-solid fa-eye-slash"></i> Lo aplica el Master.</small></p>`;
+    } else if (exito && efectoX === "manifestarArma") {
       const categorias = Math.min(5, Math.max(1, Number(numeroCarta) || 1));
       htmlEfecto = `<p><i class="fa-solid fa-khanda"></i> Arma manifestada de <strong>${categorias} categoría(s)</strong> (carta ${SISTEMA_CONFIG.dadoPorNumeroCarta[categorias] ?? ""}) durante <strong>${valor} turno(s)</strong>.</p>`;
     } else if (exito && efectoX) {
@@ -3467,6 +3787,7 @@ export class SistemaActor extends Actor {
    * @returns {string} HTML ("" si no aplica).
    */
   _htmlMasterValorX(tirada, { efectoX = null, tokenObjetivo = null } = {}) {
+    if (efectoX === "rencor") return this._htmlMasterRencor(tirada, tokenObjetivo);
     if (efectoX !== "flagelarEsencia") return "";
     const valor = Math.max(0, Number(tirada.total) || 0);
     const actorObjetivo = tokenObjetivo?.actor ?? null;
@@ -3492,6 +3813,30 @@ export class SistemaActor extends Actor {
           <p><i class="fa-solid fa-crosshairs"></i> <strong>${escapar(this.name)}</strong> → <strong>${nombre}</strong></p>
           ${detalle}
         </div>
+      </div>`;
+  }
+
+  /**
+   * Bloque solo para el Master de «Rencor» (v0.18.0, Custodio): botón que busca el último ataque
+   * BLOQUEADO contra este Actor (`.cyd-registro-bloqueo`) y aplica al atacante (o al Token objetivo)
+   * el daño mitigado + X, tras confirmarlo el Master (ver `activarBotonRencor` en `sistema.mjs`).
+   * @param {import("../dados.mjs").ResultadoTiradaSistema} tirada
+   * @param {Token|TokenDocument|null} tokenObjetivo - Objetivo marcado al usarla (respaldo).
+   * @returns {string} HTML ("" si la tirada falla).
+   */
+  _htmlMasterRencor(tirada, tokenObjetivo) {
+    const valor = Math.max(0, Number(tirada.total) || 0);
+    if (tirada.esNegativo || valor <= 0) return "";
+    const escapar = foundry.utils.escapeHTML;
+    const actorObjetivo = tokenObjetivo?.actor && tokenObjetivo.actor.id !== this.id ? tokenObjetivo.actor : null;
+    return `
+      <div class="cyd-carta-jugada">
+        <h3><i class="fa-solid fa-person-burst"></i> Rencor <small>(solo Master)</small></h3>
+        <p>Daño = daño mitigado por completo + <strong>${valor}</strong>. Se propone el último ataque bloqueado contra ${escapar(this.name)}.</p>
+        <button type="button" class="cyd-btn-rencor" data-actor-uuid="${this.uuid}" data-x="${valor}"
+                data-objetivo-uuid="${actorObjetivo?.uuid ?? ""}">
+          <i class="fa-solid fa-person-burst"></i> Aplicar Rencor
+        </button>
       </div>`;
   }
 
