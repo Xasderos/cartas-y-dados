@@ -4,7 +4,7 @@
 
 A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal card decks with dice rolls. No external modules required.
 
-**Current version:** 0.17.1 (beta)
+**Current version:** 0.17.2 (beta)
 
 ## How it plays
 - **Card + Dice (`XdY`):** a card's **suit** picks the Characteristic that sets how many dice you roll: Espadas → Physical (FISC), Bastos → Awareness (CONS), Oros → Social (SOC), Copas → Mysticism (MIST). Its **number (1–5)** sets the die: d4, d6, d8, d10, d12.
@@ -28,9 +28,21 @@ A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal c
 - **Death at 0 Health:** a token whose Health drops to 0 or below gets the Dead status (and is marked defeated in combat); healing above 0 removes it, unless the death came from Exhaustion 8.
 
 ## Installation
-1. Clone into `Data/systems/` as `cartas-y-dados`:
+
+### From Foundry (recommended)
+1. In the Foundry **Setup** screen, open **Game Systems** → **Install System**.
+2. Paste this URL into the **Manifest URL** field at the bottom and click **Install**:
+   ```
+   https://raw.githubusercontent.com/Xasderos/cartas-y-dados/master/manifest.json
+   ```
+3. Create a World with **"Sistema de Rol: Cartas y Dados"**.
+
+Updates show up in **Game Systems** → **Check for Updates**, like any other system.
+
+### Manual (development)
+1. Clone into `Data/systems/` as `cartas-y-dados` (the folder name must match the system `id`):
    ```bash
-   git clone <REPOSITORY_URL> cartas-y-dados
+   git clone https://github.com/Xasderos/cartas-y-dados.git cartas-y-dados
    ```
 2. Create a World with **"Sistema de Rol: Cartas y Dados"**.
 
