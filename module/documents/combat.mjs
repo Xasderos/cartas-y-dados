@@ -56,11 +56,25 @@ export class SistemaCombat extends Combat {
    * «Corazón del dragón» (Custodio) y (v0.19.0) su «Caleidoscopio» pierden un turno, y sus
    * «Pesadillas» desaparecen salvo que las haya mantenido con un hueco de ilusión (Ilusionista).
    * (v0.20.0) Su «Corrupción física» (Brujo) también pierde un turno.
+   * (v0.22.0) La invocación de un Invocador comparte su turno: sus estados también avanzan.
    */
   async #finTurnoCombatiente() {
     if (!this.started) return;
     const actor = this.combatant?.actor;
     if (!actor?.isOwner) return;
+    await SistemaCombat.#avanzarEstadosFinTurno(actor);
+    const invocacion = actor.invocacionActiva?.();
+    if (invocacion?.isOwner && !this.combatants.some(c => c.actor?.id === invocacion.id)) {
+      await SistemaCombat.#avanzarEstadosFinTurno(invocacion);
+    }
+  }
+
+  /**
+   * Estados que pierden un turno al final del turno de un Actor.
+   * @param {Actor} actor
+   * @returns {Promise<void>}
+   */
+  static async #avanzarEstadosFinTurno(actor) {
     await actor.avanzarMalDeOjo?.();
     await actor.avanzarCorazonDragon?.(); // (v0.18.0) Custodio
     await actor.avanzarPesadillas?.(); // (v0.19.0) Ilusionista

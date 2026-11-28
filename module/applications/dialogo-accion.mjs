@@ -10,6 +10,8 @@
  * CONS un grupo «Como FISC (Espada)» (valor `fisc:<accion>` → `comoFisico`); Espada y Daga permiten un
  * Ataque apuntado FISC + CONS; Escudo añade la reacción adicional «Defender a un aliado».
  * (v0.16.0) Elementalismo (Alta Scentia) añade la elección del elemento de la acción (`elemento`).
+ * (v0.22.0) Invocador: la invocación (Actor PNJ) usa este mismo diálogo; `bonoExtra` (Saciar estímulo)
+ * suma un bono fijo a la tirada de la carta principal.
  */
 
 import {
@@ -40,9 +42,11 @@ const PALOS_APUNTADO_MIXTO = ["espadas", "bastos"];
  * @param {string} cartaId - ID de la carta en la mano.
  * @param {Object} [opciones]
  * @param {boolean} [opciones.quemar=false] - Llega desde «Usar y Quemar»: casilla Quemar marcada.
+ * @param {number} [opciones.bonoExtra=0] - (v0.22.0) Bono fijo a la tirada de la carta principal.
+ * @param {string} [opciones.motivoBono=""] - (v0.22.0) Origen del bono (se muestra en el diálogo y el chat).
  * @returns {Promise<boolean>} true si se realizó la acción.
  */
-export async function abrirDialogoAccion(actor, cartaId, { quemar = false } = {}) {
+export async function abrirDialogoAccion(actor, cartaId, { quemar = false, bonoExtra = 0, motivoBono = "" } = {}) {
   const escapar = foundry.utils.escapeHTML;
   const mano = actor.system.pilasDocumentos?.mano;
   const carta = mano?.cards.get(cartaId);
@@ -117,6 +121,7 @@ export async function abrirDialogoAccion(actor, cartaId, { quemar = false } = {}
         <i class="fa-solid ${SISTEMA_CONFIG.ICONOS_CARACTERISTICA[caract] ?? "fa-diamond"}"></i>
         <strong>${escapar(nombreVisibleCarta(carta))}</strong> · ${abreviadoPalo(carta.system.palo)} (${escapar(nombreCaracteristica(caract))}) · ${actor._dadosDeCaracteristica(caract)}${carta.system.tipoDado}
       </p>
+      ${bonoExtra ? `<p class="hint"><i class="fa-solid fa-plus"></i> ${escapar(motivoBono || "Bono")}: +${Number(bonoExtra) || 0} a la tirada de esta carta.</p>` : ""}
       ${amistad ? `<p class="hint"><i class="fa-solid fa-handshake"></i> Amistad: ${escapar(amistad.aliado)} jugó ${escapar(nombreCaracteristica(caract))} en su última acción: tiras 1 dado más (salvo en la Acción del compañero).</p>` : ""}
 
       <div class="form-group">
@@ -250,6 +255,6 @@ export async function abrirDialogoAccion(actor, cartaId, { quemar = false } = {}
   // La casilla Quemar solo se pasa como excepción cuando difiere de lo que dicen las reglas
   // (así la carta de Ataque apuntado aplica sus propias reglas de quema).
   const quemarExplicito = eleccion.quemar !== quemaPorReglas ? eleccion.quemar : undefined;
-  await actor.jugarCarta(cartaId, { ...eleccion, quemar: quemarExplicito });
+  await actor.jugarCarta(cartaId, { ...eleccion, quemar: quemarExplicito, bonoExtra, motivoBono });
   return true;
 }

@@ -604,8 +604,10 @@ button.cyd-btn-aplicar-curacion i {
 /*  ALTA SCENTIA (v0.16.0): ficha, chat y desglose de tirada                */
 /* ======================================================================== */
 
-/* Fila de la ficha: primera carta del Mazo, artilugio y dados embotellados (el texto largo se parte) */
-.cyd-alta-scentia .cyd-chip-estado {
+/* Fila de la ficha: primera carta del Mazo, artilugio y dados embotellados (el texto largo se parte).
+   (v0.22.0) También la fila del Invocador: nombre de la invocación y objetivo de Marca y Combo. */
+.cyd-alta-scentia .cyd-chip-estado,
+.cyd-invocador .cyd-chip-estado {
   max-width: 100%;
   flex-wrap: wrap;
   overflow-wrap: anywhere;

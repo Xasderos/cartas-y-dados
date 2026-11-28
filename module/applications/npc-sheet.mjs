@@ -127,7 +127,9 @@ export class HojaPnjActor extends VentanaDinamicaMixin(RetratoFichaMixin(Handleb
       contadoresPilas,
       cartasEnMano,
       // (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este PNJ
-      estadosMisticos: actor.contextoEstadosMisticos()
+      estadosMisticos: actor.contextoEstadosMisticos(),
+      // (v0.22.0) Invocador: este PNJ es la invocación de un personaje
+      invocacion: actor.contextoInvocacion()
     };
   }
 

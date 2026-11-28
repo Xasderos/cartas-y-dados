@@ -13,7 +13,7 @@ import {
   ObjetoDataModel,
   HabilidadDataModel
 } from "./data/item-model.mjs";
-import { SistemaActor, registrarSocketAltaScentia } from "./documents/actor.mjs";
+import { SistemaActor, registrarSocketAltaScentia, registrarSocketInvocador } from "./documents/actor.mjs";
 import { fusionarCarpetasDuplicadas, obtenerOCrearCarpeta } from "./carpetas.mjs";
 import { SistemaCombat } from "./documents/combat.mjs";
 import { HojaPersonajeActor } from "./applications/actor-sheet.mjs";
@@ -175,6 +175,7 @@ Hooks.once("ready", async () => {
   registrarSocketDados();
   registrarSocketPeligro(); // (v0.21.0) Nivel de peligro: peticiones de los jugadores al Master
   registrarSocketAltaScentia(); // (v0.16.0) Monóculo indiscreto
+  registrarSocketInvocador(); // (v0.22.0) Invocador: el Master crea la invocación y coloca su Token
 
   // (v0.14.1) El ajuste "tamanoBase" guardaba índices ("0".."4"): se convierte al nombre del tamaño.
   if (game.user.isGM && game.settings.get("cartas-y-dados", "tamanoBase") !== leerTamanoBase()) {
@@ -687,7 +688,10 @@ function activarBotonesMendacium(message, html) {
     { selector: ".cyd-btn-visto", flag: "ultimoVisto",
       usar: (actor, b) => actor.usarVisto(b.dataset.sourceId ?? "", b.dataset.nombre ?? "") },
     { selector: ".cyd-btn-no-visto", flag: "ultimoNoVisto",
-      usar: actor => actor.usarNoVisto() }
+      usar: actor => actor.usarNoVisto() },
+    // (v0.22.0) Mendacium Charisma · Invocador: Saciar estímulo (la invocación usa una carta al azar + X).
+    { selector: ".cyd-btn-saciar", flag: "ultimoSaciar",
+      usar: (actor, b) => actor.usarSaciarEstimulo(Number(b.dataset.x) || 0) }
   ];
   for (const { selector, flag, usar } of botones) {
     for (const boton of html.querySelectorAll(selector)) {

@@ -64,7 +64,12 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       mantenerPesadillas: HojaPersonajeActor.#onMantenerPesadillas,
       abalanzarPesadillas: HojaPersonajeActor.#onAbalanzarPesadillas,
       sacrificarReflejo: HojaPersonajeActor.#onSacrificarReflejo,
-      soltarCartaVisto: HojaPersonajeActor.#onSoltarCartaVisto
+      soltarCartaVisto: HojaPersonajeActor.#onSoltarCartaVisto,
+      // (v0.22.0) Mendacium Charisma · Invocador
+      invocar: HojaPersonajeActor.#onInvocar,
+      desinvocar: HojaPersonajeActor.#onDesinvocar,
+      abrirInvocacion: HojaPersonajeActor.#onAbrirInvocacion,
+      elegirTipoInvocacion: HojaPersonajeActor.#onElegirTipoInvocacion
     }
   };
 
@@ -199,6 +204,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       altaScentia: actor.isOwner ? actor.contextoAltaScentia() : null,
       // (v0.19.0) Ilusionista: huecos de ilusión, pesadillas y carta sobre «Visto y No visto»
       ilusionista: actor.isOwner ? actor.contextoIlusionista() : null,
+      // (v0.22.0) Invocador: tipo de invocación, su estado y la marca de «Marca y Combo»
+      invocador: actor.isOwner ? actor.contextoInvocador() : null,
       // (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este Actor
       estadosMisticos: actor.contextoEstadosMisticos()
     };
@@ -421,7 +428,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
 
     const {
       configClase, nivelActual, nivelDestino, habilidades, packs, especializaciones, artilugio,
-      caracteristica, manoMaxima, abalorios, pasivas, pendientes
+      caracteristica, manoMaxima, abalorios, pasivas, pendientes, invocaciones = []
     } = opciones;
     const especializacionesVisibles = claveEspecializacion
       ? especializaciones.filter(e => e.clave === claveEspecializacion)
@@ -438,6 +445,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       }).join("")
       : "";
     const radiosAbalorios = abalorios.map((a, i) => radio("cydAbalorioNivel", i, a.nombre, a.texto, { marcado: i === 0, icono: a.icono, auto: a.auto })).join("");
+    // (v0.22.0) Invocador: tipo de invocación.
+    const radiosInvocaciones = invocaciones.map((o, i) => radio("cydInvocacionNivel", o.clave, o.nombre, o.texto, { marcado: i === 0, icono: o.icono })).join("");
     // (v0.16.0) Artilugio de primera: se puede cambiar una vez por subida de nivel.
     const radiosArtilugio = artilugio
       ? artilugio.opciones.map((a, i) => `
@@ -466,6 +475,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
         ${especializacionesVisibles.length ? `<fieldset><legend><i class="fa-solid fa-award"></i> ${especializacionesVisibles.length > 1 ? "Elige una especialización" : "Especialización"}</legend>${radiosEspecializaciones}</fieldset>` : ""}
         ${caracteristica ? `<fieldset><legend><i class="fa-solid fa-arrow-up-1-9"></i> Elige una característica (+1)</legend>${radiosCaracteristicas}</fieldset>` : ""}
         ${abalorios.length ? `<fieldset><legend><i class="fa-solid fa-gem"></i> Elige un abalorio</legend>${radiosAbalorios}</fieldset>` : ""}
+        ${invocaciones.length ? `<fieldset><legend><i class="fa-solid fa-hat-wizard"></i> Elige tu invocación</legend>${radiosInvocaciones}</fieldset>` : ""}
         ${habilidades.length ? `<fieldset><legend><i class="fa-solid fa-wand-magic-sparkles"></i> Elige una habilidad</legend>${radiosHabilidades}</fieldset>` : ""}
         ${packs.length ? `<fieldset><legend><i class="fa-solid fa-layer-group"></i> Elige un pack de cartas</legend>${radiosPacks}</fieldset>` : ""}
         ${fijos ? `<fieldset><legend><i class="fa-solid fa-gift"></i> Además obtienes</legend>${fijos}</fieldset>` : ""}
@@ -483,7 +493,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
             especializacion: claveEspecializacion,
             caracteristica: f.cydCaracteristicaNivel?.value || null,
             indiceAbalorio: Number(f.cydAbalorioNivel?.value ?? 0),
-            artilugio: f.cydArtilugioNivel?.value || null
+            artilugio: f.cydArtilugioNivel?.value || null,
+            invocacion: f.cydInvocacionNivel?.value || null
           };
         }
       },
@@ -495,6 +506,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     const pack = packs[eleccion.indicePack] ?? null;
     const especializacion = especializaciones[eleccion.indiceEspecializacion] ?? null;
     const abalorio = abalorios[eleccion.indiceAbalorio] ?? null;
+    const invocacionElegida = invocaciones.find(o => o.clave === eleccion.invocacion) ?? null;
     const confirmado = await DialogV2.confirm({
       ...opcionesDialogoSistema(),
       window: { title: "Confirmar Subida de Nivel" },
@@ -503,6 +515,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
         ${especializacion ? `<p><i class="fa-solid fa-award"></i> Especialización: <strong>${escapar(especializacion.nombre)}</strong></p>` : ""}
         ${caracteristica && eleccion.caracteristica ? `<p><i class="fa-solid fa-arrow-up-1-9"></i> +1 <strong>${escapar(nombreCaracteristica(eleccion.caracteristica))}</strong></p>` : ""}
         ${abalorio ? `<p><i class="fa-solid ${abalorio.icono}"></i> Abalorio: <strong>${escapar(abalorio.nombre)}</strong></p>` : ""}
+        ${invocacionElegida ? `<p><i class="fa-solid ${invocacionElegida.icono}"></i> Invocación: <strong>${escapar(invocacionElegida.nombre)}</strong></p>` : ""}
         ${habilidad ? `<p><i class="fa-solid fa-wand-magic-sparkles"></i> Habilidad: <strong>${escapar(habilidad.nombre)}</strong></p>` : ""}
         ${pack ? `<p><i class="fa-solid fa-layer-group"></i> Cartas: ${escapar(describirPackCartas(pack))}</p>` : ""}
         ${manoMaxima ? `<p><i class="fa-solid fa-hand"></i> +${manoMaxima} Mano Máxima</p>` : ""}
@@ -561,6 +574,7 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     else if (target.dataset.estado === "caleidoscopio") await this.document.retirarCaleidoscopio(); // (v0.19.0)
     else if (target.dataset.estado === "corrupcionFisica") await this.document.retirarCorrupcionFisica(); // (v0.20.0)
     else if (target.dataset.estado === "pesadillas") await this.document.retirarPesadillas(); // (v0.19.0)
+    else if (target.dataset.estado === "marcaCombo") await this.document.retirarMarcaCombo(); // (v0.22.0)
   }
 
   /**
@@ -585,6 +599,27 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
   /** (v0.19.0) Ilusionista · Caleidoscopio: sacrificar un reflejo (+3 Defensa en esta defensa). */
   static async #onSacrificarReflejo() {
     await this.document.sacrificarReflejo();
+  }
+
+  /** (v0.22.0) Invocador: invocar a la criatura (divide la mano; el Master coloca su Token). */
+  static async #onInvocar() {
+    await this.document.invocar();
+  }
+
+  /** (v0.22.0) Invocador: deshacer la invocación (acción gratuita). */
+  static async #onDesinvocar() {
+    await this.document.desinvocar();
+  }
+
+  /** (v0.22.0) Invocador: abrir la ficha de la invocación. */
+  static async #onAbrirInvocacion() {
+    this.document.actorInvocacion()?.sheet.render(true);
+  }
+
+  /** (v0.22.0) Invocador: elegir el tipo de invocación (Invocadores anteriores a v0.22.0). */
+  static async #onElegirTipoInvocacion() {
+    await this.document.elegirTipoInvocacion();
+    this.render();
   }
 
   /** (v0.19.0) Ilusionista · Visto y No visto: devolver al Descarte la carta guardada. */

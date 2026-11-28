@@ -10,7 +10,7 @@ import {
   SISTEMA_CONFIG, abalorioDeTrinket, abreviadoPalo, claveClaseDeItem, dadoReducidoMalDeOjo, describirPackCartas,
   efectoPermanenteAbalorio, esAbalorioEterno, especializacionDeClase, estadoAgotamiento, generarNombreMisticoUnico, nombreCaracteristica,
   nombreEstadoElemento, nombreVisibleCarta, opcionesArtilugio, opcionesTrinketsClase, razaBaseDeActor, tieneRasgoRacial,
-  valorCarta
+  valorCarta, INVOCACIONES, opcionesInvocacion
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
 import { abrirDialogoAccion } from "../applications/dialogo-accion.mjs";
@@ -253,6 +253,8 @@ export class SistemaActor extends Actor {
       abalorios: opcionesTrinketsClase({ trinkets: lista("abalorios") }),
       pasivas: lista("pasivas"),
       pendientes: lista("pendientes"),
+      // (v0.22.0) Invocador: elección del tipo de invocación.
+      invocaciones: opcionesInvocacion(lista("invocaciones")),
       artilugio: this._cartasDeAbalorio("artilugio").length
         ? { actual: this.artilugioActual(), opciones: opcionesArtilugio(this.artilugioActual()) }
         : null
@@ -278,11 +280,12 @@ export class SistemaActor extends Actor {
    *   Índices dentro de las opciones (solo se exigen los de las listas que el nivel ofrece).
    *   `especializacion` (v0.18.0): clave de la especialización (alternativa a `indiceEspecializacion`).
    *   `caracteristica` (v0.18.0): clave (`fisico`, `consciencia`, `social`, `misticismo`) que sube +1.
+   *   `invocacion` (v0.22.0, Invocador): clave de `INVOCACIONES` (se guarda en `flags.cartas-y-dados.invocacion.tipo`).
    * @returns {Promise<boolean>} true si se aplicó la subida.
    */
   async subirDeNivel({
     indiceHabilidad, indicePack, indiceEspecializacion, especializacion: claveEspecializacion = null,
-    caracteristica: claveCaracteristica = null, indiceAbalorio, artilugio = null
+    caracteristica: claveCaracteristica = null, indiceAbalorio, artilugio = null, invocacion: claveInvocacion = null
   } = {}) {
     const previas = this.obtenerOpcionesSubidaNivel();
     if (!previas) {
@@ -302,7 +305,9 @@ export class SistemaActor extends Actor {
     const abalorio = opciones.abalorios.length ? opciones.abalorios[indiceAbalorio] ?? null : null;
     const caracteristica = opciones.caracteristica && ["fisico", "consciencia", "social", "misticismo"].includes(claveCaracteristica)
       ? claveCaracteristica : null;
-    if ((opciones.habilidades.length && !habilidad) || (opciones.packs.length && !pack)
+    // (v0.22.0) Invocador: tipo de invocación elegido.
+    const invocacion = opciones.invocaciones.find(i => i.clave === claveInvocacion) ?? null;
+    if ((opciones.invocaciones.length && !invocacion) || (opciones.habilidades.length && !habilidad) || (opciones.packs.length && !pack)
         || (opciones.especializaciones.length && !especializacion)
         || (opciones.abalorios.length && !abalorio) || (opciones.caracteristica && !caracteristica)) {
       ui.notifications.warn("Debes elegir una opción de cada recompensa del nivel.");
@@ -387,6 +392,10 @@ export class SistemaActor extends Actor {
       otros.push(`+1 ${nombreCaracteristica(caracteristica)}`);
     }
     if (opciones.manoMaxima) otros.push(`+${opciones.manoMaxima} Mano Máxima`);
+    if (invocacion) {
+      await this.setFlag("cartas-y-dados", "invocacion.tipo", invocacion.clave);
+      otros.push(`Invocación: ${invocacion.nombre}`);
+    }
     if (abalorio) {
       if (!this.system.pilasDocumentos?.trinkets) await this.inicializarPilasDeJugador();
       const trinkets = this.system.pilasDocumentos?.trinkets;
@@ -453,6 +462,7 @@ export class SistemaActor extends Actor {
       caracteristica ? `<p><i class="fa-solid fa-arrow-up-1-9"></i> +1 <strong>${nombreCaracteristica(caracteristica)}</strong></p>` : "",
       opciones.manoMaxima ? `<p><i class="fa-solid fa-hand"></i> +${opciones.manoMaxima} Mano Máxima</p>` : "",
       abalorio ? `<p><i class="fa-solid ${abalorio.icono}"></i> Nuevo abalorio en el Mazo de Trinkets: <strong>${abalorio.nombre}</strong></p>` : "",
+      invocacion ? `<p><i class="fa-solid ${invocacion.icono}"></i> Invocación: <strong>${invocacion.nombre}</strong></p>` : "",
       opciones.pasivas.map(p => `<p><i class="fa-solid fa-star"></i> ${p.nombre}</p>`).join(""),
       opciones.pendientes.map(p => `<p><i class="fa-solid fa-hourglass-half"></i> ${p}: <em>pendiente de definir, lo aplica el Master</em></p>`).join(""),
       cambiaArtilugio ? `<p><i class="fa-solid fa-toolbox"></i> Artilugio de primera: <strong>${SISTEMA_CONFIG.ARTILUGIOS[artilugio].nombre}</strong>${artilugioAnterior ? ` (antes: ${SISTEMA_CONFIG.ARTILUGIOS[artilugioAnterior]?.nombre ?? artilugioAnterior})` : ""}</p>` : ""
@@ -733,7 +743,25 @@ export class SistemaActor extends Actor {
   /*  3. ROBO DE TURNO Y BARAJADO CON AGOTAMIENTO                             */
   /* ======================================================================== */
 
+  /**
+   * Robo de turno: roba hasta la Mano Máx. (v0.22.0) La invocación activa de un Invocador comparte su
+   * turno y también roba su mano máxima (la misma que la del Invocador).
+   * @returns {Promise<void>}
+   */
   async robarHastaLimiteMano() {
+    // (v0.22.0) La invocación usa la Mano Máx. de su Invocador (recalcularla por si cambió).
+    if (this.esInvocacion()) this.prepareData();
+    await this._robarHastaLimiteManoPropia();
+    const invocacion = this.invocacionActiva();
+    if (invocacion) await invocacion.robarHastaLimiteMano();
+  }
+
+  /**
+   * Implementación del robo de turno de un solo Actor (no llamar directamente).
+   * @returns {Promise<void>}
+   * @private
+   */
+  async _robarHastaLimiteManoPropia() {
     const { mazo, mano, descarte } = this.system.pilasDocumentos;
     if (!mazo || !mano || !descarte) return;
 
@@ -749,10 +777,28 @@ export class SistemaActor extends Actor {
     });
   }
 
-  async robarCantidadCartas(cantidad) {
+  /**
+   * Roba `cantidad` cartas del Mazo a la Mano (barajando el Descarte con +1 Agotamiento si se agota).
+   * (v0.22.0) Con `elegirMano` (robos que no son el de turno: Empatía, automatizaciones, Restaurar
+   * Vínculo...) y una invocación activa, el Invocador elige cuántas van a la mano de su invocación.
+   * @param {number} cantidad
+   * @param {{elegirMano?: boolean}} [opciones]
+   * @returns {Promise<number>} Cartas robadas en total (a cualquiera de las manos).
+   */
+  async robarCantidadCartas(cantidad, { elegirMano = false } = {}) {
     const { mazo, mano, descarte } = this.system.pilasDocumentos;
-    if (!mazo || !mano || !descarte) return;
+    if (!mazo || !mano || !descarte) return 0;
 
+    const invocacion = elegirMano && cantidad > 0 ? this.invocacionActiva() : null;
+    if (invocacion) {
+      const paraInvocacion = await this._elegirManoDelRobo(cantidad, invocacion);
+      if (paraInvocacion === null) return 0;
+      const propias = paraInvocacion < cantidad ? await this.robarCantidadCartas(cantidad - paraInvocacion) : 0;
+      const ajenas = paraInvocacion > 0 ? await invocacion.robarCantidadCartas(paraInvocacion) : 0;
+      return propias + ajenas;
+    }
+
+    const antes = mano.cards.size;
     let porRobar = cantidad;
 
     while (porRobar > 0) {
@@ -774,9 +820,18 @@ export class SistemaActor extends Actor {
       await this._extraerCartasDeMazo(mazo, mano, idsARobar);
       porRobar -= lote;
     }
+    return Math.max(0, mano.cards.size - antes);
   }
 
+  /**
+   * Agota el Mazo: devuelve el Descarte, baraja y +1 Agotamiento.
+   * (v0.22.0) La invocación comparte el Mazo y el Descarte de su Invocador: el barajado (y su
+   * Agotamiento) es del Invocador.
+   * @returns {Promise<void>}
+   */
   async barajarDescarteEnMazo() {
+    const invocador = this.invocadorDeInvocacion();
+    if (invocador) return invocador.barajarDescarteEnMazo();
     const { mazo, descarte } = this.system.pilasDocumentos;
     if (!mazo || !descarte) return;
 
@@ -1023,6 +1078,10 @@ export class SistemaActor extends Actor {
    *   carta de Físico: tira con Físico.
    * @param {string|null} [opciones.elemento=null] - (v0.16.0, abalorio Elementalismo) Elemento de la acción:
    *   clave de `SISTEMA_CONFIG.ELEMENTOS` o texto libre; se indica en el chat.
+   * @param {number} [opciones.bonoExtra=0] - (v0.22.0) Bono a la tirada de la carta principal (Saciar estímulo).
+   * @param {string} [opciones.motivoBono=""] - (v0.22.0) Origen del `bonoExtra` (se indica en el chat).
+   * (v0.22.0) Invocador · Marca y Combo: los ataques del Invocador y de su invocación contra el objetivo
+   * marcado (Token T) suman dados y actualizan la marca (`_contextoMarcaCombo`).
    * (v0.15.0) Abalorios En Juego: con Espada o Daga el Ataque apuntado admite combinar FISC y CONS
    * (con Espada ambas tiran con Físico; con Daga cada una con su característica). Las acciones con
    * `reaccionAdicional` (Escudo) no gastan ni exigen la reacción del turno.
@@ -1030,7 +1089,8 @@ export class SistemaActor extends Actor {
    */
   async jugarCarta(cartaId, {
     quemar, modo = "usar", accion = null, cartaApuntadoId = null, puntoDebil = false,
-    cartaPotenciarId = null, reaccion = false, resolucion = "auto", comoFisico = false, elemento = null
+    cartaPotenciarId = null, reaccion = false, resolucion = "auto", comoFisico = false, elemento = null,
+    bonoExtra = 0, motivoBono = ""
   } = {}) {
     const { mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mano || !enJuego || !descarte || !quemadas) return null;
@@ -1115,6 +1175,9 @@ export class SistemaActor extends Actor {
       : cartaApuntado ? "ataque" : configAccion?.resolucion ?? "segunCarta";
     if (tipoResolucion === "segunCarta") tipoResolucion = carta.system.esAtaque ? "ataque" : "dificultad";
     const esAtaque = tipoResolucion === "ataque";
+    // (v0.22.0) Invocador · Marca y Combo: dados extra contra el objetivo marcado.
+    const marcaCombo = esAtaque ? this._contextoMarcaCombo(game.user.targets.first() ?? null) : null;
+    const bonoPrincipal = Number(bonoExtra) || 0;
 
     // --- Tiradas ---------------------------------------------------------------------------------
     /** @type {import("../dados.mjs").ResultadoTiradaSistema|null} */
@@ -1137,6 +1200,7 @@ export class SistemaActor extends Actor {
         ? Math.max(1, Math.ceil(this._dadosDeCaracteristica(caract) / 2))
         : this._dadosDeCaracteristica(caract);
       // (v0.21.0) `principal`: solo la carta principal recibe los dados extra del Nivel de peligro.
+      // (v0.22.0) `bonoExtra` (Saciar estímulo) solo se suma a la carta principal.
       const tirarCarta = (c, caract, extra = 0, principal = false) => {
         // (v0.17.0) Mal de ojo: las cartas MIST del Actor maldito bajan una categoría de dado.
         const malDeOjo = c.system.palo === "copas" ? this._ajusteMalDeOjo(c.system.tipoDado ?? "d6") : null;
@@ -1144,7 +1208,7 @@ export class SistemaActor extends Actor {
         return tirarDadosSistema({
           cantidadDados: dadosDe(caract) + extra,
           tipoDado: malDeOjo?.tipoDado ?? c.system.tipoDado ?? "d6",
-          bono: Number(c.system.automatizacion?.bonoTirada) || 0,
+          bono: (Number(c.system.automatizacion?.bonoTirada) || 0) + (principal ? bonoPrincipal : 0),
           rollData: this.getRollData(),
           mitadPorAgotamiento, multiplicador: this._multiplicadorTiradas(),
           parcial: hayPartes, dadosPeligro: principal,
@@ -1153,7 +1217,7 @@ export class SistemaActor extends Actor {
           resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
         });
       };
-      const partes = [{ tirada: await tirarCarta(carta, claveCaract, amistad ? 1 : 0, true), etiqueta: nombreVisibleCarta(carta) }];
+      const partes = [{ tirada: await tirarCarta(carta, claveCaract, (amistad ? 1 : 0) + (marcaCombo?.bono ?? 0), true), etiqueta: nombreVisibleCarta(carta) }];
       if (cartaApuntado) {
         partes.push({ tirada: await tirarCarta(cartaApuntado, caractApuntado), etiqueta: `${nombreVisibleCarta(cartaApuntado)} (apuntado)` });
       }
@@ -1165,6 +1229,8 @@ export class SistemaActor extends Actor {
       bloqueResolucionHtml = tirada.html + res.publico;
       htmlMaster = res.master;
     }
+    // (v0.22.0) Marca y Combo: impacta (hace daño) → marca o la aumenta; si no, se pierde.
+    const lineaMarca = marcaCombo ? await this._actualizarMarcaCombo(marcaCombo, tirada) : "";
 
     // --- Destino de las cartas -------------------------------------------------------------
     /** Motivos de reglas por los que una carta usada se quema en vez de descartarse. */
@@ -1213,10 +1279,13 @@ export class SistemaActor extends Actor {
     if (cartaApuntado) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-bullseye"></i> Ataque apuntado (÷ 2)</span>');
     if (cartaPotenciar) etiquetas.push('<span class="cyd-tag-accion"><i class="fa-solid fa-moon"></i> Potenciada</span>');
     if (usaMalDeOjo) etiquetas.push(this._etiquetaMalDeOjo());
+    if (marcaCombo?.bono && tipoResolucion !== "sinTirada") etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-crosshairs"></i> Marca y Combo: +${marcaCombo.bono} dado(s)</span>`);
+    if (bonoPrincipal && tipoResolucion !== "sinTirada") etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-plus"></i> ${foundry.utils.escapeHTML(motivoBono || "Bono")}: +${bonoPrincipal}</span>`);
     if (nombreElemento) etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid ${SISTEMA_CONFIG.ELEMENTOS[elemento]?.icono ?? "fa-fire-flame-curved"}"></i> Elementalismo: ${foundry.utils.escapeHTML(nombreElemento)}</span>`);
     if (resolucion && resolucion !== "auto") etiquetas.push(`<span class="cyd-tag-accion"><i class="fa-solid fa-sliders"></i> ${SISTEMA_CONFIG.RESOLUCIONES_ACCION[resolucion] ?? resolucion}</span>`);
 
     const lineasExtra = [];
+    if (lineaMarca) lineasExtra.push(lineaMarca);
     if (accion === "correr") {
       const mov = Number(this.system.movimiento?.max) || 0;
       lineasExtra.push(`<p><i class="fa-solid fa-person-running"></i> Movimiento duplicado: <strong>${mov * 2} m</strong> este turno (${mov} × 2).</p>`);
@@ -1344,7 +1413,7 @@ export class SistemaActor extends Actor {
     if (Object.keys(updatesActor).length > 0) await this.update(updatesActor);
 
     if (auto.robarCartas > 0) {
-      await this.robarCantidadCartas(auto.robarCartas);
+      await this.robarCantidadCartas(auto.robarCartas, { elegirMano: true });
       resumen.push(`<i class="fa-solid fa-clone"></i> Roba +${auto.robarCartas} carta(s)`);
     }
     return resumen;
@@ -1472,6 +1541,9 @@ export class SistemaActor extends Actor {
    * @returns {boolean}
    */
   estaEnCombate() {
+    // (v0.22.0) La invocación comparte el turno de su Invocador (no es un combatiente propio).
+    const invocador = this.invocadorDeInvocacion();
+    if (invocador) return invocador.estaEnCombate();
     return game.combats?.some(c => c.started && c.combatants.some(cb => cb.actor?.uuid === this.uuid)) ?? false;
   }
 
@@ -1617,9 +1689,9 @@ export class SistemaActor extends Actor {
       ui.notifications.warn("Inicializa las pilas de cartas antes de robar.");
       return false;
     }
-    const antes = mano.cards.size;
-    await this.robarCantidadCartas(1);
-    if (mano.cards.size <= antes) return false;
+    // (v0.22.0) Invocador: un robo que no es el de turno puede ir a la mano de la invocación.
+    const robadas = await this.robarCantidadCartas(1, { elegirMano: true });
+    if (!robadas) return false;
     if (this.estaEnCombate()) await this.setFlag("cartas-y-dados", "empatiaUsada", true);
     this.prepareData();
 
@@ -2292,6 +2364,30 @@ export class SistemaActor extends Actor {
     const escaparHtml = foundry.utils.escapeHTML;
     const abalorios = this.abaloriosActivos();
     const notas = [];
+    // 0. (v0.22.0) Invocador · Cordel de sintonía: el Invocador recibe la mitad (redondeo hacia arriba,
+    // como Mártir) y su invocación presente el resto.
+    const invocacionCordel = restante > 0 && abalorios.has("cordelSintonia") ? this.invocacionActiva() : null;
+    if (invocacionCordel) {
+      const paraMago = Math.ceil(restante / 2);
+      const paraInvocacion = restante - paraMago;
+      const usar = await foundry.applications.api.DialogV2.wait({
+        ...opcionesDialogoSistema({ width: 420 }),
+        window: { title: "Cordel de sintonía", icon: "fa-solid fa-link" },
+        content: `<p><strong>${escaparHtml(this.name)}</strong> va a recibir <strong>${restante}</strong> de daño y tiene el <strong>Cordel de sintonía</strong> En Juego.</p><p class="hint">Si lo reparte, recibe ${paraMago} y su invocación (${escaparHtml(invocacionCordel.name)}) recibe ${paraInvocacion}.</p>`,
+        buttons: [
+          { action: "repartir", label: "Repartir el daño", icon: "fa-solid fa-link", default: true, callback: () => "repartir" },
+          { action: "dano", label: "Recibirlo todo", icon: "fa-solid fa-droplet", callback: () => "dano" },
+          { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => null }
+        ],
+        rejectClose: false
+      });
+      if (!usar) return null;
+      if (usar === "repartir") {
+        notas.push(`<i class="fa-solid fa-link"></i> Cordel de sintonía: ${escaparHtml(invocacionCordel.name)} recibe ${paraInvocacion} del daño (${restante} → ${paraMago})`);
+        restante = paraMago;
+        if (paraInvocacion > 0) await invocacionCordel.aplicarDano(paraInvocacion, { atacanteUuid });
+      }
+    }
     // 1. (v0.18.0) Mártir: propio (×2) o de un aliado Custodio en rango de visión (÷2, hacia arriba).
     if (restante > 0 && abalorios.has("martir")) {
       notas.push(`<i class="fa-solid fa-hand-holding-heart"></i> Mártir: daño duplicado (${restante} → ${restante * 2})`);
@@ -2382,6 +2478,8 @@ export class SistemaActor extends Actor {
     }
     const salud = Math.max(0, antes - restante);
     if (salud !== antes) await this.update({ "system.salud.value": salud });
+    // (v0.22.0) Invocador · Conceder ofrenda: el ataque del Invocador o de su invocación acaba con la criatura.
+    if (antes > 0 && salud <= 0 && atacanteUuid) await this._avisarConcederOfrenda(atacanteUuid);
     if (notas.length) {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this }),
@@ -3354,6 +3452,656 @@ export class SistemaActor extends Actor {
     return [...game.user.targets].filter(t => t.actor && t.actor.id !== this.id).slice(0, Math.max(0, valor));
   }
 
+  /* ======================================================================== */
+  /*  (v0.22.0) MENDACIUM CHARISMA · INVOCADOR                                */
+  /* ======================================================================== */
+  /*
+   * La invocación es un Actor `pnj` persistente (mismos recursos cada vez que vuelve), enlazado con
+   * `flags.cartas-y-dados.invocadorId`; el Invocador guarda `flags.cartas-y-dados.invocacion
+   * {tipo, actorId, activa}`. La invocación COMPARTE el Mazo y el Descarte del Invocador
+   * (`system.pilas.mazoId/descarteId` iguales) y tiene Mano, Quemadas, Mazo de Trinkets y En Juego
+   * propios, así que usa todo el motor de cartas (diálogo de acción, ataques...) desde su ficha de PNJ
+   * con sus propias características, Salud, Defensa y Agotamiento (las ajusta el Master).
+   * Crear el Actor, sus pilas y su Token lo hace el Master (`solicitarInvocacionAlMaster`, socket).
+   */
+
+  /**
+   * ¿Tiene el Actor la especialización Invocador? Pasiva «Invocaciones» (`flags.cartas-y-dados.pasiva`) o,
+   * para quien la eligió antes de v0.22.0 (sin pasiva), la especialización guardada en su Item de Clase.
+   * @returns {boolean}
+   */
+  esInvocador() {
+    if (this.type !== "personaje") return false;
+    if (this.items.some(i => i.type === "habilidad" && i.getFlag("cartas-y-dados", "pasiva") === "invocaciones")) return true;
+    const itemClase = this.items.find(i => i.type === "clase");
+    const claveClase = claveClaseDeItem(itemClase);
+    const configClase = claveClase ? SISTEMA_CONFIG.CLASES_BASE[claveClase] : null;
+    return Boolean(configClase) && especializacionDeClase(itemClase, configClase)?.clave === "invocador";
+  }
+
+  /**
+   * Tipo de invocación elegido (clave de `INVOCACIONES`).
+   * @returns {string|null}
+   */
+  tipoInvocacion() {
+    const tipo = this.getFlag("cartas-y-dados", "invocacion")?.tipo ?? null;
+    return INVOCACIONES[tipo] ? tipo : null;
+  }
+
+  /**
+   * Actor de la invocación de este Invocador (esté o no invocada).
+   * @returns {Actor|null}
+   */
+  actorInvocacion() {
+    const id = this.getFlag("cartas-y-dados", "invocacion")?.actorId;
+    const actor = id ? game.actors?.get(id) : null;
+    return actor && actor.id !== this.id && actor.getFlag("cartas-y-dados", "invocadorId") === this.id ? actor : null;
+  }
+
+  /**
+   * Invocación presente (invocada y no desinvocada).
+   * @returns {Actor|null}
+   */
+  invocacionActiva() {
+    return this.getFlag("cartas-y-dados", "invocacion")?.activa ? this.actorInvocacion() : null;
+  }
+
+  /**
+   * Si este Actor es la invocación de un Invocador, ese Invocador.
+   * @returns {Actor|null}
+   */
+  invocadorDeInvocacion() {
+    const id = this.getFlag("cartas-y-dados", "invocadorId");
+    const invocador = id ? game.actors?.get(id) : null;
+    return invocador && invocador.id !== this.id ? invocador : null;
+  }
+
+  /**
+   * ¿Es este Actor la invocación de un Invocador?
+   * @returns {boolean}
+   */
+  esInvocacion() {
+    return Boolean(this.invocadorDeInvocacion());
+  }
+
+  /**
+   * Elige el tipo de invocación (Plaga sobrenatural, Bestia mágica o Poltergeist). Normalmente se elige al
+   * especializarse; esto cubre a los Invocadores anteriores a v0.22.0. No se cambia si ya existe la invocación.
+   * @returns {Promise<string|null>} Clave elegida o null.
+   */
+  async elegirTipoInvocacion() {
+    const actual = this.tipoInvocacion();
+    if (actual && this.actorInvocacion()) return actual;
+    const escapar = foundry.utils.escapeHTML;
+    const radios = opcionesInvocacion(Object.keys(INVOCACIONES)).map((o, i) => `
+      <label class="cyd-opcion-radio">
+        <input type="radio" name="cydTipoInvocacion" value="${o.clave}" ${(actual ? o.clave === actual : i === 0) ? "checked" : ""} />
+        <span><i class="fa-solid ${o.icono}"></i> <strong>${escapar(o.nombre)}</strong><br><small>${escapar(o.texto)}</small></span>
+      </label>`).join("");
+    const tipo = await foundry.applications.api.DialogV2.prompt({
+      ...opcionesDialogoSistema({ width: 460 }),
+      window: { title: `${this.name} — Elección de invocación`, icon: "fa-solid fa-hat-wizard" },
+      content: `<fieldset><legend><i class="fa-solid fa-hat-wizard"></i> Elige tu invocación</legend>${radios}</fieldset>`,
+      ok: { label: "Elegir", icon: "fa-solid fa-hat-wizard", callback: (event, button) => button.form.elements.cydTipoInvocacion.value },
+      rejectClose: false
+    });
+    if (!INVOCACIONES[tipo]) return null;
+    await this.setFlag("cartas-y-dados", "invocacion.tipo", tipo);
+    return tipo;
+  }
+
+  /**
+   * Invocar (Invocador): tras la acción de la invocación (sus limitaciones las aplica el Master), divide la
+   * mano actual a la mitad: el jugador marca las Cartas de Acción que pasan a la mano de la invocación
+   * (los Trinkets se quedan en su mano). Solo una criatura invocada al mismo tiempo. El Master crea el
+   * Actor (la primera vez), coloca su Token junto al del Invocador y mueve las cartas.
+   * @returns {Promise<boolean>} true si se ha pedido la invocación.
+   */
+  async invocar() {
+    if (!this.isOwner) return false;
+    if (!this.esInvocador()
+        && !(await this._confirmarExcepcion("Invocar", ["No tienes la especialización Invocador."]))) return false;
+    if (this.invocacionActiva()) {
+      ui.notifications.warn(`${this.name} ya tiene una criatura invocada: solo puede haber una al mismo tiempo.`);
+      return false;
+    }
+    const tipo = this.tipoInvocacion() ?? await this.elegirTipoInvocacion();
+    if (!tipo) return false;
+    const mano = this.system.pilasDocumentos?.mano;
+    if (!mano) {
+      ui.notifications.warn("Inicializa las pilas de cartas antes de invocar.");
+      return false;
+    }
+    const cartas = mano.cards.contents.filter(c => c.type === "accion");
+    const mitad = Math.floor(cartas.length / 2);
+    let cartasIds = [];
+    if (cartas.length) {
+      cartasIds = await this._elegirCartasParaInvocacion(cartas, mitad, this.actorInvocacion()?.name ?? INVOCACIONES[tipo].nombre);
+      if (cartasIds === null) return false;
+      if (cartasIds.length !== mitad && !(await this._confirmarExcepcion("Dividir la mano", [
+        `Tu mano se divide a la mitad: tu invocación debe recibir ${mitad} carta(s) y has elegido ${cartasIds.length}.`
+      ]))) return false;
+    }
+    return solicitarInvocacionAlMaster("invocar", { invocadorId: this.id, cartasIds });
+  }
+
+  /**
+   * Diálogo para dividir la mano al invocar: casillas con las Cartas de Acción (marcadas las `mitad` últimas).
+   * @param {Card[]} cartas
+   * @param {number} mitad - Cartas que debe recibir la invocación.
+   * @param {string} nombreInvocacion
+   * @returns {Promise<string[]|null>} IDs elegidos o null si se cancela.
+   */
+  async _elegirCartasParaInvocacion(cartas, mitad, nombreInvocacion) {
+    const escapar = foundry.utils.escapeHTML;
+    const desde = cartas.length - mitad;
+    const casillas = cartas.map((c, i) => `
+      <label class="cyd-opcion-radio">
+        <input type="checkbox" name="cydCartaInvocacion" value="${c.id}" ${i >= desde ? "checked" : ""} />
+        <span>${escapar(nombreVisibleCarta(c))} · ${abreviadoPalo(c.system.palo)} ${escapar(c.system.tipoDado ?? "")}</span>
+      </label>`).join("");
+    const ids = await foundry.applications.api.DialogV2.prompt({
+      ...opcionesDialogoSistema({ width: 460 }),
+      window: { title: `Invocar: ${nombreInvocacion}`, icon: "fa-solid fa-hat-wizard" },
+      content: `
+        <p>Activa la acción de tu invocación (sus limitaciones las aplica el Master). Después divides tu mano a la mitad: marca las <strong>${mitad}</strong> carta(s) que pasan a la mano de <strong>${escapar(nombreInvocacion)}</strong>.</p>
+        <fieldset><legend><i class="fa-solid fa-hand"></i> Mano de la invocación</legend>${casillas}</fieldset>
+        <p class="hint">Los Trinkets se quedan en tu mano. Hace falta un Master conectado: él coloca el Token de la invocación junto al tuyo.</p>`,
+      ok: {
+        label: "Invocar", icon: "fa-solid fa-hat-wizard",
+        callback: (event, button) => [...button.form.querySelectorAll("input[name='cydCartaInvocacion']:checked")].map(i => i.value)
+      },
+      rejectClose: false
+    });
+    return Array.isArray(ids) ? ids : null;
+  }
+
+  /**
+   * Desinvocar (acción gratuita en el turno del Invocador): la mano de la invocación va al Descarte y su
+   * Token se retira de las escenas. El Actor se conserva con su Salud, Agotamiento y Quemadas.
+   * @returns {Promise<boolean>}
+   */
+  async desinvocar() {
+    const invocacion = this.invocacionActiva();
+    if (!invocacion) {
+      ui.notifications.warn(`${this.name} no tiene ninguna criatura invocada.`);
+      return false;
+    }
+    const escapar = foundry.utils.escapeHTML;
+    const confirmado = await foundry.applications.api.DialogV2.confirm({
+      ...opcionesDialogoSistema({ width: 420 }),
+      window: { title: "Desinvocar", icon: "fa-solid fa-person-walking-arrow-loop-left" },
+      content: `<p>Deshaces la invocación de <strong>${escapar(invocacion.name)}</strong> (acción gratuita en tu turno). Las cartas de su mano van al Descarte.</p><p class="hint">Volverá con la misma Salud, Agotamiento y cartas quemadas, salvo que descanséis.</p>`,
+      yes: { label: "Desinvocar", icon: "fa-solid fa-person-walking-arrow-loop-left" },
+      no: { label: "Cancelar" },
+      rejectClose: false
+    });
+    if (!confirmado) return false;
+    return solicitarInvocacionAlMaster("desinvocar", { invocadorId: this.id });
+  }
+
+  /**
+   * (Master) Realiza la invocación: crea el Actor la primera vez, asegura sus pilas, mueve a su mano las
+   * cartas elegidas, la marca como presente y coloca su Token.
+   * @param {string[]} cartasIds - Cartas de la mano del Invocador para la invocación.
+   * @returns {Promise<boolean>}
+   */
+  async _invocarComoMaster(cartasIds = []) {
+    const tipo = this.tipoInvocacion();
+    if (!tipo || this.invocacionActiva()) return false;
+    const invocacion = this.actorInvocacion() ?? await this._crearActorInvocacion(tipo);
+    if (!invocacion) return false;
+    await this._asegurarPilasInvocacion(invocacion);
+    const mano = this.system.pilasDocumentos?.mano;
+    const manoInvocacion = invocacion.system.pilasDocumentos?.mano;
+    let pasadas = 0;
+    if (mano && manoInvocacion) {
+      for (const id of cartasIds) {
+        if (mano.cards.get(id)?.type !== "accion") continue;
+        if (await this._moverCartaEntrePilas(mano, manoInvocacion, id)) pasadas++;
+      }
+    }
+    await this.setFlag("cartas-y-dados", "invocacion", { activa: true, actorId: invocacion.id });
+    invocacion.prepareData();
+    const token = await this._colocarTokenInvocacion(invocacion);
+    const escapar = foundry.utils.escapeHTML;
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-hat-wizard"></i> ${escapar(this.name)} invoca a ${escapar(invocacion.name)}</h3>
+          <p><i class="fa-solid fa-hand"></i> Divide su mano: <strong>${pasadas}</strong> carta(s) pasan a la mano de la invocación.</p>
+          <p><small><i class="fa-solid fa-circle-info"></i> Comparten turno, Mazo y Descarte; la invocación tiene la misma Mano Máx. y roba la suya en cada turno.</small></p>
+          ${token ? "" : '<p class="hint"><i class="fa-solid fa-location-dot"></i> No hay Token del Invocador en la escena: el Master coloca el Token de la invocación.</p>'}
+        </div>`
+    });
+    return true;
+  }
+
+  /**
+   * (Master) Desinvoca: mano de la invocación → Descarte, retira sus Tokens y la marca como ausente.
+   * @returns {Promise<boolean>}
+   */
+  async _desinvocarComoMaster() {
+    const invocacion = this.actorInvocacion();
+    if (invocacion) {
+      const mano = invocacion.system.pilasDocumentos?.mano;
+      const descarte = this.system.pilasDocumentos?.descarte;
+      if (mano && descarte) {
+        for (const carta of [...mano.cards]) await invocacion._moverCartaEntrePilas(mano, descarte, carta.id);
+      }
+      for (const escena of game.scenes ?? []) {
+        const ids = escena.tokens.filter(t => t.actorId === invocacion.id).map(t => t.id);
+        if (ids.length) await escena.deleteEmbeddedDocuments("Token", ids);
+      }
+    }
+    await this.setFlag("cartas-y-dados", "invocacion.activa", false);
+    if (this.getFlag("cartas-y-dados", "marcaCombo")) await this.unsetFlag("cartas-y-dados", "marcaCombo");
+    const escapar = foundry.utils.escapeHTML;
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-person-walking-arrow-loop-left"></i><p><strong>${escapar(this.name)}</strong> deshace su invocación${invocacion ? ` (${escapar(invocacion.name)})` : ""}: las cartas de su mano van al Descarte.</p></div>`
+    });
+    return true;
+  }
+
+  /**
+   * (Master) Crea el Actor PNJ de la invocación: mismas características base que el Invocador (el Master
+   * las ajusta al tipo), dueños del Invocador, Token vinculado y amistoso.
+   * @param {string} tipo - Clave de `INVOCACIONES`.
+   * @returns {Promise<Actor|null>}
+   */
+  async _crearActorInvocacion(tipo) {
+    const cfg = INVOCACIONES[tipo];
+    const pilas = this.system.pilas ?? {};
+    if (!cfg || !pilas.mazoId || !pilas.descarteId) {
+      ui.notifications.warn(`${this.name} necesita sus pilas de cartas para invocar.`);
+      return null;
+    }
+    const nombre = `${cfg.nombre} (${this.name})`;
+    const invocacion = await Actor.create({
+      name: nombre,
+      type: "pnj",
+      img: cfg.img,
+      ownership: foundry.utils.deepClone(this.ownership ?? {}),
+      system: {
+        caracteristicas: foundry.utils.deepClone(this.system._source?.caracteristicas ?? {}),
+        pilas: { mazoId: pilas.mazoId, descarteId: pilas.descarteId }
+      },
+      prototypeToken: {
+        name: nombre, actorLink: true, disposition: CONST.TOKEN_DISPOSITIONS.FRIENDLY, texture: { src: cfg.img }
+      },
+      flags: { "cartas-y-dados": { invocadorId: this.id, tipoInvocacion: tipo } }
+    });
+    if (invocacion) await this.setFlag("cartas-y-dados", "invocacion.actorId", invocacion.id);
+    return invocacion ?? null;
+  }
+
+  /**
+   * (Master) Asegura las pilas de la invocación: Mazo y Descarte del Invocador (compartidos) y Mano,
+   * Quemadas, Mazo de Trinkets y En Juego propios, con los mismos dueños que el Invocador.
+   * @param {Actor} invocacion
+   * @returns {Promise<void>}
+   */
+  async _asegurarPilasInvocacion(invocacion) {
+    const { NONE, OBSERVER, OWNER } = CONST.DOCUMENT_OWNERSHIP_LEVELS;
+    const duenos = Object.fromEntries(Object.entries(this.ownership ?? {})
+      .filter(([id, nivel]) => id !== "default" && nivel >= OWNER));
+    const pilasInvocador = this.system.pilas ?? {};
+    const idsInvocador = new Set(Object.values(pilasInvocador).filter(Boolean));
+    const cambios = {};
+    for (const clave of ["mazoId", "descarteId"]) {
+      if (invocacion.system.pilas?.[clave] !== pilasInvocador[clave]) cambios[`system.pilas.${clave}`] = pilasInvocador[clave];
+    }
+    const propias = [
+      { clave: "manoId", nombre: "Mano", tipo: "hand", publico: false },
+      { clave: "quemadasId", nombre: "Cartas Quemadas", tipo: "pile", publico: true },
+      { clave: "enJuegoId", nombre: "Trinkets en Juego", tipo: "pile", publico: true },
+      { clave: "trinketsId", nombre: "Mazo de Trinkets", tipo: "deck", publico: true }
+    ];
+    let carpeta = null;
+    for (const def of propias) {
+      const id = invocacion.system.pilas?.[def.clave];
+      if (id && game.cards.get(id) && !idsInvocador.has(id)) continue;
+      carpeta ??= await obtenerOCrearCarpeta("Cards", invocacion.name, "#2b3a4a");
+      const pila = await Cards.create({
+        name: `${invocacion.name} - ${def.nombre}`, type: def.tipo, folder: carpeta.id,
+        ownership: { default: def.publico ? OBSERVER : NONE, ...duenos }
+      });
+      cambios[`system.pilas.${def.clave}`] = pila.id;
+    }
+    if (Object.keys(cambios).length) await invocacion.update(cambios);
+    invocacion.prepareData();
+  }
+
+  /**
+   * (Master) Coloca el Token de la invocación junto al del Invocador (escena vista o activa), si no está ya.
+   * @param {Actor} invocacion
+   * @returns {Promise<TokenDocument|null>} null si no se ha colocado.
+   */
+  async _colocarTokenInvocacion(invocacion) {
+    for (const escena of [game.scenes?.viewed, game.scenes?.active].filter(Boolean)) {
+      if (escena.tokens.some(t => t.actorId === invocacion.id)) return escena.tokens.find(t => t.actorId === invocacion.id);
+      const tokenInvocador = escena.tokens.find(t => t.actorId === this.id);
+      if (!tokenInvocador) continue;
+      const tam = Number(escena.grid?.size) || 100;
+      const datos = await invocacion.getTokenDocument({
+        x: tokenInvocador.x + tam * (Number(tokenInvocador.width) || 1), y: tokenInvocador.y
+      });
+      const [creado] = await escena.createEmbeddedDocuments("Token", [datos.toObject()]);
+      return creado ?? null;
+    }
+    return null;
+  }
+
+  /**
+   * Fin de escena/combate de la invocación: solo su Mano vuelve al Mazo compartido (el Descarte lo
+   * devuelve el Invocador) y se baraja.
+   * @returns {Promise<void>}
+   */
+  async _finalizarEscenaInvocacion() {
+    const { mazo, mano } = this.system.pilasDocumentos ?? {};
+    if (mazo && mano?.cards.size) {
+      await this._devolverCartasASuMazoOriginal(mano);
+      await mazo.shuffle({ chatNotification: false });
+    }
+    await this._limpiarEstadoAcciones();
+    this.prepareData();
+  }
+
+  /**
+   * Descanso de la invocación (con cualquier descanso del Invocador o desde su ficha; decisión: el texto
+   * dice «descanso largo»): su Mano y sus Quemadas vuelven al Mazo compartido, su Agotamiento vuelve a 0
+   * y su Salud al máximo.
+   * @returns {Promise<void>}
+   */
+  async restablecerInvocacion() {
+    if (!this.isOwner) return;
+    const { mazo, mano, quemadas } = this.system.pilasDocumentos ?? {};
+    for (const pila of [mano, quemadas]) {
+      if (pila?.cards.size) await this._devolverCartasASuMazoOriginal(pila);
+    }
+    if (mazo) await mazo.shuffle({ chatNotification: false });
+    const agotamiento = Number(this.system.cansancio?.value) || 0;
+    if (agotamiento > 0) await this.cambiarAgotamiento(-agotamiento);
+    this.prepareData();
+    await this.update({ "system.salud.value": Math.max(1, Number(this.system.salud?.maxTotal) || 1) });
+    await this._limpiarEstadoAcciones();
+    this.prepareData();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-campground"></i><p><strong>${foundry.utils.escapeHTML(this.name)}</strong> descansa: recupera su Salud, su Agotamiento vuelve a 0 y sus Cartas Quemadas vuelven al Mazo.</p></div>`
+    });
+  }
+
+  /**
+   * Robo que no es el de turno con la invocación presente: el Invocador elige cuántas cartas van a la
+   * mano de la invocación.
+   * @param {number} cantidad
+   * @param {Actor} invocacion
+   * @returns {Promise<number|null>} Cartas para la invocación (0..cantidad) o null si se cancela.
+   */
+  async _elegirManoDelRobo(cantidad, invocacion) {
+    const escapar = foundry.utils.escapeHTML;
+    const nombre = escapar(invocacion.name);
+    if (cantidad === 1) {
+      const destino = await foundry.applications.api.DialogV2.wait({
+        ...opcionesDialogoSistema({ width: 420 }),
+        window: { title: "¿A qué mano va la carta?", icon: "fa-solid fa-clone" },
+        content: `<p><strong>${escapar(this.name)}</strong> roba 1 carta fuera del robo de turno: elige a qué mano va.</p>`,
+        buttons: [
+          { action: "propia", label: "A mi mano", icon: "fa-solid fa-hand", default: true, callback: () => "propia" },
+          { action: "invocacion", label: `A la mano de ${invocacion.name}`, icon: "fa-solid fa-hat-wizard", callback: () => "invocacion" }
+        ],
+        rejectClose: false
+      });
+      if (!destino) return null;
+      return destino === "invocacion" ? 1 : 0;
+    }
+    const valor = await foundry.applications.api.DialogV2.prompt({
+      ...opcionesDialogoSistema({ width: 420 }),
+      window: { title: "¿A qué mano van las cartas?", icon: "fa-solid fa-clone" },
+      content: `<p><strong>${escapar(this.name)}</strong> roba <strong>${cantidad}</strong> cartas fuera del robo de turno. ¿Cuántas van a la mano de <strong>${nombre}</strong>? El resto va a la tuya.</p>
+        <div class="form-group"><label>Para la invocación</label><input type="number" name="cydParaInvocacion" value="0" min="0" max="${cantidad}" step="1" /></div>`,
+      ok: { label: "Robar", icon: "fa-solid fa-clone", callback: (event, button) => Number(button.form.elements.cydParaInvocacion.value) },
+      rejectClose: false
+    });
+    if (typeof valor !== "number" || Number.isNaN(valor)) return null;
+    return Math.min(cantidad, Math.max(0, Math.floor(valor)));
+  }
+
+  /**
+   * Marca y Combo: contexto de un ataque de este Actor (el Invocador o su invocación) contra el Token
+   * objetivo. La marca vive en el Invocador (`flags.cartas-y-dados.marcaCombo {objetivoUuid, nombre,
+   * dados, ultimo: "invocador"|"invocacion", turnoBono}`). Si el ataque es del otro atacante contra el
+   * objetivo marcado, suma `dados` dados (una vez por turno de combate).
+   * @param {Token|null} tokenObjetivo
+   * @returns {object|null} null si el abalorio no está En Juego o no hay objetivo válido.
+   */
+  _contextoMarcaCombo(tokenObjetivo) {
+    const actorObjetivo = tokenObjetivo?.actor ?? null;
+    if (!actorObjetivo) return null;
+    const invocador = this.invocadorDeInvocacion() ?? this;
+    if (!invocador.abaloriosActivos().has("marcaCombo")) return null;
+    if ([invocador.id, invocador.actorInvocacion()?.id].includes(actorObjetivo.id)) return null;
+    const rol = invocador.id === this.id ? "invocador" : "invocacion";
+    const marca = invocador.getFlag("cartas-y-dados", "marcaCombo") ?? null;
+    const turno = claveTurnoCombate();
+    const alterna = Boolean(marca) && marca.objetivoUuid === actorObjetivo.uuid && marca.ultimo !== rol;
+    const bonoUsado = alterna && turno !== null && marca.turnoBono === turno;
+    const dados = Math.max(1, Number(marca?.dados) || 1);
+    return {
+      invocador, rol, marca, actorObjetivo, nombre: tokenObjetivo.name ?? actorObjetivo.name,
+      alterna, dados, turno, bono: alterna && !bonoUsado ? dados : 0
+    };
+  }
+
+  /**
+   * Marca y Combo tras la tirada de ataque: si hace daño (supera la Defensa) marca al objetivo o, si se
+   * alterna con bono, la marca crece en 1; si no hace daño, la marca se pierde. Atacar a otro objetivo o
+   * repetir atacante la reinicia a 1.
+   * @param {object} contexto - De `_contextoMarcaCombo`.
+   * @param {import("../dados.mjs").ResultadoTiradaSistema|null} tirada
+   * @returns {Promise<string>} Línea de chat ("" si no hay nada que decir).
+   */
+  async _actualizarMarcaCombo(contexto, tirada) {
+    const { invocador, rol, marca, actorObjetivo, nombre, alterna, dados, turno, bono } = contexto;
+    const escapar = foundry.utils.escapeHTML;
+    actorObjetivo.prepareData();
+    const defensa = Number(actorObjetivo.system.defensaTotal ?? actorObjetivo.system.defensa) || 0;
+    const impacta = Boolean(tirada) && !tirada.esNegativo && tirada.total - defensa > 0;
+    if (!impacta) {
+      if (!marca) return "";
+      await invocador.unsetFlag("cartas-y-dados", "marcaCombo");
+      return `<p><i class="fa-solid fa-crosshairs"></i> <strong>Marca y Combo:</strong> la marca sobre ${escapar(marca.nombre ?? "el objetivo")} se pierde.</p>`;
+    }
+    const nueva = alterna
+      ? { objetivoUuid: actorObjetivo.uuid, nombre, dados: dados + (bono ? 1 : 0), ultimo: rol, turnoBono: bono ? turno : (marca.turnoBono ?? null) }
+      : { objetivoUuid: actorObjetivo.uuid, nombre, dados: 1, ultimo: rol, turnoBono: null };
+    await invocador.setFlag("cartas-y-dados", "marcaCombo", nueva);
+    const siguiente = rol === "invocador" ? "la invocación" : escapar(invocador.name);
+    return `<p><i class="fa-solid fa-crosshairs"></i> <strong>Marca y Combo:</strong> ${escapar(nombre)} queda marcado: el siguiente ataque de ${siguiente} contra él suma <strong>+${nueva.dados} dado(s)</strong>.</p>`;
+  }
+
+  /**
+   * Retira la marca de «Marca y Combo» (botón de la ficha).
+   * @returns {Promise<void>}
+   */
+  async retirarMarcaCombo() {
+    if (this.getFlag("cartas-y-dados", "marcaCombo")) await this.unsetFlag("cartas-y-dados", "marcaCombo");
+  }
+
+  /**
+   * Conceder ofrenda (lo llama `aplicarDano` en el cliente del Master): si el atacante es un Invocador con el
+   * abalorio En Juego (o su invocación) y este Actor cae a 0, el Master recibe el botón para curar a la
+   * invocación la mitad de la Salud Máx. de la criatura (redondeo hacia arriba). El Master decide si era
+   * un enemigo.
+   * @param {string} atacanteUuid
+   * @returns {Promise<void>}
+   */
+  async _avisarConcederOfrenda(atacanteUuid) {
+    const atacante = await fromUuid(atacanteUuid);
+    const invocador = atacante?.invocadorDeInvocacion?.() ?? atacante;
+    if (typeof invocador?.abaloriosActivos !== "function" || !invocador.abaloriosActivos().has("concederOfrenda")) return;
+    const invocacion = invocador.actorInvocacion();
+    if (!invocacion || [invocador.id, invocacion.id].includes(this.id)) return;
+    const curacion = Math.ceil((Number(this.system.salud?.maxTotal) || 0) / 2);
+    if (curacion <= 0) return;
+    const escapar = foundry.utils.escapeHTML;
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: invocador }),
+      whisper: invocador._destinatariosPrivados(),
+      content: `
+        <div class="cyd-carta-jugada">
+          <h3><i class="fa-solid fa-hand-holding-droplet"></i> Conceder ofrenda</h3>
+          <p>${escapar(atacante.name)} acaba con <strong>${escapar(this.name)}</strong>. Si es un enemigo, su vida puede ofrecerse: ${escapar(invocacion.name)} sana <strong>${curacion}</strong> (la mitad de su Salud Máx.).</p>
+          <button type="button" class="cyd-btn-aplicar-curacion" data-actor-uuid="${invocacion.uuid}" data-curacion="${curacion}">
+            <i class="fa-solid fa-heart-pulse"></i> Aplicar ${curacion} de Curación a ${escapar(invocacion.name)}
+          </button>
+        </div>`
+    });
+  }
+
+  /**
+   * Bloque del valor X de Saciar estímulo y Restaurar Vínculo (sobre la propia invocación).
+   * @param {"saciarEstimulo"|"restaurarVinculo"} efectoX
+   * @param {number} valor - X (> 0).
+   * @returns {string} HTML.
+   */
+  _htmlValorXInvocacion(efectoX, valor) {
+    const escapar = foundry.utils.escapeHTML;
+    const invocacion = efectoX === "saciarEstimulo" ? this.invocacionActiva() : this.actorInvocacion();
+    if (!invocacion) {
+      return `<p class="hint"><i class="fa-solid fa-hat-wizard"></i> ${efectoX === "saciarEstimulo" ? "Tu invocación no está presente: invócala para automatizar el efecto." : "Aún no tienes ninguna invocación."}</p>`;
+    }
+    const nombre = escapar(invocacion.name);
+    if (efectoX === "saciarEstimulo") {
+      return `
+        <p><i class="fa-solid fa-shuffle"></i> <strong>${nombre}</strong> actúa por voluntad propia con una carta al azar de su mano y suma <strong>+${valor}</strong> a su tirada.</p>
+        <button type="button" class="cyd-btn-saciar" data-actor-uuid="${this.uuid}" data-x="${valor}">
+          <i class="fa-solid fa-shuffle"></i> Saciar estímulo: carta al azar (+${valor})
+        </button>`;
+    }
+    return `
+      <p><i class="fa-solid fa-heart-pulse"></i> Sana <strong>${valor}</strong> de Salud a <strong>${nombre}</strong> (lo aplica el Master) y después robas 1 carta.</p>
+      <button type="button" class="cyd-btn-aplicar-curacion" data-actor-uuid="${invocacion.uuid}" data-curacion="${valor}">
+        <i class="fa-solid fa-heart-pulse"></i> Aplicar ${valor} de Curación a ${nombre}
+      </button>`;
+  }
+
+  /**
+   * Saciar estímulo (botón del chat): la invocación usa una Carta de Acción al azar de su mano con +X.
+   * @param {number} x
+   * @returns {Promise<boolean>}
+   */
+  async usarSaciarEstimulo(x) {
+    const invocacion = this.invocacionActiva();
+    if (!invocacion) {
+      ui.notifications.warn("Tu invocación no está presente.");
+      return false;
+    }
+    const cartas = invocacion.system.pilasDocumentos?.mano?.cards.contents.filter(c => c.type === "accion") ?? [];
+    if (!cartas.length) {
+      ui.notifications.warn(`La mano de ${invocacion.name} no tiene Cartas de Acción.`);
+      return false;
+    }
+    const carta = cartas[Math.floor(Math.random() * cartas.length)];
+    const escapar = foundry.utils.escapeHTML;
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: invocacion }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-shuffle"></i><p><strong>Saciar estímulo:</strong> ${escapar(invocacion.name)} usa al azar <strong>${escapar(nombreVisibleCarta(carta))}</strong> (${abreviadoPalo(carta.system.palo)} ${escapar(carta.system.tipoDado ?? "")}) con +${x}.</p></div>`
+    });
+    return abrirDialogoAccion(invocacion, carta.id, { bonoExtra: x, motivoBono: "Saciar estímulo" });
+  }
+
+  /**
+   * Restitución (habilidad sin tirada): la mano de la invocación va al Descarte y roba otras tantas
+   * cartas. Exige la invocación presente; sin ella no se gasta nada.
+   * @returns {Promise<{html: string, invocacion: Actor, cartas: Card[]}|null>}
+   */
+  async _resolverRestitucion() {
+    const invocacion = this.invocacionActiva();
+    const mano = invocacion?.system.pilasDocumentos?.mano;
+    const descarte = this.system.pilasDocumentos?.descarte;
+    if (!invocacion || !mano || !descarte) {
+      ui.notifications.warn("Restitución necesita a tu invocación presente: invócala antes.");
+      return null;
+    }
+    const ids = mano.cards.contents.filter(c => c.type === "accion").map(c => c.id);
+    for (const id of ids) await invocacion._moverCartaEntrePilas(mano, descarte, id);
+    const previas = new Set(mano.cards.map(c => c.id));
+    const robadas = ids.length ? await invocacion.robarCantidadCartas(ids.length) : 0;
+    const cartas = mano.cards.contents.filter(c => c.type === "accion" && !previas.has(c.id));
+    const nombre = foundry.utils.escapeHTML(invocacion.name);
+    return {
+      invocacion, cartas,
+      html: `<p><i class="fa-solid fa-recycle"></i> <strong>${nombre}</strong> manda al Descarte ${ids.length} carta(s) de su mano y roba ${robadas}${cartas.length ? ": actúa de inmediato con una de ellas." : "."}</p>`
+    };
+  }
+
+  /**
+   * Abre el diálogo de acción de la invocación con una de `cartas` (Restitución).
+   * @param {Actor} invocacion
+   * @param {Card[]} cartas
+   * @param {string} origen - Nombre del efecto (título del diálogo).
+   * @returns {Promise<boolean>}
+   */
+  async _accionInmediataInvocacion(invocacion, cartas, origen) {
+    const mano = invocacion.system.pilasDocumentos?.mano;
+    const vivas = cartas.filter(c => mano?.cards.has(c.id));
+    if (!vivas.length) return false;
+    const cartaId = vivas.length === 1 ? vivas[0].id : await this._elegirCartaDeMano(vivas, {
+      titulo: `${origen}: acción de ${invocacion.name}`, icono: "fa-solid fa-recycle",
+      texto: "<p>Elige la carta con la que actúa tu invocación.</p>"
+    });
+    if (!cartaId) return false;
+    return abrirDialogoAccion(invocacion, cartaId);
+  }
+
+  /**
+   * Contexto de la ficha del Invocador: tipo, invocación (Salud, Agotamiento, cartas) y marca.
+   * @returns {object|null} null si no es Invocador.
+   */
+  contextoInvocador() {
+    if (!this.esInvocador()) return null;
+    const tipo = this.tipoInvocacion();
+    const invocacion = this.actorInvocacion();
+    invocacion?.prepareData();
+    const pilas = invocacion?.system.pilasDocumentos ?? {};
+    const marca = this.getFlag("cartas-y-dados", "marcaCombo") ?? null;
+    return {
+      tipo: tipo ? { clave: tipo, ...INVOCACIONES[tipo] } : null,
+      activa: Boolean(this.invocacionActiva()),
+      invocacion: invocacion
+        ? {
+          nombre: invocacion.name,
+          salud: Number(invocacion.system.salud?.value) || 0,
+          saludMax: Number(invocacion.system.salud?.maxTotal) || 0,
+          agotamiento: Number(invocacion.system.cansancio?.value) || 0,
+          mano: pilas.mano?.cards.size ?? 0,
+          quemadas: pilas.quemadas?.cards.size ?? 0
+        }
+        : null,
+      marca: marca && this.abaloriosActivos().has("marcaCombo")
+        ? { nombre: marca.nombre, dados: Number(marca.dados) || 1, siguiente: marca.ultimo === "invocador" ? "tu invocación" : "tú" }
+        : null
+    };
+  }
+
+  /**
+   * Contexto de la ficha de PNJ de una invocación: su Invocador y si está presente.
+   * @returns {{invocador: string, tipo: string, activa: boolean}|null}
+   */
+  contextoInvocacion() {
+    const invocador = this.invocadorDeInvocacion();
+    if (!invocador) return null;
+    return {
+      invocador: invocador.name,
+      tipo: INVOCACIONES[this.getFlag("cartas-y-dados", "tipoInvocacion")]?.nombre ?? "",
+      activa: invocador.invocacionActiva()?.id === this.id
+    };
+  }
+
   /**
    * Estados de Potens Mystica sobre este Actor para las fichas de PJ y PNJ (v0.17.0).
    * @returns {{malDeOjo: object|null, destinoSellado: object|null}|null} null si no hay ninguno.
@@ -3389,6 +4137,9 @@ export class SistemaActor extends Actor {
     for (const clave of ["reaccionUsada", "empatiaUsada", "preservacionUsada"]) {
       if (this.getFlag("cartas-y-dados", clave)) await this.unsetFlag("cartas-y-dados", clave);
     }
+    // (v0.22.0) Invocador: la invocación comparte el turno y también recupera su reacción.
+    const invocacion = this.actorInvocacion();
+    if (invocacion?.isOwner) await invocacion.restablecerReaccion();
   }
 
   /**
@@ -3679,6 +4430,11 @@ export class SistemaActor extends Actor {
   async finalizarAccionOCombate() {
     const { mazo, trinkets, mano, enJuego, descarte } = this.system.pilasDocumentos;
     if (!mazo) return;
+    // (v0.22.0) Invocador: la invocación solo devuelve su Mano (el Descarte es el del Invocador).
+    if (this.esInvocacion()) return this._finalizarEscenaInvocacion();
+    const invocacion = this.actorInvocacion();
+    if (invocacion) await invocacion._finalizarEscenaInvocacion();
+    if (this.getFlag("cartas-y-dados", "marcaCombo")) await this.unsetFlag("cartas-y-dados", "marcaCombo");
     await this.soltarCartaVisto(); // (v0.19.0) Visto y No visto: la carta guardada vuelve con el Descarte
 
     for (const pila of [mano, enJuego, descarte]) {
@@ -3713,6 +4469,11 @@ export class SistemaActor extends Actor {
   async realizarDescanso({ comodo = false } = {}) {
     const { mazo, trinkets, mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mazo) return;
+    // (v0.22.0) Invocador: la invocación se restablece (Salud, Agotamiento y Quemadas) al descansar.
+    if (this.esInvocacion()) return this.restablecerInvocacion();
+    const invocacion = this.actorInvocacion();
+    if (invocacion) await invocacion.restablecerInvocacion();
+    if (this.getFlag("cartas-y-dados", "marcaCombo")) await this.unsetFlag("cartas-y-dados", "marcaCombo");
     await this.soltarCartaVisto(); // (v0.19.0) Visto y No visto: la carta guardada vuelve con el Descarte
 
     for (const pila of [mano, enJuego, descarte, quemadas]) {
@@ -4487,13 +5248,16 @@ export class SistemaActor extends Actor {
       const efectoSinTirada = item.getFlag("cartas-y-dados", "efectoX") ?? null;
       const brujo = efectoSinTirada === "cerrarDestino" ? this._prepararCerrarDestino() : null;
       if (efectoSinTirada === "cerrarDestino" && !brujo) return null;
+      // (v0.22.0) Invocador · Restitución: exige la invocación presente (si no, no se gasta nada).
+      const restitucion = efectoSinTirada === "restitucion" ? await this._resolverRestitucion() : null;
+      if (efectoSinTirada === "restitucion" && !restitucion) return null;
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this }),
         content: `
           <div class="cyd-carta-jugada">
             <h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${item.name}</h3>
             ${lineaCartaUsada}
-            ${sellar?.html ?? brujo?.html ?? "<p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>"}
+            ${sellar?.html ?? brujo?.html ?? restitucion?.html ?? "<p><strong>Efecto:</strong> aplicado directamente sin tirada de dados.</p>"}
             ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
             ${lineaQuemada}
           </div>
@@ -4506,9 +5270,11 @@ export class SistemaActor extends Actor {
       if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
       await this._registrarUltimaCaracteristica("misticismo"); // (v0.15.0) abalorio Amistad
     await this._marcarAccionMiniTurno();
-    await this.retirarDestinoSellado(); // (v0.17.0) Sellar destino: la acción ya se ha realizado
+      await this.retirarDestinoSellado(); // (v0.17.0) Sellar destino: la acción ya se ha realizado
       this.prepareData();
       if (this.sheet?.rendered) this.sheet.render();
+      // (v0.22.0) Restitución: la invocación actúa de inmediato con una de las cartas robadas.
+      if (restitucion?.cartas?.length) await this._accionInmediataInvocacion(restitucion.invocacion, restitucion.cartas, "Restitución");
       return null;
     }
 
@@ -4631,6 +5397,8 @@ export class SistemaActor extends Actor {
     await this._aplicarAutomatizacionHabilidad(item);
     // (v0.20.0) Brujo · Corrupción física: +1 Agotamiento al usarla (después de fijar el nivel copiado).
     if (efectoX === "corrupcionFisica") await this.cambiarAgotamiento(1);
+    // (v0.22.0) Invocador · Restaurar Vínculo: tras curar a la invocación (lo aplica el Master), roba 1 carta.
+    if (efectoX === "restaurarVinculo" && !tirada.esNegativo) await this.robarCantidadCartas(1, { elegirMano: true });
 
     if (reaccion && this.estaEnCombate()) await this.setFlag("cartas-y-dados", "reaccionUsada", true);
     await this._registrarUltimaCaracteristica("misticismo"); // (v0.15.0) abalorio Amistad
@@ -4708,6 +5476,9 @@ export class SistemaActor extends Actor {
             <i class="fa-solid fa-heart-pulse"></i> Aplicar ${consumidas.length} de Curación a ${escapar(this.name)}
           </button>`
         : `<p class="hint"><i class="fa-solid fa-crosshairs"></i> Puedes consumir hasta <strong>${valor}</strong> criatura(s): márcalas con <strong>T</strong> antes de usar la habilidad para automatizar la curación (+1 Salud por cada una).</p>`;
+    } else if (exito && (efectoX === "saciarEstimulo" || efectoX === "restaurarVinculo")) {
+      // (v0.22.0) Invocador: efectos sobre la propia invocación (no usan el Token objetivo).
+      htmlEfecto = this._htmlValorXInvocacion(efectoX, valor);
     } else if (exito && efectoX === "manifestarArma") {
       const categorias = Math.min(5, Math.max(1, Number(numeroCarta) || 1));
       htmlEfecto = `<p><i class="fa-solid fa-khanda"></i> Arma manifestada de <strong>${categorias} categoría(s)</strong> (carta ${SISTEMA_CONFIG.dadoPorNumeroCarta[categorias] ?? ""}) durante <strong>${valor} turno(s)</strong>.</p>`;
@@ -4867,7 +5638,7 @@ export class SistemaActor extends Actor {
     }
 
     if (robarCartas > 0) {
-      await this.robarCantidadCartas(robarCartas);
+      await this.robarCantidadCartas(robarCartas, { elegirMano: true });
     }
   }
 
@@ -4981,5 +5752,65 @@ export function registrarSocketAltaScentia() {
     if (mensaje?.tipo !== "monoculo") return;
     if (game.user !== game.users.activeGM) return;
     await revelarCartaSuperiorMonoculo(mensaje.datos ?? {});
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  (v0.22.0) Invocador: peticiones al Master (crear la invocación y su Token) */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Clave del turno de combate en curso (Marca y Combo: bono una vez por turno). null fuera de combate.
+ * @returns {string|null}
+ */
+function claveTurnoCombate() {
+  const combate = game.combat;
+  return combate?.started ? `${combate.id}:${combate.round}:${combate.turn}` : null;
+}
+
+/**
+ * Ejecuta una acción del Invocador que necesita permisos de Master (crear Actores, pilas y Tokens): si el
+ * usuario es Master la ejecuta directamente; si no, la pide por socket al Master activo.
+ * @param {"invocar"|"desinvocar"} accion
+ * @param {{invocadorId: string, cartasIds?: string[]}} datos
+ * @returns {Promise<boolean>}
+ */
+async function solicitarInvocacionAlMaster(accion, datos) {
+  if (game.user.isGM) return atenderInvocacion(accion, datos);
+  if (!game.users.activeGM) {
+    ui.notifications.warn("Hace falta un Master conectado para invocar o desinvocar.");
+    return false;
+  }
+  game.socket.emit(CANAL_SOCKET, { tipo: "invocacion", accion, datos });
+  return true;
+}
+
+/**
+ * Atiende (en el cliente del Master) una acción de invocación.
+ * @param {"invocar"|"desinvocar"} accion
+ * @param {{invocadorId: string, cartasIds?: string[]}} datos
+ * @returns {Promise<boolean>}
+ */
+async function atenderInvocacion(accion, { invocadorId, cartasIds = [] } = {}) {
+  const invocador = game.actors?.get(invocadorId);
+  if (!invocador) return false;
+  if (accion === "invocar") return invocador._invocarComoMaster(cartasIds);
+  if (accion === "desinvocar") return invocador._desinvocarComoMaster();
+  return false;
+}
+
+/**
+ * Escucha en el socket del sistema las peticiones de invocación de los jugadores (v0.22.0). Solo el
+ * Master activo las atiende. Llamar en `ready`.
+ */
+export function registrarSocketInvocador() {
+  game.socket.on(CANAL_SOCKET, async mensaje => {
+    if (mensaje?.tipo !== "invocacion") return;
+    if (game.user !== game.users.activeGM) return;
+    try {
+      await atenderInvocacion(mensaje.accion, mensaje.datos ?? {});
+    } catch (error) {
+      console.error("Cartas y Dados | Error atendiendo una invocación:", error);
+    }
   });
 }

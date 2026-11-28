@@ -397,6 +397,33 @@
             {{/if}}
           </div>
           {{/if}}
+          {{!-- (v0.22.0) Mendacium Charisma · Invocador: invocación, su estado y Marca y Combo --}}
+          {{#if invocador}}
+          <div class="cyd-estado-acciones cyd-invocador">
+            {{#if invocador.tipo}}
+              <span class="cyd-chip-estado{{#if invocador.activa}} cyd-activo{{/if}}" data-tooltip="{{invocador.tipo.nombre}}: {{invocador.tipo.texto}}{{#if invocador.invocacion}}<br>Salud {{invocador.invocacion.salud}}/{{invocador.invocacion.saludMax}} · Agotamiento {{invocador.invocacion.agotamiento}} · Mano {{invocador.invocacion.mano}} · Quemadas {{invocador.invocacion.quemadas}}{{/if}}<br>Comparte tu turno, tu Mazo y tu Descarte; tiene tu misma Mano Máx.">
+                <i class="fa-solid {{invocador.tipo.icono}}"></i> {{#if invocador.invocacion}}{{invocador.invocacion.nombre}}{{else}}{{invocador.tipo.nombre}}{{/if}}{{#if invocador.activa}} · invocada{{/if}}
+                {{#if invocador.invocacion}} · <i class="fa-solid fa-heart"></i> {{invocador.invocacion.salud}}/{{invocador.invocacion.saludMax}}{{/if}}
+              </span>
+              {{#if invocador.activa}}
+                <button type="button" class="cyd-btn-mini" data-action="desinvocar" data-tooltip="Deshacer la invocación (acción gratuita en tu turno): las cartas de su mano van al Descarte"><i class="fa-solid fa-person-walking-arrow-loop-left"></i> Desinvocar</button>
+              {{else}}
+                <button type="button" class="cyd-btn-mini" data-action="invocar" data-tooltip="Invoca a tu criatura y divide tu mano a la mitad entre tú y ella (el Master coloca su Token)"><i class="fa-solid fa-hat-wizard"></i> Invocar</button>
+              {{/if}}
+              {{#if invocador.invocacion}}
+                <button type="button" class="cyd-btn-icono" data-action="abrirInvocacion" data-tooltip="Abrir la ficha de la invocación (sus cartas, Salud y acciones)"><i class="fa-solid fa-up-right-from-square"></i></button>
+              {{/if}}
+            {{else}}
+              <button type="button" class="cyd-btn-mini" data-action="elegirTipoInvocacion" data-tooltip="Elige tu invocación: Plaga sobrenatural, Bestia mágica o Poltergeist"><i class="fa-solid fa-hat-wizard"></i> Elegir invocación</button>
+            {{/if}}
+            {{#if invocador.marca}}
+              <span class="cyd-chip-estado cyd-activo" data-tooltip="Marca y Combo: si el siguiente ataque contra el objetivo marcado lo hace {{invocador.marca.siguiente}}, suma estos dados (una vez por turno). Atacar a otro objetivo, repetir atacante o no hacer daño reinicia la marca">
+                <i class="fa-solid fa-crosshairs"></i> Marca: <strong>{{invocador.marca.nombre}}</strong> · +{{invocador.marca.dados}} dado(s) para {{invocador.marca.siguiente}}
+              </span>
+              <button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="marcaCombo" data-tooltip="Retirar la marca"><i class="fa-solid fa-xmark"></i></button>
+            {{/if}}
+          </div>
+          {{/if}}
           <div class="cyd-acciones-turno cyd-cols-2">
             {{#if estadoAcciones.miniTurno}}
               {{#if estadoAcciones.miniTurno.esReaccion}}

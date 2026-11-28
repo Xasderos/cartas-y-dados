@@ -275,6 +275,13 @@ export class BaseActorDataModel extends TypeDataModel {
     // (se acumula con la reducción por Agotamiento).
     this.manoMitadPorSangreFria = this.razaBase === "sierpes" && Boolean(this.rasgosRaza?.expuestoElementos);
     if (this.manoMitadPorSangreFria) this.limiteMano = Math.max(minimoMano, Math.ceil(this.limiteMano / 2));
+    // (v0.22.0) Invocador: la invocación (PNJ con `flags.cartas-y-dados.invocadorId`) tiene la misma
+    // Mano Máx. que su Invocador (si este ya tiene sus datos derivados calculados).
+    const idInvocador = this.parent?.flags?.["cartas-y-dados"]?.invocadorId;
+    const invocador = idInvocador && idInvocador !== this.parent?.id ? game.actors?.get?.(idInvocador) : null;
+    const limiteInvocador = Number(invocador?.system?.limiteMano);
+    this.manoDeInvocador = Number.isFinite(limiteInvocador) && limiteInvocador > 0;
+    if (this.manoDeInvocador) this.limiteMano = limiteInvocador;
 
     // Movimiento máximo = Base editable (ajuste world "movimientoBase") + (Físico Total * 5) metros.
     // El campo `value` se sincroniza con `max` por compatibilidad con datos antiguos;

@@ -584,8 +584,73 @@ export const SISTEMA_CONFIG = {
               texto: "Especialización de Mendacium Charisma. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
             },
             {
+              // (v0.22.0) Invocador: progresión propia de Nv. 3 a 6 (se suma a la de la clase).
               clave: "invocador", nombre: "Invocador",
-              texto: "Especialización de Mendacium Charisma. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+              texto: "Especialización de Mendacium Charisma: haces aparecer a un ser con el que posees un vínculo mágico, que comparte tu turno y tus cartas.",
+              tablaElecciones: [
+                { nivel: 3, beneficios: "Elección de característica · +1 Mano Máxima · Elección de abalorio · Elección de invocación" },
+                { nivel: 4, beneficios: "Elección de habilidad · Elección de cartas" },
+                { nivel: 5, beneficios: "Elección de habilidad (pendiente de definir) · Elección de característica" },
+                { nivel: 6, beneficios: "Elección de abalorio (pendiente de definir) · +1 Mano Máxima" }
+              ],
+              progresion: {
+                3: {
+                  caracteristica: true,
+                  manoMaxima: 1,
+                  abalorios: [
+                    {
+                      clave: "cordelSintonia", nombre: "Cordel de sintonía", icono: "fa-link",
+                      texto: "Cuando el mago vaya a recibir daño, en su lugar puede recibir la mitad de ese daño. La otra mitad del daño lo recibe la invocación.",
+                      auto: "En Juego y con la invocación presente: al aplicar daño al Invocador, el Master puede repartirlo; el Invocador recibe la mitad (redondeo hacia arriba) y la invocación el resto."
+                    },
+                    {
+                      clave: "marcaCombo", nombre: "Marca y Combo", icono: "fa-crosshairs",
+                      texto: "Cuando uno de tus ataques (o de tu invocación) alcanza a un objetivo, queda marcado y recibe más daño de tu parte o de tu invocación: +1 dado a los ataques. Este efecto se mantiene mientras tu invocación y tú continuéis alternando los ataques en el objetivo. Este efecto está limitado a una vez por turno y es acumulativo. La marca se pierde cuando tu invocación o tú atacáis a otro objetivo o el objetivo no recibe daño.",
+                      auto: "En Juego: un ataque que impacta marca al objetivo (+1). Si el siguiente ataque contra él lo hace el otro (tú o tu invocación), suma tantos dados como la marca (una vez por turno) y, si impacta, la marca crece en 1. Atacar a otro objetivo, repetir atacante o no hacer daño reinicia la marca. Se ve en la ficha."
+                    },
+                    {
+                      clave: "concederOfrenda", nombre: "Conceder ofrenda", icono: "fa-hand-holding-droplet",
+                      texto: "Cuando tú o tu invocación acabéis con un enemigo, puedes dar su vida como ofrenda; sanas a tu invocación la mitad de su vida total.",
+                      auto: "En Juego: cuando el daño de un ataque tuyo o de tu invocación deja a una criatura a 0 de Salud, el Master recibe un botón para curar a la invocación la mitad de la Salud Máx. de esa criatura (redondeo hacia arriba)."
+                    }
+                  ],
+                  invocaciones: ["plaga", "bestia", "poltergeist"],
+                  pasivas: [
+                    {
+                      clave: "invocaciones", nombre: "Invocaciones",
+                      texto: "Obtienes la capacidad de hacer aparecer seres con los que posees un vínculo mágico (un contrato de ambas partes, cultural, familiar...). Invocación: activas una de las acciones de la invocación que deseas invocar (con sus limitaciones); una vez la criatura realice la acción, divides tu mano actual a la mitad: una mitad es tu mano y la otra la de tu invocación. Mano máxima: tu invocación tiene la misma mano máxima que tú. Turno: compartís turno; realizáis acciones, movimientos y reacciones de forma intercambiable y simultánea. Robo de cartas: tu invocación roba su mano máxima todos los turnos al igual que tú; si fueras a robar por un efecto distinto al robo de turno, eliges a qué mano va la carta. Límite: solo una criatura invocada al mismo tiempo. Salud y descanso: la salud, el agotamiento y las cartas quemadas de la invocación se restablecen con un descanso largo; la misma invocación vuelve siempre con los mismos recursos y puntos de vida, a no ser que se le permita descansar. Desinvocar: en tu turno, como acción gratuita."
+                    }
+                  ]
+                },
+                4: {
+                  habilidades: [
+                    {
+                      nombre: "Restitución", esAtaque: false, requiereTirada: false, efectoX: "restitucion",
+                      texto: "Mandas al descarte las cartas de la mano de tu invocación. Robas tantas cartas como hayas descartado. Tu invocación realiza una acción inmediatamente usando una de estas cartas."
+                    },
+                    {
+                      nombre: "Saciar estímulo", esAtaque: false, valorX: true, efectoX: "saciarEstimulo",
+                      texto: "Infundes de poder a tu invocación para que actúe por voluntad propia en un impulso. Escoge una carta de forma aleatoria de la mano de tu invocación, úsala y añádele el resultado de la carta de misticismo. (X es el resultado de la tirada de misticismo)"
+                    },
+                    {
+                      nombre: "Restaurar Vínculo", esAtaque: false, valorX: true, efectoX: "restaurarVinculo",
+                      texto: "Sanas a tu invocación tantos puntos de vida como resultado en la tirada. Tras ello robas una carta. (X es el resultado de la tirada de misticismo)"
+                    }
+                  ],
+                  packs: [
+                    [{ palo: "espadas", numero: 2 }, { palo: "oros", numero: 3 }],
+                    [{ palo: "bastos", numero: 2 }, { palo: "oros", numero: 3 }]
+                  ]
+                },
+                5: {
+                  caracteristica: true,
+                  pendientes: ["Elección de habilidad"]
+                },
+                6: {
+                  manoMaxima: 1,
+                  pendientes: ["Elección de abalorio"]
+                }
+              }
             }
           ]
         }
@@ -1042,6 +1107,13 @@ function gruposProgresion(progresion = {}) {
         opciones: opcionesTrinketsClase({ trinkets: recompensas.abalorios })
       });
     }
+    if (recompensas.invocaciones?.length) {
+      // (v0.22.0) Invocador: tipo de invocación.
+      grupos.push({
+        titulo: "Elección de invocación", icono: "fa-hat-wizard", nivel: Number(nivel),
+        opciones: opcionesInvocacion(recompensas.invocaciones)
+      });
+    }
     if (recompensas.habilidades?.length) {
       grupos.push({
         titulo: "Elección de habilidad", icono: "fa-wand-magic-sparkles", nivel: Number(nivel),
@@ -1140,8 +1212,42 @@ export const EFECTOS_VALOR_X = {
   // (v0.20.0) Potens Mystica · Brujo
   canibalizar: "Canibalizar: consumir hasta X criaturas marcadas (+1 Salud por cada una)",
   cerrarDestino: "Cerrar destino: todos queman una carta al azar y tiras con ellas (daño al objetivo, sin tirada)",
-  corrupcionFisica: "Corrupción física: el objetivo sufre tus desventajas de Agotamiento X turnos (+1 Agotamiento)"
+  corrupcionFisica: "Corrupción física: el objetivo sufre tus desventajas de Agotamiento X turnos (+1 Agotamiento)",
+  // (v0.22.0) Mendacium Charisma · Invocador
+  restitucion: "Restitución: la mano de tu invocación va al Descarte, roba otras tantas y actúa (sin tirada)",
+  saciarEstimulo: "Saciar estímulo: tu invocación usa una carta al azar de su mano + X",
+  restaurarVinculo: "Restaurar Vínculo: curar X a tu invocación y robar una carta"
 };
+
+/**
+ * (v0.22.0) Tipos de invocación del Invocador (Mendacium Charisma), elegidos al especializarse.
+ * Sus acciones y estadísticas aún no están definidas: la invocación es un Actor PNJ cuyas
+ * características, Salud y Defensa ajusta el Master en su ficha. `img`: imagen inicial del Actor.
+ */
+export const INVOCACIONES = {
+  plaga: {
+    nombre: "Plaga sobrenatural", icono: "fa-bugs", img: "icons/svg/poison.svg",
+    texto: "Un enjambre o plaga ligada a ti. Sus acciones están pendientes de definir: el Master las aplica y ajusta la ficha de la invocación."
+  },
+  bestia: {
+    nombre: "Bestia mágica", icono: "fa-paw", img: "icons/svg/pawprint.svg",
+    texto: "Una bestia con la que compartes un vínculo mágico. Sus acciones están pendientes de definir: el Master las aplica y ajusta la ficha de la invocación."
+  },
+  poltergeist: {
+    nombre: "Poltergeist", icono: "fa-ghost", img: "icons/svg/skull.svg",
+    texto: "Un espíritu inquieto atado a ti. Sus acciones están pendientes de definir: el Master las aplica y ajusta la ficha de la invocación."
+  }
+};
+
+/**
+ * (v0.22.0) Opciones de invocación de una lista de claves de `INVOCACIONES` (subida de nivel y tabla
+ * de elecciones del Item de Clase).
+ * @param {string[]} claves
+ * @returns {{clave: string, nombre: string, icono: string, texto: string}[]}
+ */
+export function opcionesInvocacion(claves = []) {
+  return (claves ?? []).filter(c => INVOCACIONES[c]).map(c => ({ clave: c, ...INVOCACIONES[c] }));
+}
 
 /**
  * Valor de una carta (v0.17.0, Potens Mystica): las caras de su dado (d4 = 4 ... d12 = 12).
