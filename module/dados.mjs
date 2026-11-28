@@ -8,6 +8,8 @@
  * - **Pifia:** si al menos la mitad de los dados base sacan el mínimo (1), se apunta el
  *   resultado (base + crítico + bono) y se vuelven a tirar todos los dados que salieron 1;
  *   su suma se RESTA del resultado apuntado.
+ * - **Crítico y Pifia a la vez (v0.22.1):** una tirada no puede ser ambas cosas; si se cumplen las
+ *   dos condiciones, ninguna se aplica y la tirada es normal (el desglose lo indica).
  * - **Resultado negativo:** en tiradas normales es un fallo automático; en tiradas
  *   enfrentadas el oponente suma el valor absoluto a su propia tirada.
  *
@@ -32,6 +34,8 @@ import { efectosPeligro } from "./peligro.mjs";
  * @property {number[]} resultadosPifia - Valores de las repeticiones por Pifia.
  * @property {boolean} esCritico - Al menos un dado base salió máximo.
  * @property {boolean} esPifia - Al menos la mitad de los dados base salieron 1.
+ * @property {boolean} criticoYPifia - (v0.22.1) Se cumplían Crítico y Pifia a la vez: se anulan y la
+ *   tirada es normal (`esCritico` y `esPifia` quedan en false).
  * @property {boolean} esNegativo - El total es menor que 0 (fallo automático).
  * @property {boolean} mitadPorAgotamiento - Se aplicó la mitad por Agotamiento 6+ (nunca a un resultado negativo).
  * @property {number} totalSinAgotamiento - Total antes de la reducción por Agotamiento.
@@ -118,11 +122,15 @@ export async function tirarDadosSistema({
 
   // Crítico: una única repetición por cada dado máximo (sin encadenar). (v0.21.0) Con peligro 5,
   // también desde uno menos del máximo; con peligro 8, la repetición crítica se repite una vez más.
-  const maximos = resultadosBase.filter(esCriticoValor).length;
+  const maximosBase = resultadosBase.filter(esCriticoValor).length;
   // Pifia: al menos la mitad de los dados base en 1 → se repiten esos dados y se restan.
   // (v0.21.0) Con peligro 6 basta un solo dado en 1.
   const minimos = resultadosBase.filter(v => v === 1).length;
-  const esPifia = minimos > 0 && (peligro.pifiaUnDado || minimos * 2 >= n);
+  const condicionPifia = minimos > 0 && (peligro.pifiaUnDado || minimos * 2 >= n);
+  // (v0.22.1) Una tirada no puede ser Crítico y Pifia a la vez: si se cumplen ambas, es una tirada normal.
+  const criticoYPifia = maximosBase > 0 && condicionPifia;
+  const maximos = criticoYPifia ? 0 : maximosBase;
+  const esPifia = criticoYPifia ? false : condicionPifia;
 
   // Modo manual (ajuste `modoCriticosPifias`): la tarjeta se publica con los dados base y
   // botones para lanzar el Crítico y/o la Pifia; la tirada continúa al pulsarlos.
@@ -189,6 +197,7 @@ export async function tirarDadosSistema({
     resultadosPifia,
     esCritico: maximos > 0,
     esPifia,
+    criticoYPifia,
     esNegativo: total < 0,
     mitadPorAgotamiento: aplicaMitad,
     totalSinAgotamiento,
@@ -229,6 +238,7 @@ async function tiradaResultadoFijo(valor, { n, caras, motivo }) {
     resultadosPifia: [],
     esCritico: false,
     esPifia: false,
+    criticoYPifia: false,
     esNegativo: valor < 0,
     mitadPorAgotamiento: false,
     totalSinAgotamiento: valor,
@@ -298,6 +308,10 @@ function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, s
   if (t.sustituciones?.length) {
     const cambios = t.sustituciones.map(s => `dado ${s.indice + 1}: ${s.antes} → ${s.despues}`).join(" · ");
     lineas.push(`<p class="cyd-tirada-embotellado"><i class="fa-solid fa-hourglass-start"></i> <strong>TIEMPO EMBOTELLADO</strong> · ${cambios}</p>`);
+  }
+  if (t.criticoYPifia) {
+    // (v0.22.1) Crítico y Pifia a la vez se anulan: tirada normal.
+    lineas.push(`<p class="cyd-tirada-anulada"><i class="fa-solid fa-scale-balanced"></i> <strong>CRÍTICO Y PIFIA</strong> · hay dados al máximo y dados en 1 a la vez: se anulan y la tirada es normal (no se repite ningún dado)</p>`);
   }
   if (t.esCritico) {
     // (v0.21.0) Peligro 5: umbral de Crítico uno menos; peligro 8: segunda repetición.
@@ -375,6 +389,7 @@ export function combinarTiradas(partes, { mitad = false, motivoMitad = "" } = {}
     rolls: partes.flatMap(p => p.tirada.rolls),
     esCritico: partes.some(p => p.tirada.esCritico),
     esPifia: partes.some(p => p.tirada.esPifia),
+    criticoYPifia: partes.some(p => p.tirada.criticoYPifia),
     esNegativo,
     totalSinAgotamiento: suma,
     formula: partes.map(p => p.tirada.formula).join(" + "),

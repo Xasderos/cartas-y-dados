@@ -3459,7 +3459,9 @@ export class SistemaActor extends Actor {
    * La invocación es un Actor `pnj` persistente (mismos recursos cada vez que vuelve), enlazado con
    * `flags.cartas-y-dados.invocadorId`; el Invocador guarda `flags.cartas-y-dados.invocacion
    * {tipo, actorId, activa}`. La invocación COMPARTE el Mazo y el Descarte del Invocador
-   * (`system.pilas.mazoId/descarteId` iguales) y tiene Mano, Quemadas, Mazo de Trinkets y En Juego
+   * (`system.pilas.mazoId/descarteId` iguales) y (v0.22.1) también sus Cartas Quemadas
+   * (`quemadasId`); solo la Mano es propia (además de un Mazo de Trinkets y En Juego vacíos, que el
+   * motor necesita)
    * propios, así que usa todo el motor de cartas (diálogo de acción, ataques...) desde su ficha de PNJ
    * con sus propias características, Salud, Defensa y Agotamiento (las ajusta el Master).
    * Crear el Actor, sus pilas y su Token lo hace el Master (`solicitarInvocacionAlMaster`, socket).
@@ -3631,7 +3633,7 @@ export class SistemaActor extends Actor {
     const confirmado = await foundry.applications.api.DialogV2.confirm({
       ...opcionesDialogoSistema({ width: 420 }),
       window: { title: "Desinvocar", icon: "fa-solid fa-person-walking-arrow-loop-left" },
-      content: `<p>Deshaces la invocación de <strong>${escapar(invocacion.name)}</strong> (acción gratuita en tu turno). Las cartas de su mano van al Descarte.</p><p class="hint">Volverá con la misma Salud, Agotamiento y cartas quemadas, salvo que descanséis.</p>`,
+      content: `<p>Deshaces la invocación de <strong>${escapar(invocacion.name)}</strong> (acción gratuita en tu turno). Las cartas de su mano van al Descarte.</p><p class="hint">Volverá con la misma Salud y Agotamiento, salvo que descanséis.</p>`,
       yes: { label: "Desinvocar", icon: "fa-solid fa-person-walking-arrow-loop-left" },
       no: { label: "Cancelar" },
       rejectClose: false
@@ -3671,7 +3673,7 @@ export class SistemaActor extends Actor {
         <div class="cyd-carta-jugada">
           <h3><i class="fa-solid fa-hat-wizard"></i> ${escapar(this.name)} invoca a ${escapar(invocacion.name)}</h3>
           <p><i class="fa-solid fa-hand"></i> Divide su mano: <strong>${pasadas}</strong> carta(s) pasan a la mano de la invocación.</p>
-          <p><small><i class="fa-solid fa-circle-info"></i> Comparten turno, Mazo y Descarte; la invocación tiene la misma Mano Máx. y roba la suya en cada turno.</small></p>
+          <p><small><i class="fa-solid fa-circle-info"></i> Comparten turno, Mazo, Descarte y Cartas Quemadas; la invocación tiene la misma Mano Máx. y roba la suya en cada turno.</small></p>
           ${token ? "" : '<p class="hint"><i class="fa-solid fa-location-dot"></i> No hay Token del Invocador en la escena: el Master coloca el Token de la invocación.</p>'}
         </div>`
     });
@@ -3738,8 +3740,10 @@ export class SistemaActor extends Actor {
   }
 
   /**
-   * (Master) Asegura las pilas de la invocación: Mazo y Descarte del Invocador (compartidos) y Mano,
-   * Quemadas, Mazo de Trinkets y En Juego propios, con los mismos dueños que el Invocador.
+   * (Master) Asegura las pilas de la invocación: Mazo, Descarte y (v0.22.1) Cartas Quemadas del Invocador
+   * (compartidos) y Mano, Mazo de Trinkets y En Juego propios, con los mismos dueños que el Invocador.
+   * (v0.22.1) Una invocación creada en v0.22.0 tenía Quemadas propias: sus cartas pasan a las del
+   * Invocador y esa pila se borra.
    * @param {Actor} invocacion
    * @returns {Promise<void>}
    */
@@ -3750,12 +3754,26 @@ export class SistemaActor extends Actor {
     const pilasInvocador = this.system.pilas ?? {};
     const idsInvocador = new Set(Object.values(pilasInvocador).filter(Boolean));
     const cambios = {};
-    for (const clave of ["mazoId", "descarteId"]) {
+    for (const clave of ["mazoId", "descarteId", "quemadasId"]) {
       if (invocacion.system.pilas?.[clave] !== pilasInvocador[clave]) cambios[`system.pilas.${clave}`] = pilasInvocador[clave];
+    }
+    // (v0.22.1) Migración: Quemadas propias de v0.22.0 → Quemadas del Invocador.
+    const quemadasAntiguas = invocacion.system.pilas?.quemadasId && !idsInvocador.has(invocacion.system.pilas.quemadasId)
+      ? game.cards.get(invocacion.system.pilas.quemadasId) : null;
+    const quemadasInvocador = this.system.pilasDocumentos?.quemadas;
+    if (quemadasAntiguas && quemadasInvocador) {
+      const datos = quemadasAntiguas.cards.map(c => {
+        const copia = c.toObject();
+        delete copia._id;
+        return this._normalizarPayloadCarta(copia);
+      });
+      // `cydMigracion`: no son quemas nuevas (sin avisos de Empatía ni de Potens Mystica).
+      if (datos.length) await quemadasInvocador.createEmbeddedDocuments("Card", datos, { cydMigracion: true });
+      const enUso = game.actors.some(a => a.id !== invocacion.id && Object.values(a.system?.pilas ?? {}).includes(quemadasAntiguas.id));
+      if (!enUso) await quemadasAntiguas.delete();
     }
     const propias = [
       { clave: "manoId", nombre: "Mano", tipo: "hand", publico: false },
-      { clave: "quemadasId", nombre: "Cartas Quemadas", tipo: "pile", publico: true },
       { clave: "enJuegoId", nombre: "Trinkets en Juego", tipo: "pile", publico: true },
       { clave: "trinketsId", nombre: "Mazo de Trinkets", tipo: "deck", publico: true }
     ];
@@ -3811,16 +3829,14 @@ export class SistemaActor extends Actor {
 
   /**
    * Descanso de la invocación (con cualquier descanso del Invocador o desde su ficha; decisión: el texto
-   * dice «descanso largo»): su Mano y sus Quemadas vuelven al Mazo compartido, su Agotamiento vuelve a 0
-   * y su Salud al máximo.
+   * dice «descanso largo»): su Mano vuelve al Mazo compartido, su Agotamiento vuelve a 0 y su Salud al
+   * máximo. (v0.22.1) Sus Cartas Quemadas son las del Invocador: las recupera el descanso del Invocador.
    * @returns {Promise<void>}
    */
   async restablecerInvocacion() {
     if (!this.isOwner) return;
-    const { mazo, mano, quemadas } = this.system.pilasDocumentos ?? {};
-    for (const pila of [mano, quemadas]) {
-      if (pila?.cards.size) await this._devolverCartasASuMazoOriginal(pila);
-    }
+    const { mazo, mano } = this.system.pilasDocumentos ?? {};
+    if (mano?.cards.size) await this._devolverCartasASuMazoOriginal(mano);
     if (mazo) await mazo.shuffle({ chatNotification: false });
     const agotamiento = Number(this.system.cansancio?.value) || 0;
     if (agotamiento > 0) await this.cambiarAgotamiento(-agotamiento);
@@ -3830,7 +3846,7 @@ export class SistemaActor extends Actor {
     this.prepareData();
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-campground"></i><p><strong>${foundry.utils.escapeHTML(this.name)}</strong> descansa: recupera su Salud, su Agotamiento vuelve a 0 y sus Cartas Quemadas vuelven al Mazo.</p></div>`
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-campground"></i><p><strong>${foundry.utils.escapeHTML(this.name)}</strong> descansa: recupera su Salud y su Agotamiento vuelve a 0 (las Cartas Quemadas, compartidas, vuelven con el descanso de su Invocador).</p></div>`
     });
   }
 
@@ -4078,8 +4094,7 @@ export class SistemaActor extends Actor {
           salud: Number(invocacion.system.salud?.value) || 0,
           saludMax: Number(invocacion.system.salud?.maxTotal) || 0,
           agotamiento: Number(invocacion.system.cansancio?.value) || 0,
-          mano: pilas.mano?.cards.size ?? 0,
-          quemadas: pilas.quemadas?.cards.size ?? 0
+          mano: pilas.mano?.cards.size ?? 0
         }
         : null,
       marca: marca && this.abaloriosActivos().has("marcaCombo")

@@ -417,6 +417,11 @@ button.cyd-btn-aplicar-dano:disabled i {
   color: var(--cyd-peligro);
 }
 
+/* (v0.22.1) Crítico y Pifia a la vez: se anulan (tirada normal) */
+.cyd-tirada-anulada i {
+  color: var(--cyd-azul);
+}
+
 /* Crítico y Pifia en modo manual (v0.14.1): botones de la tarjeta de tirada pendiente */
 button.cyd-btn-tirada-pendiente {
   width: 100%;

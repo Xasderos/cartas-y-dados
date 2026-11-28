@@ -29,7 +29,7 @@
       <p class="cyd-subtitulo-cabecera">
         {{#if invocacion}}
         {{!-- (v0.22.0) Invocación de un Invocador: comparte su Mazo, su Descarte, su turno y su Mano Máx. --}}
-        <span data-tooltip="Comparte el Mazo, el Descarte y el turno de {{invocacion.invocador}}; tiene su misma Mano Máx. ({{system.limiteMano}}). Su Mano, Quemadas, Salud y Agotamiento son propios y se restablecen al descansar">
+        <span data-tooltip="Comparte el Mazo, el Descarte, las Cartas Quemadas y el turno de {{invocacion.invocador}}; tiene su misma Mano Máx. ({{system.limiteMano}}). Su Mano es propia; su Salud y su Agotamiento se restablecen al descansar">
           <i class="fa-solid fa-hat-wizard"></i> Invocación{{#if invocacion.tipo}} ({{invocacion.tipo}}){{/if}} de <strong>{{invocacion.invocador}}</strong> · {{#if invocacion.activa}}invocada{{else}}no invocada{{/if}}
         </span>
         {{else}}

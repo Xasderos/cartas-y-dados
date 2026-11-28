@@ -214,6 +214,21 @@ Hooks.once("ready", async () => {
     }
   }
 
+  // (v0.22.1) Invocador: la invocación comparte Mazo, Descarte y Cartas Quemadas con su Invocador.
+  // Las creadas en v0.22.0 tenían Quemadas propias: el Master activo las traslada y enlaza las compartidas.
+  if (game.users.activeGM?.isSelf) {
+    for (const invocacion of game.actors?.filter(a => a.type === "pnj" && a.getFlag("cartas-y-dados", "invocadorId")) ?? []) {
+      const invocador = invocacion.invocadorDeInvocacion?.();
+      if (!invocador || invocacion.system.pilas?.quemadasId === invocador.system.pilas?.quemadasId) continue;
+      try {
+        invocador.prepareData();
+        await invocador._asegurarPilasInvocacion(invocacion);
+      } catch (err) {
+        console.warn(`Cartas y Dados | Error enlazando las pilas compartidas de ${invocacion.name}:`, err);
+      }
+    }
+  }
+
 
   // REFRESCO DE SEGURIDAD AL REABRIR EL MUNDO (Bug 1):
   // game.cards y game.actors ya están hidratados. Recalcular los datos derivados
@@ -727,8 +742,10 @@ const temporizadoresEmpatia = new Map();
  * sus dueños y al Master) a los demás personajes con el abalorio Empatía En Juego, con un botón
  * para robar una carta.
  */
-Hooks.on("createCard", (carta, _opciones, userId) => {
+Hooks.on("createCard", (carta, opciones, userId) => {
   if (userId !== game.user.id) return;
+  // (v0.22.1) Traslado de cartas ya quemadas (migración de las Quemadas de una invocación): no es una quema.
+  if (opciones?.cydMigracion) return;
   const pila = carta.parent;
   if (!(pila instanceof Cards)) return;
   const quemador = game.actors.find(a => a.type === "personaje" && a.system.pilas?.quemadasId === pila.id);

@@ -401,7 +401,7 @@
           {{#if invocador}}
           <div class="cyd-estado-acciones cyd-invocador">
             {{#if invocador.tipo}}
-              <span class="cyd-chip-estado{{#if invocador.activa}} cyd-activo{{/if}}" data-tooltip="{{invocador.tipo.nombre}}: {{invocador.tipo.texto}}{{#if invocador.invocacion}}<br>Salud {{invocador.invocacion.salud}}/{{invocador.invocacion.saludMax}} · Agotamiento {{invocador.invocacion.agotamiento}} · Mano {{invocador.invocacion.mano}} · Quemadas {{invocador.invocacion.quemadas}}{{/if}}<br>Comparte tu turno, tu Mazo y tu Descarte; tiene tu misma Mano Máx.">
+              <span class="cyd-chip-estado{{#if invocador.activa}} cyd-activo{{/if}}" data-tooltip="{{invocador.tipo.nombre}}: {{invocador.tipo.texto}}{{#if invocador.invocacion}}<br>Salud {{invocador.invocacion.salud}}/{{invocador.invocacion.saludMax}} · Agotamiento {{invocador.invocacion.agotamiento}} · Mano {{invocador.invocacion.mano}}{{/if}}<br>Comparte tu turno, tu Mazo, tu Descarte y tus Cartas Quemadas; solo su mano es propia y tiene tu misma Mano Máx.">
                 <i class="fa-solid {{invocador.tipo.icono}}"></i> {{#if invocador.invocacion}}{{invocador.invocacion.nombre}}{{else}}{{invocador.tipo.nombre}}{{/if}}{{#if invocador.activa}} · invocada{{/if}}
                 {{#if invocador.invocacion}} · <i class="fa-solid fa-heart"></i> {{invocador.invocacion.salud}}/{{invocador.invocacion.saludMax}}{{/if}}
               </span>
