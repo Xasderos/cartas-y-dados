@@ -217,6 +217,12 @@
               </span>
               {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="corazonDragon" data-tooltip="Retirar el Corazón del dragón"><i class="fa-solid fa-xmark"></i></button>{{/if}}
             {{/if}}
+            {{#if estadosMisticos.caleidoscopio}}
+              <span class="cyd-chip-estado cyd-activo" data-tooltip="Caleidoscopio{{#if estadosMisticos.caleidoscopio.origen}} de {{estadosMisticos.caleidoscopio.origen}}{{/if}}: 3 reflejos actúan y se mueven como tú (izquierda, derecha y detrás). Si alcanzan a un enemigo con un ataque, hacen la mitad del daño de la acción como daño psíquico. Al defender, sacrifica un reflejo para +3 de Defensa en esa defensa. En combate pierde un turno al final de cada uno de tus turnos">
+                <i class="fa-solid fa-clone"></i> Caleidoscopio · {{estadosMisticos.caleidoscopio.turnos}} turno(s) · {{estadosMisticos.caleidoscopio.reflejos}} reflejo(s)
+              </span>
+              {{#if esPropietario}}{{#if estadosMisticos.caleidoscopio.reflejos}}<button type="button" class="cyd-btn-mini" data-action="sacrificarReflejo" data-tooltip="Sacrifica un reflejo: +3 a la Defensa solo durante esta defensa"><i class="fa-solid fa-shield-halved"></i> +3 Def.</button>{{/if}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="caleidoscopio" data-tooltip="Retirar el Caleidoscopio"><i class="fa-solid fa-xmark"></i></button>{{/if}}
+            {{/if}}
             {{#if estadosMisticos.malDeOjo}}
               <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Mal de ojo{{#if estadosMisticos.malDeOjo.origen}} de {{estadosMisticos.malDeOjo.origen}}{{/if}}: tus cartas de Misticismo bajan una categoría de dado (una carta d4 da automáticamente 1). En combate pierde un turno al final de cada uno de tus turnos">
                 <i class="fa-solid fa-eye-slash"></i> Mal de ojo · {{estadosMisticos.malDeOjo.turnos}} turno(s)
@@ -354,6 +360,32 @@
                 <i class="fa-solid fa-hourglass-start"></i> Embotellado: [{{#each altaScentia.tiempoEmbotellado.valores as |v|}}{{#unless @first}}, {{/unless}}{{v}}{{/each}}] {{altaScentia.tiempoEmbotellado.tipoDado}}
               </span>
               <button type="button" class="cyd-btn-icono cyd-peligro" data-action="descartarTiempoEmbotellado" data-tooltip="Descartar los dados embotellados"><i class="fa-solid fa-xmark"></i></button>
+            {{/if}}
+          </div>
+          {{/if}}
+          {{!-- (v0.19.0) Alta Scentia · Ilusionista: huecos de ilusión, Pesadillas y Visto y No visto --}}
+          {{#if ilusionista}}
+          <div class="cyd-estado-acciones cyd-ilusionista">
+            {{#if ilusionista.huecos}}
+              <span class="cyd-chip-estado{{#if ilusionista.huecos.libres}} cyd-activo{{else}} cyd-bloqueado{{/if}}" data-tooltip="Huecos de ilusión (tantos como tu nivel): 1 hueco = una ilusión pequeña; 2 = una mediana o dos pequeñas... Hasta a 10 m de ti; no pueden atacar. Se recuperan al descansar">
+                <i class="fa-solid fa-wand-sparkles"></i> Huecos de ilusión <strong>{{ilusionista.huecos.libres}}/{{ilusionista.huecos.max}}</strong>
+              </span>
+              <button type="button" class="cyd-btn-icono" data-action="cambiarHuecoIlusion" data-delta="1" data-tooltip="Gastar 1 hueco de ilusión"><i class="fa-solid fa-minus"></i></button>
+              <button type="button" class="cyd-btn-icono" data-action="cambiarHuecoIlusion" data-delta="-1" data-tooltip="Recuperar 1 hueco de ilusión (excepción)"><i class="fa-solid fa-plus"></i></button>
+            {{/if}}
+            {{#if ilusionista.pesadillas}}
+              <span class="cyd-chip-estado cyd-activo" data-tooltip="Pesadillas: cada una hace 1 de daño psíquico que ignora la Defensa al abalanzarse. Desaparecen al terminar tu turno salvo que sacrifiques 1 hueco de ilusión">
+                <i class="fa-solid fa-ghost"></i> Pesadillas · {{ilusionista.pesadillas.cantidad}}{{#if ilusionista.pesadillas.mantener}} · mantenidas{{/if}}
+              </span>
+              <button type="button" class="cyd-btn-mini" data-action="abalanzarPesadillas" data-tooltip="Marca con T uno o varios objetivos y reparte las pesadillas entre ellos (el Master aplica el daño)"><i class="fa-solid fa-crosshairs"></i> Abalanzar</button>
+              {{#unless ilusionista.pesadillas.mantener}}<button type="button" class="cyd-btn-mini" data-action="mantenerPesadillas" data-tooltip="Sacrifica 1 hueco de ilusión para que no desaparezcan al terminar este turno"><i class="fa-solid fa-hourglass-half"></i> Mantener</button>{{/unless}}
+              <button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="pesadillas" data-tooltip="Disipar las pesadillas"><i class="fa-solid fa-xmark"></i></button>
+            {{/if}}
+            {{#if ilusionista.cartaVisto}}
+              <span class="cyd-chip-estado{{#if ilusionista.cartaVisto.abalorioEnJuego}} cyd-activo{{else}} cyd-bloqueado{{/if}}" data-tooltip="Carta guardada sobre «Visto y No visto»: tras tu próxima acción, el chat te deja sustituirla por una acción con esta carta (No visto){{#unless ilusionista.cartaVisto.abalorioEnJuego}}. El abalorio no está En Juego{{/unless}}">
+                <i class="fa-solid fa-eye-low-vision"></i> Sobre el abalorio: <strong>{{ilusionista.cartaVisto.nombre}}</strong> · {{ilusionista.cartaVisto.palo}} {{ilusionista.cartaVisto.tipoDado}}
+              </span>
+              <button type="button" class="cyd-btn-icono cyd-peligro" data-action="soltarCartaVisto" data-tooltip="Devolver la carta al Descarte"><i class="fa-solid fa-xmark"></i></button>
             {{/if}}
           </div>
           {{/if}}

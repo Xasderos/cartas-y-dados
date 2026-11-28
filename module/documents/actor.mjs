@@ -13,6 +13,7 @@ import {
   valorCarta
 } from "../config.mjs";
 import { opcionesDialogoSistema } from "../applications/ventana-dinamica.mjs";
+import { abrirDialogoAccion } from "../applications/dialogo-accion.mjs";
 import { combinarTiradas, enviarMensajeSoloMaster, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 import { obtenerOCrearCarpeta } from "../carpetas.mjs";
 
@@ -1111,6 +1112,10 @@ export class SistemaActor extends Actor {
     if (cartaApuntado && puntoDebil) {
       lineasExtra.push('<p><i class="fa-solid fa-crosshairs"></i> Apunta al <strong>punto débil</strong>: si impacta, explota su debilidad (efecto a criterio del Master).</p>');
     }
+    if (accion === "accionConjunta") {
+      // (v0.19.0) Ilusionista · Imitación.
+      lineasExtra.push('<p><i class="fa-solid fa-masks-theater"></i> <strong>Imitación:</strong> si tu aliado usa una carta del mismo palo y la misma acción, el enemigo reacciona como si fuese una única acción: el Master suma ambos resultados (p. ej., contra la Defensa del objetivo).</p>');
+    }
 
     const efectoHtml = carta.system.efecto;
     const titulo = configAccion ? `${configAccion.nombre} · ${nombreVisibleCarta(carta)}` : nombreVisibleCarta(carta);
@@ -1129,6 +1134,7 @@ export class SistemaActor extends Actor {
         ${htmlEfectosAuto}
         ${efectoHtml ? `<div class="cyd-efecto">${efectoHtml}</div>` : ""}
         ${tirada ? this._htmlBotonVisionFuturo([claveCaract, caractApuntado, cartaPotenciar ? "misticismo" : null]) : ""}
+        ${this._htmlBotonesVistoNoVisto(carta)}
       </div>
     `;
 
@@ -1280,6 +1286,21 @@ export class SistemaActor extends Actor {
                 ? `<span class="cyd-resultado-exito">+${aporta}</span> a su tirada`
                 : '<span class="cyd-resultado-fallo">no aporta nada</span>'}</p>
               <p><small>Solo se puede aplicar una ayuda por acción.</small></p>
+            </div>`,
+          master: ""
+        };
+      }
+      case "estorbo": {
+        // (v0.19.0) Ilusionista · Influencia ilusoria: el resultado se resta a la tirada objetivo.
+        const objetivo = foundry.utils.escapeHTML(game.user.targets.first()?.name ?? "la criatura objetivo");
+        const resta = tirada.esNegativo ? 0 : Math.max(0, Number(tirada.total) || 0);
+        return {
+          publico: `
+            <div class="cyd-resolucion-caja ${resta > 0 ? "cyd-exito" : "cyd-fallo"}">
+              <p><i class="fa-solid fa-brain"></i> <strong>Interviene en la tirada de ${objetivo}:</strong> ${resta > 0
+                ? `<span class="cyd-resultado-exito">−${resta}</span> a su tirada`
+                : '<span class="cyd-resultado-fallo">no resta nada</span>'}</p>
+              <p><small>El Master resta este valor al resultado de la tirada objetivo.</small></p>
             </div>`,
           master: ""
         };
@@ -2392,6 +2413,405 @@ export class SistemaActor extends Actor {
     });
   }
 
+  /* ------------------------------------------------------------------------ */
+  /*  (v0.19.0) ALTA SCENTIA · ILUSIONISTA                                    */
+  /* ------------------------------------------------------------------------ */
+
+  /**
+   * ¿Tiene el Actor la Habilidad pasiva «Ilusiones» (Ilusionista Nv. 3)?
+   * @returns {boolean}
+   */
+  esIlusionista() {
+    return this.items.some(i => i.type === "habilidad" && i.getFlag("cartas-y-dados", "pasiva") === "ilusiones");
+  }
+
+  /**
+   * Huecos de ilusión (pasiva «Ilusiones»): tantos como el nivel del personaje; los usados se guardan
+   * en `flags.cartas-y-dados.huecosIlusionUsados` y se recuperan al descansar (`realizarDescanso`).
+   * @returns {{max: number, usados: number, libres: number}}
+   */
+  huecosIlusion() {
+    const max = Math.max(1, Number(this.system.nivelEfectivo) || 1);
+    const usados = Math.min(max, Math.max(0, Number(this.getFlag("cartas-y-dados", "huecosIlusionUsados")) || 0));
+    return { max, usados, libres: max - usados };
+  }
+
+  /**
+   * Gasta (`delta` > 0) o recupera (`delta` < 0) huecos de ilusión, dentro de 0..máximo.
+   * @param {number} [delta=1]
+   * @returns {Promise<boolean>} false si no quedaba ningún hueco que gastar.
+   */
+  async cambiarHuecosIlusion(delta = 1) {
+    const { max, usados } = this.huecosIlusion();
+    if (delta > 0 && usados >= max) {
+      ui.notifications.warn(`${this.name} no tiene huecos de ilusión libres (se recuperan al descansar).`);
+      return false;
+    }
+    await this.setFlag("cartas-y-dados", "huecosIlusionUsados", Math.min(max, Math.max(0, usados + delta)));
+    return true;
+  }
+
+  /**
+   * Pesadillas invocadas (`flags.cartas-y-dados.pesadillas`).
+   * @returns {{cantidad: number, mantener: boolean}|null}
+   */
+  pesadillas() {
+    const datos = this.getFlag("cartas-y-dados", "pesadillas");
+    return Number(datos?.cantidad) > 0 ? { cantidad: Number(datos.cantidad), mantener: Boolean(datos.mantener) } : null;
+  }
+
+  /**
+   * Invoca (o renueva) `cantidad` pesadillas (al usar la habilidad Pesadillas).
+   * @param {number} cantidad
+   * @returns {Promise<void>}
+   */
+  async activarPesadillas(cantidad) {
+    const n = Math.max(1, Math.floor(Number(cantidad) || 1));
+    await this.setFlag("cartas-y-dados", "pesadillas", { cantidad: n, mantener: false });
+  }
+
+  /**
+   * Disipa las pesadillas (ficha o fin de turno).
+   * @returns {Promise<void>}
+   */
+  async retirarPesadillas() {
+    if (this.getFlag("cartas-y-dados", "pesadillas")) await this.unsetFlag("cartas-y-dados", "pesadillas");
+  }
+
+  /**
+   * Sacrifica 1 hueco de ilusión para que las pesadillas no desaparezcan al terminar este turno.
+   * @returns {Promise<boolean>}
+   */
+  async mantenerPesadillas() {
+    const datos = this.pesadillas();
+    if (!datos) return false;
+    if (datos.mantener) {
+      ui.notifications.info("Las pesadillas ya se mantienen hasta el final del siguiente turno.");
+      return false;
+    }
+    if (!(await this.cambiarHuecosIlusion(1))) return false;
+    await this.setFlag("cartas-y-dados", "pesadillas", { ...datos, mantener: true });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-ghost"></i><p><strong>${foundry.utils.escapeHTML(this.name)}</strong> sacrifica 1 hueco de ilusión: sus <strong>${datos.cantidad} pesadilla(s)</strong> se mantienen un turno más.</p></div>`
+    });
+    return true;
+  }
+
+  /**
+   * Fin de turno en combate (`SistemaCombat`): las pesadillas desaparecen, salvo que se hayan
+   * mantenido con un hueco de ilusión (entonces solo se consume el «mantener»).
+   * @returns {Promise<void>}
+   */
+  async avanzarPesadillas() {
+    const datos = this.pesadillas();
+    if (!datos || !this.isOwner) return;
+    if (datos.mantener) {
+      await this.setFlag("cartas-y-dados", "pesadillas", { ...datos, mantener: false });
+      return;
+    }
+    await this.retirarPesadillas();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-ghost"></i><p>Las pesadillas de <strong>${foundry.utils.escapeHTML(this.name)}</strong> se desvanecen.</p></div>`
+    });
+  }
+
+  /**
+   * Abalanza las pesadillas contra los Tokens marcados con T: se reparten entre ellos y cada una hace
+   * 1 de daño psíquico que ignora la Defensa. El daño lo aplica el Master (mensaje solo para él con
+   * un botón `.cyd-btn-aplicar-dano` por objetivo). Las pesadillas siguen invocadas.
+   * @returns {Promise<boolean>}
+   */
+  async abalanzarPesadillas() {
+    const datos = this.pesadillas();
+    if (!datos) {
+      ui.notifications.warn(`${this.name} no tiene pesadillas invocadas.`);
+      return false;
+    }
+    const objetivos = [...game.user.targets].filter(t => t.actor && t.actor.id !== this.id);
+    if (!objetivos.length) {
+      ui.notifications.warn("Marca con T los Tokens de los objetivos contra los que se abalanzan las pesadillas.");
+      return false;
+    }
+    const escapar = foundry.utils.escapeHTML;
+    // Reparto inicial equitativo (el resto, a los primeros objetivos).
+    const base = Math.floor(datos.cantidad / objetivos.length);
+    const resto = datos.cantidad % objetivos.length;
+    const filas = objetivos.map((t, i) => `
+      <div class="form-group">
+        <label>${escapar(t.name)}</label>
+        <input type="number" name="p-${i}" min="0" max="${datos.cantidad}" step="1" value="${base + (i < resto ? 1 : 0)}" />
+      </div>`).join("");
+    const reparto = await foundry.applications.api.DialogV2.wait({
+      ...opcionesDialogoSistema({ width: 420 }),
+      window: { title: "Abalanzar pesadillas", icon: "fa-solid fa-ghost" },
+      content: `
+        <p>Tienes <strong>${datos.cantidad} pesadilla(s)</strong>. Cada una hace 1 de daño psíquico que ignora la Defensa.</p>
+        <fieldset><legend><i class="fa-solid fa-crosshairs"></i> Pesadillas por objetivo</legend>${filas}</fieldset>`,
+      buttons: [
+        { action: "lanzar", label: "Abalanzar", icon: "fa-solid fa-ghost", default: true,
+          callback: (_e, button) => objetivos.map((_t, i) => Math.max(0, Math.floor(Number(button.form.elements[`p-${i}`]?.value) || 0))) },
+        { action: "cancelar", label: "Cancelar", icon: "fa-solid fa-xmark", callback: () => null }
+      ],
+      rejectClose: false
+    });
+    if (!Array.isArray(reparto)) return false;
+    const total = reparto.reduce((a, b) => a + b, 0);
+    if (total <= 0) return false;
+    if (total > datos.cantidad) {
+      ui.notifications.warn(`Solo tienes ${datos.cantidad} pesadilla(s) para repartir (has asignado ${total}).`);
+      return false;
+    }
+    const asignados = objetivos.map((t, i) => ({ token: t, n: reparto[i] })).filter(a => a.n > 0);
+    const speaker = ChatMessage.getSpeaker({ actor: this });
+    await ChatMessage.create({
+      speaker,
+      content: `<div class="cyd-carta-jugada"><h3><i class="fa-solid fa-ghost"></i> Pesadillas</h3>
+        <p><strong>${escapar(this.name)}</strong> lanza sus pesadillas: ${asignados.map(a => `<strong>${escapar(a.token.name)}</strong> (${a.n})`).join(", ")}.</p>
+        <p><small>1 de daño psíquico por pesadilla, ignora la Defensa. Lo aplica el Master.</small></p></div>`
+    });
+    for (const { token, n } of asignados) {
+      await enviarMensajeSoloMaster({
+        speaker,
+        content: `
+          <div class="cyd-carta-jugada">
+            <h3><i class="fa-solid fa-ghost"></i> Pesadillas <small>(solo Master)</small></h3>
+            <p><strong>${escapar(this.name)}</strong> → <strong>${escapar(token.name)}</strong>: ${n} de daño psíquico (ignora la Defensa).</p>
+            <button type="button" class="cyd-btn-aplicar-dano" data-actor-uuid="${token.actor.uuid}" data-dano="${n}" data-atacante-uuid="${this.uuid}">
+              <i class="fa-solid fa-droplet"></i> Aplicar ${n} de Daño a ${escapar(token.name)}
+            </button>
+          </div>`
+      });
+    }
+    return true;
+  }
+
+  /**
+   * Prisma de «Caleidoscopio» sobre este Actor (`flags.cartas-y-dados.caleidoscopio`).
+   * @returns {{turnos: number, reflejos: number, origen: string}|null}
+   */
+  caleidoscopio() {
+    const datos = this.getFlag("cartas-y-dados", "caleidoscopio");
+    return Number(datos?.turnos) > 0
+      ? { turnos: Number(datos.turnos), reflejos: Math.max(0, Number(datos.reflejos) || 0), origen: datos.origen ?? "" }
+      : null;
+  }
+
+  /**
+   * Cubre al Actor con el prisma de Caleidoscopio: `turnos` turnos y 3 reflejos.
+   * @param {number} turnos
+   * @param {string} [origen=""] - Nombre del Ilusionista.
+   * @returns {Promise<void>}
+   */
+  async aplicarCaleidoscopio(turnos, origen = "") {
+    const n = Math.max(1, Math.floor(Number(turnos) || 1));
+    await this.setFlag("cartas-y-dados", "caleidoscopio", { turnos: n, reflejos: 3, origen });
+  }
+
+  /**
+   * Retira el prisma de Caleidoscopio.
+   * @returns {Promise<void>}
+   */
+  async retirarCaleidoscopio() {
+    if (this.getFlag("cartas-y-dados", "caleidoscopio")) await this.unsetFlag("cartas-y-dados", "caleidoscopio");
+  }
+
+  /**
+   * Sacrifica un reflejo al defender: +3 a la Defensa solo durante esa defensa (lo tiene en cuenta el
+   * Master; se avisa en el chat). Sin reflejos, el prisma sigue hasta agotar sus turnos.
+   * @returns {Promise<boolean>}
+   */
+  async sacrificarReflejo() {
+    const datos = this.caleidoscopio();
+    if (!datos || datos.reflejos <= 0) {
+      ui.notifications.warn(`${this.name} no tiene reflejos que sacrificar.`);
+      return false;
+    }
+    const reflejos = datos.reflejos - 1;
+    await this.setFlag("cartas-y-dados", "caleidoscopio", { ...datos, reflejos });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-clone"></i><p><strong>${foundry.utils.escapeHTML(this.name)}</strong> sacrifica un reflejo del Caleidoscopio: <strong>+3 a la Defensa</strong> solo durante esta defensa (Defensa ${(Number(this.system.defensaTotal) || 0) + 3}). Quedan ${reflejos} reflejo(s).</p></div>`
+    });
+    return true;
+  }
+
+  /**
+   * Fin de turno en combate (`SistemaCombat`): el prisma de Caleidoscopio pierde un turno.
+   * @returns {Promise<void>}
+   */
+  async avanzarCaleidoscopio() {
+    const datos = this.caleidoscopio();
+    if (!datos || !this.isOwner) return;
+    const turnos = datos.turnos - 1;
+    if (turnos > 0) {
+      await this.setFlag("cartas-y-dados", "caleidoscopio", { ...datos, turnos });
+      return;
+    }
+    await this.retirarCaleidoscopio();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-clone"></i><p>El prisma del <strong>Caleidoscopio</strong> de <strong>${foundry.utils.escapeHTML(this.name)}</strong> se desvanece.</p></div>`
+    });
+  }
+
+  /**
+   * Carta guardada sobre el abalorio «Visto y No visto» (`flags.cartas-y-dados.cartaVisto`): los datos
+   * de la carta (sin `_id`, con su `sourceCardId`) mientras no está en ninguna pila.
+   * @returns {{datos: object, nombre: string, palo: string, tipoDado: string}|null}
+   */
+  cartaVisto() {
+    const guardada = this.getFlag("cartas-y-dados", "cartaVisto");
+    return guardada?.datos ? guardada : null;
+  }
+
+  /**
+   * Botón de chat tras una acción con el abalorio «Visto y No visto» En Juego: «Visto» (guardar la
+   * carta usada sobre el abalorio) o, si ya hay una carta guardada, «No visto» (actuar con ella).
+   * Lo activa `sistema.mjs` (solo el propietario, una vez por mensaje).
+   * @param {Card} carta - Carta principal usada en la acción (aún en la mano al generar el HTML).
+   * @returns {string} HTML ("" si no aplica).
+   */
+  _htmlBotonesVistoNoVisto(carta) {
+    if (this.type !== "personaje" || !this.abaloriosActivos().has("vistoNoVisto")) return "";
+    const escapar = foundry.utils.escapeHTML;
+    const guardada = this.cartaVisto();
+    if (guardada) {
+      return `
+        <button type="button" class="cyd-btn-no-visto" data-actor-uuid="${this.uuid}">
+          <i class="fa-solid fa-eye-low-vision"></i> No visto: no haber realizado la acción y actuar con ${escapar(guardada.nombre)}
+        </button>`;
+    }
+    if (carta?.type !== "accion") return "";
+    return `
+      <button type="button" class="cyd-btn-visto" data-actor-uuid="${this.uuid}"
+              data-source-id="${escapar(carta.getFlag("cartas-y-dados", "sourceCardId") ?? "")}" data-nombre="${escapar(nombreVisibleCarta(carta))}">
+        <i class="fa-solid fa-eye-low-vision"></i> Visto: no haber realizado la acción (guardar la carta)
+      </button>`;
+  }
+
+  /**
+   * Visto (abalorio «Visto y No visto»): el Actor elige NO haber realizado la acción; la carta usada
+   * sale del Descarte o de Quemadas y queda guardada sobre el abalorio (las reacciones a esa acción
+   * quedan realizadas). Solo cabe una carta sobre el abalorio.
+   * @param {string} sourceId - `sourceCardId` de la carta usada ("" si no tenía).
+   * @param {string} [nombre=""] - Nombre visible (respaldo para cartas sin `sourceCardId`).
+   * @returns {Promise<boolean>}
+   */
+  async usarVisto(sourceId, nombre = "") {
+    const { descarte, quemadas } = this.system.pilasDocumentos ?? {};
+    if (!descarte || !quemadas) return false;
+    if (this.cartaVisto()) {
+      ui.notifications.warn("Ya hay una carta sobre tu abalorio «Visto y No visto»: usa «No visto» antes de guardar otra.");
+      return false;
+    }
+    if (!this.abaloriosActivos().has("vistoNoVisto")
+        && !(await this._confirmarExcepcion("Visto y No visto no activo", ["El Trinket «Visto y No visto» no está En Juego."]))) {
+      return false;
+    }
+    const coincide = c => c.type === "accion" && (sourceId
+      ? c.getFlag("cartas-y-dados", "sourceCardId") === sourceId
+      : nombreVisibleCarta(c) === nombre);
+    let pila = descarte;
+    let carta = descarte.cards.find(coincide);
+    if (!carta) {
+      pila = quemadas;
+      carta = quemadas.cards.find(coincide);
+    }
+    if (!carta) {
+      ui.notifications.warn("No se encontró la carta usada en tu Descarte ni en tus Cartas Quemadas.");
+      return false;
+    }
+    const datos = carta.toObject();
+    delete datos._id;
+    await this.setFlag("cartas-y-dados", "cartaVisto", {
+      datos, nombre: nombreVisibleCarta(carta), palo: carta.system.palo ?? "", tipoDado: carta.system.tipoDado ?? ""
+    });
+    await pila.deleteEmbeddedDocuments("Card", [carta.id]);
+    this.prepareData();
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-eye-low-vision"></i><p><strong>Visto:</strong> todo era una ilusión, <strong>${foundry.utils.escapeHTML(this.name)}</strong> NO ha realizado la acción. La carta <strong>${foundry.utils.escapeHTML(nombreVisibleCarta(carta))}</strong> queda sobre su abalorio. Las reacciones a esta acción quedan realizadas.</p></div>`
+    });
+    if (this.sheet?.rendered) this.sheet.render();
+    return true;
+  }
+
+  /**
+   * No visto (abalorio «Visto y No visto»): el Actor elige no haber realizado la acción y la sustituye
+   * por una acción con la carta guardada, que vuelve a la mano y abre el diálogo «Realizar acción».
+   * Si se cancela el diálogo, la carta vuelve a quedar sobre el abalorio.
+   * @returns {Promise<boolean>} true si se realizó la acción sustituta.
+   */
+  async usarNoVisto() {
+    const guardada = this.cartaVisto();
+    const mano = this.system.pilasDocumentos?.mano;
+    if (!guardada || !mano) {
+      ui.notifications.warn("No hay ninguna carta sobre tu abalorio «Visto y No visto».");
+      return false;
+    }
+    if (!this.abaloriosActivos().has("vistoNoVisto")
+        && !(await this._confirmarExcepcion("Visto y No visto no activo", ["El Trinket «Visto y No visto» no está En Juego."]))) {
+      return false;
+    }
+    const [enMano] = await mano.createEmbeddedDocuments("Card", [this._normalizarPayloadCarta(foundry.utils.deepClone(guardada.datos))]);
+    await this.unsetFlag("cartas-y-dados", "cartaVisto");
+    this.prepareData();
+    const hecho = enMano ? await abrirDialogoAccion(this, enMano.id) : false;
+    if (!hecho) {
+      // Cancelado: la carta vuelve a estar sobre el abalorio.
+      const sigue = mano.cards.get(enMano?.id);
+      if (sigue) {
+        await this.setFlag("cartas-y-dados", "cartaVisto", guardada);
+        await mano.deleteEmbeddedDocuments("Card", [sigue.id]);
+        this.prepareData();
+      }
+      if (this.sheet?.rendered) this.sheet.render();
+      return false;
+    }
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div class="cyd-chat-aviso"><i class="fa-solid fa-eye-low-vision"></i><p><strong>No visto:</strong> <strong>${foundry.utils.escapeHTML(this.name)}</strong> no había realizado su acción anterior: la sustituye por la acción con <strong>${foundry.utils.escapeHTML(guardada.nombre)}</strong>.</p></div>`
+    });
+    if (this.sheet?.rendered) this.sheet.render();
+    return true;
+  }
+
+  /**
+   * Devuelve al Descarte la carta guardada sobre «Visto y No visto» (el abalorio deja de estar En
+   * Juego, fin de escena/combate o descanso, o a mano desde la ficha).
+   * @returns {Promise<void>}
+   */
+  async soltarCartaVisto() {
+    const guardada = this.cartaVisto();
+    const descarte = this.system.pilasDocumentos?.descarte;
+    if (!guardada || !descarte || !this.isOwner) return;
+    await descarte.createEmbeddedDocuments("Card", [this._normalizarPayloadCarta(foundry.utils.deepClone(guardada.datos))]);
+    await this.unsetFlag("cartas-y-dados", "cartaVisto");
+    this.prepareData();
+  }
+
+  /**
+   * Estado del Ilusionista para la ficha de PJ (solo el propietario): huecos de ilusión, pesadillas y
+   * carta guardada sobre «Visto y No visto».
+   * @returns {object|null} null si no hay nada que mostrar.
+   */
+  contextoIlusionista() {
+    const ilusionista = this.esIlusionista();
+    const pesadillas = this.pesadillas();
+    const guardada = this.cartaVisto();
+    if (!ilusionista && !pesadillas && !guardada) return null;
+    return {
+      huecos: ilusionista ? this.huecosIlusion() : null,
+      pesadillas,
+      cartaVisto: guardada ? {
+        nombre: guardada.nombre, palo: abreviadoPalo(guardada.palo), tipoDado: guardada.tipoDado,
+        abalorioEnJuego: this.abaloriosActivos().has("vistoNoVisto")
+      } : null
+    };
+  }
+
   /**
    * Maldición «Mal de ojo» activa (`flags.cartas-y-dados.malDeOjo`).
    * @returns {{turnos: number, origen: string}|null}
@@ -2584,9 +3004,11 @@ export class SistemaActor extends Actor {
     const mal = this.malDeOjo();
     const destino = this.destinoSellado();
     const dragon = this.corazonDragon(); // (v0.18.0) Custodio
-    if (!mal && !destino && !dragon) return null;
+    const prisma = this.caleidoscopio(); // (v0.19.0) Ilusionista
+    if (!mal && !destino && !dragon && !prisma) return null;
     return {
       corazonDragon: dragon ? { turnos: Number(dragon.turnos) } : null,
+      caleidoscopio: prisma,
       malDeOjo: mal ? { turnos: Number(mal.turnos), origen: mal.origen ?? "" } : null,
       destinoSellado: destino ? {
         palo: abreviadoPalo(destino.palo),
@@ -2874,6 +3296,10 @@ export class SistemaActor extends Actor {
     if (eterno) quemar = true;
     const destino = quemar ? quemadas : descarte;
     const textoAccion = quemar ? "quema" : "descarta";
+    // (v0.19.0) Visto y No visto: su carta guardada vuelve al Descarte al dejar de estar En Juego.
+    if (abalorioDeTrinket(trinket, claveClaseDeItem(this.items.find(i => i.type === "clase"))) === "vistoNoVisto") {
+      await this.soltarCartaVisto();
+    }
     const iconoAccion = quemar ? '<i class="fa-solid fa-fire"></i>' : '<i class="fa-solid fa-box-archive"></i>';
 
     await this._moverCartaEntrePilas(enJuego, destino, trinket.id);
@@ -2893,6 +3319,7 @@ export class SistemaActor extends Actor {
   async finalizarAccionOCombate() {
     const { mazo, trinkets, mano, enJuego, descarte } = this.system.pilasDocumentos;
     if (!mazo) return;
+    await this.soltarCartaVisto(); // (v0.19.0) Visto y No visto: la carta guardada vuelve con el Descarte
 
     for (const pila of [mano, enJuego, descarte]) {
       if (pila && pila.cards.size > 0) {
@@ -2926,6 +3353,7 @@ export class SistemaActor extends Actor {
   async realizarDescanso({ comodo = false } = {}) {
     const { mazo, trinkets, mano, enJuego, descarte, quemadas } = this.system.pilasDocumentos;
     if (!mazo) return;
+    await this.soltarCartaVisto(); // (v0.19.0) Visto y No visto: la carta guardada vuelve con el Descarte
 
     for (const pila of [mano, enJuego, descarte, quemadas]) {
       if (pila && pila.cards.size > 0) {
@@ -2945,6 +3373,8 @@ export class SistemaActor extends Actor {
     const recargaRasgos = { "system.rasgosRaza.esperaUnMomentoUsado": false };
     if (comodo) recargaRasgos["system.rasgosRaza.alquimiaUsada"] = false;
     await this.update(recargaRasgos);
+    // (v0.19.0) Ilusionista: los huecos de ilusión se recuperan al descansar.
+    if (this.getFlag("cartas-y-dados", "huecosIlusionUsados")) await this.unsetFlag("cartas-y-dados", "huecosIlusionUsados");
     // (v0.15.0) Un Abalorio Eterno que sale de Quemadas vuelve directamente a estar En Juego.
     await this._asegurarAbaloriosEternos();
     await this._limpiarEstadoAcciones();
@@ -3371,6 +3801,16 @@ export class SistemaActor extends Actor {
       if (!tirada.esNegativo && Number(tirada.total) > 0) await this.activarCorazonDragon(Number(tirada.total));
       else await this.retirarCorazonDragon();
     }
+    // (v0.19.0) Ilusionista: la repetición fija el nuevo número de pesadillas / turnos del prisma.
+    const exitoRepetida = !tirada.esNegativo && Number(tirada.total) > 0;
+    if (datos.efectoX === "pesadillas") {
+      if (exitoRepetida) await this.activarPesadillas(Number(tirada.total));
+      else await this.retirarPesadillas();
+    }
+    if (datos.efectoX === "caleidoscopio" && (tokenObjetivo?.actor ?? this).id === this.id) {
+      if (exitoRepetida) await this.aplicarCaleidoscopio(Number(tirada.total), this.name);
+      else await this.retirarCaleidoscopio();
+    }
     const resolucion = datos.valorX
       ? {
         publico: this._htmlValorX(tirada, { efectoX: datos.efectoX ?? null, tokenObjetivo, numeroCarta: datos.numeroCarta ?? null }),
@@ -3740,6 +4180,13 @@ export class SistemaActor extends Actor {
     if (efectoX === "corazonDragon" && !tirada.esNegativo && Number(tirada.total) > 0) {
       await this.activarCorazonDragon(Number(tirada.total));
     }
+    // (v0.19.0) Ilusionista · Pesadillas y Caleidoscopio sobre el propio Actor (si se marca a un
+    // aliado con T, el Caleidoscopio lo aplica el Master con el botón de `_htmlValorX`).
+    const exitoX = !tirada.esNegativo && Number(tirada.total) > 0;
+    if (efectoX === "pesadillas" && exitoX) await this.activarPesadillas(Number(tirada.total));
+    if (efectoX === "caleidoscopio" && exitoX && (tokenObjetivoX?.actor ?? this).id === this.id) {
+      await this.aplicarCaleidoscopio(Number(tirada.total), this.name);
+    }
     const bloqueResolucionHtml = resolucion.publico;
     const htmlMaster = resolucion.master;
 
@@ -3773,6 +4220,7 @@ export class SistemaActor extends Actor {
         ${item.system.descripcion ? `<div class="cyd-efecto">${item.system.descripcion}</div>` : ""}
         ${lineaQuemada}
         ${this._htmlBotonVisionFuturo(hayPartes ? ["misticismo", "consciencia"] : ["misticismo"])}
+        ${cartaElegida ? this._htmlBotonesVistoNoVisto(cartaElegida) : ""}
       </div>
     `;
 
@@ -3844,6 +4292,23 @@ export class SistemaActor extends Actor {
     } else if (exito && efectoX === "rencor") {
       // (v0.18.0) Custodio · Rencor: el daño (mitigado + X) lo aplica el Master (`_htmlMasterValorX`).
       htmlEfecto = `<p><i class="fa-solid fa-person-burst"></i> Devuelve al enemigo el daño que acabas de mitigar por completo <strong>+ ${valor}</strong>. <small><i class="fa-solid fa-eye-slash"></i> Lo aplica el Master.</small></p>`;
+    } else if (exito && efectoX === "pesadillas") {
+      // (v0.19.0) Ilusionista · Pesadillas: se activan en el propio Actor (`usarHabilidad`).
+      htmlEfecto = `<p><i class="fa-solid fa-ghost"></i> Invocas <strong>${valor} pesadilla(s)</strong>. Al atacar, cada una que se abalance hace <strong>1 de daño psíquico</strong> que ignora la Defensa (botón «Abalanzar» en la ficha). Desaparecen al terminar tu turno salvo que sacrifiques 1 hueco de ilusión para mantenerlas un turno más.</p>`;
+    } else if (exito && efectoX === "pasoEnFalso") {
+      // (v0.19.0) Ilusionista · Paso en falso: radio X m, dura tantos turnos como el nivel del personaje.
+      const turnos = Math.max(1, Number(this.system.nivelEfectivo) || 1);
+      htmlEfecto = `<p><i class="fa-solid fa-shoe-prints"></i> Ilusión del terreno de <strong>${valor} m de radio</strong> durante <strong>${turnos} turno(s)</strong>: los enemigos que estén en ella mueven a la mitad de velocidad y tiran Consciencia con 1 dado menos. <small>Lo aplica el Master.</small></p>`;
+    } else if (exito && efectoX === "caleidoscopio") {
+      // (v0.19.0) Ilusionista · Caleidoscopio: en ti o en el aliado marcado con T.
+      const escapar = foundry.utils.escapeHTML;
+      const actorDestino = tokenObjetivo?.actor ?? this;
+      const nombre = escapar(tokenObjetivo?.name ?? actorDestino.name);
+      htmlEfecto = `
+        <p><i class="fa-solid fa-clone"></i> Un prisma cristalino cubre a <strong>${nombre}</strong> durante <strong>${valor} turno(s)</strong> con <strong>3 reflejos</strong>: sus ataques que alcancen a un enemigo hacen la mitad del daño de la acción como daño psíquico, y al defender puede sacrificar un reflejo para +3 de Defensa en esa defensa.</p>
+        ${actorDestino.id !== this.id ? `<button type="button" class="cyd-btn-caleidoscopio" data-actor-uuid="${actorDestino.uuid}" data-turnos="${valor}" data-origen="${escapar(this.name)}" data-nombre="${nombre}">
+          <i class="fa-solid fa-clone"></i> Aplicar Caleidoscopio a ${nombre} (${valor} turnos)
+        </button>` : ""}`;
     } else if (exito && efectoX === "manifestarArma") {
       const categorias = Math.min(5, Math.max(1, Number(numeroCarta) || 1));
       htmlEfecto = `<p><i class="fa-solid fa-khanda"></i> Arma manifestada de <strong>${categorias} categoría(s)</strong> (carta ${SISTEMA_CONFIG.dadoPorNumeroCarta[categorias] ?? ""}) durante <strong>${valor} turno(s)</strong>.</p>`;

@@ -493,6 +493,7 @@ function activarBotonEstadoAlterado(html) {
 /**
  * Potens Mystica (v0.17.0): botones solo del Master (se eliminan para el resto de usuarios):
  * - `.cyd-btn-mal-de-ojo`: maldice al Actor `data-actor-uuid` durante `data-turnos` turnos.
+ * - `.cyd-btn-caleidoscopio` (v0.19.0, Ilusionista): prisma de `data-turnos` turnos sobre el Actor.
  * - `.cyd-btn-sellar-destino`: resuelve «Sellar destino» sobre el Actor con el palo `data-palo`.
  * - `.cyd-btn-perder-vida` (Ojo por ojo): resta `data-cantidad` de Salud a los Actores de `data-uuids`
  *   o, si no hay, a los Tokens que tenga marcados el Master. No es daño: no lo mitiga la Barrera.
@@ -505,6 +506,13 @@ function activarBotonesMasterPotens(html) {
       if (!actor?.aplicarMalDeOjo) return false;
       await actor.aplicarMalDeOjo(Number(b.dataset.turnos) || 1, b.dataset.origen ?? "");
       return `Mal de ojo aplicado a ${b.dataset.nombre || actor.name}`;
+    },
+    // (v0.19.0) Ilusionista · Caleidoscopio sobre un aliado.
+    ".cyd-btn-caleidoscopio": async b => {
+      const actor = await fromUuid(b.dataset.actorUuid);
+      if (!actor?.aplicarCaleidoscopio) return false;
+      await actor.aplicarCaleidoscopio(Number(b.dataset.turnos) || 1, b.dataset.origen ?? "");
+      return `Caleidoscopio aplicado a ${b.dataset.nombre || actor.name}`;
     },
     ".cyd-btn-sellar-destino": async b => {
       const actor = await fromUuid(b.dataset.actorUuid);
@@ -618,6 +626,7 @@ function activarBotonRencor(html) {
  * (v0.16.0) También «Descartar la primera carta del Mazo» (Visión del futuro, Alta Scentia).
  * (v0.17.0) También «Ojo por ojo» y «Preservación espiritual» (Potens Mystica).
  * (v0.18.0) También «Quemar Mártir» (Custodio).
+ * (v0.19.0) También «Visto» y «No visto» (Ilusionista).
  * Solo los ve y usa el propietario del Actor indicado en `data-actor-uuid`; cada mensaje se
  * usa una sola vez por Actor (`flags.cartas-y-dados.ultimaEmpatia` / `ultimaPromesa`).
  * @param {ChatMessage} message
@@ -639,7 +648,12 @@ function activarBotonesMendacium(message, html) {
       usar: (actor, b) => actor.usarPreservacionEspiritual(b.dataset.cartaId) },
     // (v0.18.0) Fortis Corpore · Custodio: quemar Mártir con una carta CONS tras recibir daño.
     { selector: ".cyd-btn-quemar-martir", flag: "ultimoMartir",
-      usar: actor => actor.quemarMartir() }
+      usar: actor => actor.quemarMartir() },
+    // (v0.19.0) Alta Scentia · Ilusionista: Visto y No visto tras una acción.
+    { selector: ".cyd-btn-visto", flag: "ultimoVisto",
+      usar: (actor, b) => actor.usarVisto(b.dataset.sourceId ?? "", b.dataset.nombre ?? "") },
+    { selector: ".cyd-btn-no-visto", flag: "ultimoNoVisto",
+      usar: actor => actor.usarNoVisto() }
   ];
   for (const { selector, flag, usar } of botones) {
     for (const boton of html.querySelectorAll(selector)) {

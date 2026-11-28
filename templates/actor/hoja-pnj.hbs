@@ -235,6 +235,12 @@
               </span>
               {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="corazonDragon" data-tooltip="Retirar el Corazón del dragón"><i class="fa-solid fa-xmark"></i></button>{{/if}}
             {{/if}}
+            {{#if estadosMisticos.caleidoscopio}}
+              <span class="cyd-chip-estado cyd-activo" data-tooltip="Caleidoscopio{{#if estadosMisticos.caleidoscopio.origen}} de {{estadosMisticos.caleidoscopio.origen}}{{/if}}: 3 reflejos actúan y se mueven como tú (izquierda, derecha y detrás). Si alcanzan a un enemigo con un ataque, hacen la mitad del daño de la acción como daño psíquico. Al defender, sacrifica un reflejo para +3 de Defensa en esa defensa. En combate pierde un turno al final de cada uno de tus turnos">
+                <i class="fa-solid fa-clone"></i> Caleidoscopio · {{estadosMisticos.caleidoscopio.turnos}} turno(s) · {{estadosMisticos.caleidoscopio.reflejos}} reflejo(s)
+              </span>
+              {{#if esPropietario}}<button type="button" class="cyd-btn-icono cyd-peligro" data-action="retirarEstadoMistico" data-estado="caleidoscopio" data-tooltip="Retirar el Caleidoscopio"><i class="fa-solid fa-xmark"></i></button>{{/if}}
+            {{/if}}
             {{#if estadosMisticos.malDeOjo}}
               <span class="cyd-chip-estado cyd-bloqueado" data-tooltip="Mal de ojo{{#if estadosMisticos.malDeOjo.origen}} de {{estadosMisticos.malDeOjo.origen}}{{/if}}: tus cartas de Misticismo bajan una categoría de dado (una carta d4 da automáticamente 1). En combate pierde un turno al final de cada uno de tus turnos">
                 <i class="fa-solid fa-eye-slash"></i> Mal de ojo · {{estadosMisticos.malDeOjo.turnos}} turno(s)

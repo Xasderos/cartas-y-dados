@@ -58,7 +58,13 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       usarAlquimia: HojaPersonajeActor.#onUsarAlquimia,
       usarMonoculo: HojaPersonajeActor.#onUsarMonoculo,
       descartarTiempoEmbotellado: HojaPersonajeActor.#onDescartarTiempoEmbotellado,
-      retirarEstadoMistico: HojaPersonajeActor.#onRetirarEstadoMistico
+      retirarEstadoMistico: HojaPersonajeActor.#onRetirarEstadoMistico,
+      // (v0.19.0) Alta Scentia · Ilusionista
+      cambiarHuecoIlusion: HojaPersonajeActor.#onCambiarHuecoIlusion,
+      mantenerPesadillas: HojaPersonajeActor.#onMantenerPesadillas,
+      abalanzarPesadillas: HojaPersonajeActor.#onAbalanzarPesadillas,
+      sacrificarReflejo: HojaPersonajeActor.#onSacrificarReflejo,
+      soltarCartaVisto: HojaPersonajeActor.#onSoltarCartaVisto
     }
   };
 
@@ -191,6 +197,8 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
       estadoAcciones: actor.contextoAcciones(),
       // (v0.16.0) Alta Scentia: primera carta del Mazo, artilugio y dados embotellados
       altaScentia: actor.isOwner ? actor.contextoAltaScentia() : null,
+      // (v0.19.0) Ilusionista: huecos de ilusión, pesadillas y carta sobre «Visto y No visto»
+      ilusionista: actor.isOwner ? actor.contextoIlusionista() : null,
       // (v0.17.0) Potens Mystica: Mal de ojo y Destino sellado sobre este Actor
       estadosMisticos: actor.contextoEstadosMisticos()
     };
@@ -550,6 +558,38 @@ export class HojaPersonajeActor extends VentanaDinamicaMixin(RetratoFichaMixin(H
     if (target.dataset.estado === "malDeOjo") await this.document.retirarMalDeOjo();
     else if (target.dataset.estado === "destinoSellado") await this.document.retirarDestinoSellado();
     else if (target.dataset.estado === "corazonDragon") await this.document.retirarCorazonDragon(); // (v0.18.0)
+    else if (target.dataset.estado === "caleidoscopio") await this.document.retirarCaleidoscopio(); // (v0.19.0)
+    else if (target.dataset.estado === "pesadillas") await this.document.retirarPesadillas(); // (v0.19.0)
+  }
+
+  /**
+   * (v0.19.0) Ilusionista: gasta (`data-delta="1"`) o recupera (`data-delta="-1"`) un hueco de ilusión.
+   * @param {PointerEvent} event
+   * @param {HTMLElement} target
+   */
+  static async #onCambiarHuecoIlusion(event, target) {
+    await this.document.cambiarHuecosIlusion(Number(target.dataset.delta) || 1);
+  }
+
+  /** (v0.19.0) Ilusionista · Pesadillas: sacrificar 1 hueco para mantenerlas un turno más. */
+  static async #onMantenerPesadillas() {
+    await this.document.mantenerPesadillas();
+  }
+
+  /** (v0.19.0) Ilusionista · Pesadillas: abalanzarlas contra los Tokens marcados con T. */
+  static async #onAbalanzarPesadillas() {
+    await this.document.abalanzarPesadillas();
+  }
+
+  /** (v0.19.0) Ilusionista · Caleidoscopio: sacrificar un reflejo (+3 Defensa en esta defensa). */
+  static async #onSacrificarReflejo() {
+    await this.document.sacrificarReflejo();
+  }
+
+  /** (v0.19.0) Ilusionista · Visto y No visto: devolver al Descarte la carta guardada. */
+  static async #onSoltarCartaVisto() {
+    await this.document.soltarCartaVisto();
+    this.render();
   }
 
   static async #onDescartarTiempoEmbotellado() {

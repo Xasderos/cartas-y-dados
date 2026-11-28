@@ -175,6 +175,17 @@ export const SISTEMA_CONFIG = {
       resolucion: "segunCarta", abalorio: "companero", mitadAtributos: true, sinReaccion: true,
       texto: "Abalorio Compañero eterno: tu compañero realiza una tarea sencilla con esta carta. Tira con la mitad de tus dados (redondeo hacia arriba) y no puede reaccionar."
     },
+    // (v0.19.0) Alta Scentia · Ilusionista
+    accionConjunta: {
+      nombre: "Acción conjunta (Imitación)", icono: "fa-masks-theater", caracteristicas: ["fisico", "consciencia", "social", "misticismo"],
+      resolucion: "segunCarta", abalorio: "imitacion",
+      texto: "Abalorio Imitación: acompañas a un aliado en su acción, en su mismo turno. Si usáis una carta del mismo palo y la misma acción, el enemigo reacciona como si fuese una única acción (el Master suma ambos resultados)."
+    },
+    influenciaIlusoria: {
+      nombre: "Influencia ilusoria", icono: "fa-brain", caracteristicas: ["consciencia"],
+      resolucion: "estorbo", reaccion: true, abalorio: "influenciaIlusoria",
+      texto: "Abalorio Influencia ilusoria: reaccionas e intervienes en la acción de otro; restas el resultado de tu tirada a la tirada objetivo (marca su Token con T)."
+    },
     libre: {
       nombre: "Otra acción", icono: "fa-comments", caracteristicas: ["fisico", "consciencia", "social", "misticismo"],
       resolucion: "segunCarta",
@@ -193,6 +204,7 @@ export const SISTEMA_CONFIG = {
     enfrentada: "Tirada enfrentada (la compara el Master)",
     puntoDebil: "Contra la Defensa, sin daño (punto débil)",
     ayuda: "Ayuda: sumar a la tirada de un aliado",
+    estorbo: "Estorbo: restar a la tirada objetivo",
     sinResolucion: "Solo tirar, sin resolución",
     sinTirada: "Sin tirada (efecto directo)"
   },
@@ -646,8 +658,72 @@ export const SISTEMA_CONFIG = {
               texto: "Especialización de Alta Scentia. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
             },
             {
+              // (v0.19.0) Ilusionista: progresión propia de Nv. 3 a 6 (se suma a la de la clase).
               clave: "ilusionista", nombre: "Ilusionista",
-              texto: "Especialización de Alta Scentia. Sus beneficios están pendientes de definir: el Master los aplica mientras tanto."
+              texto: "Especialización de Alta Scentia: maestro de las ilusiones que engañan los sentidos y la psique.",
+              tablaElecciones: [
+                { nivel: 3, beneficios: "Elección de característica · +1 Mano Máxima · Elección de abalorio · Ilusiones" },
+                { nivel: 4, beneficios: "Elección de habilidad · Elección de cartas" },
+                { nivel: 5, beneficios: "Elección de habilidad (pendiente de definir) · Elección de característica" },
+                { nivel: 6, beneficios: "Elección de abalorio (pendiente de definir) · +1 Mano Máxima" }
+              ],
+              progresion: {
+                3: {
+                  caracteristica: true,
+                  manoMaxima: 1,
+                  abalorios: [
+                    {
+                      clave: "imitacion", nombre: "Imitación", icono: "fa-masks-theater",
+                      texto: "Adquieres el aspecto de un aliado y actúas a su manera; actúas en su mismo turno y puedes acompañarlo en sus acciones. Si usáis una carta del mismo palo y la misma acción, el enemigo debe reaccionar a ella como si fuese una única acción. Por ejemplo, si fuese un ataque, juntaríais los dados contra la defensa del objetivo. No puedes usar esto para realizar acciones que sean imposibles para ti (como usar una habilidad que no posees).",
+                      auto: "En Juego: acción «Acción conjunta (Imitación)» para cualquier carta; el chat recuerda que, con el mismo palo y la misma acción que tu aliado, el Master suma ambos resultados como una única acción."
+                    },
+                    {
+                      clave: "vistoNoVisto", nombre: "Visto y No visto", icono: "fa-eye-low-vision",
+                      texto: "Visto: generas ilusiones de tus acciones y movimientos; después de haber realizado una acción, tirar los dados y sus correspondientes reacciones, puedes elegir NO haber realizado la acción. Guarda la carta que has usado sobre tu abalorio. Las reacciones realizadas sobre esta acción quedan realizadas y son enviadas a la pila de descarte (o son quemadas si procede). No visto: mientras tengas una carta sobre tu abalorio, tras realizar una acción, puedes elegir no haberla realizado y sustituirla por una acción según la carta colocada sobre tu abalorio. Las cartas que hayas usado van a la pila de descarte.",
+                      auto: "En Juego: tras cada acción, el chat te ofrece «Visto» (la carta usada pasa a estar sobre el abalorio y la acción no se ha realizado) o, si ya hay una carta sobre él, «No visto» (la acción no se ha realizado y actúas con la carta guardada). La carta guardada se ve en la ficha y vuelve al Descarte si el abalorio deja de estar En Juego, al terminar la escena o al descansar."
+                    },
+                    {
+                      clave: "influenciaIlusoria", nombre: "Influencia ilusoria", icono: "fa-brain",
+                      texto: "Generas ilusiones que perjudican la psique enemiga; puedes usar cartas de consciencia para reaccionar e intervenir en las acciones de otros: resta el resultado de tu tirada de consciencia a la tirada objetivo.",
+                      auto: "En Juego: reacción «Influencia ilusoria» para cartas CONS; el chat indica cuánto se resta a la tirada de la criatura marcada con T."
+                    }
+                  ],
+                  pasivas: [
+                    {
+                      clave: "ilusiones", nombre: "Ilusiones",
+                      texto: "Puedes generar ilusiones siguiendo estas normas: para realizar ilusiones tienes huecos de ilusión según tu nivel de personaje. Los huecos equivalen al tamaño de la ilusión: 1 hueco es una ilusión de tamaño pequeño; 2 huecos, una ilusión de tamaño mediano o dos ilusiones de tamaño pequeño, y así sucesivamente. Las ilusiones no pueden atacar. Puedes hacer aparecer las ilusiones hasta a 10 metros de ti. Los huecos se recuperan tras un descanso."
+                    }
+                  ]
+                },
+                4: {
+                  habilidades: [
+                    {
+                      nombre: "Pesadillas", esAtaque: false, valorX: true, efectoX: "pesadillas",
+                      texto: "Invocas tantas ilusiones de pesadillas como resultado en la tirada; cuando ataques puedes hacer que las ilusiones se abalancen contra uno o varios objetivos que puedas ver: cada una hace 1 punto de daño psíquico que ignora la defensa. Las pesadillas desaparecen al terminar el turno a no ser que sacrifiques un hueco de ilusionismo para mantenerlas un turno más. Estos huecos los recuperas tras un descanso largo."
+                    },
+                    {
+                      nombre: "Paso en falso", esAtaque: false, valorX: true, efectoX: "pasoEnFalso",
+                      texto: "Una ilusión del terreno: los enemigos ven reducida su velocidad de movimiento a la mitad y sus tiradas de consciencia se ven reducidas en un dado. El lugar afectado es un radio en metros igual al resultado de la tirada, y el punto de origen es uno que puedas ver. Dura tantos turnos como tu nivel de personaje."
+                    },
+                    {
+                      nombre: "Caleidoscopio", esAtaque: false, valorX: true, efectoX: "caleidoscopio",
+                      texto: "Eliges a un aliado o a ti mismo para que le cubra un prisma cristalino tantos turnos como resultado en la tirada; su imagen y movimientos se ven reflejados en este. Tiene 3 reflejos, que actúan y se mueven igual que él, pero en direcciones diferentes (izquierda, derecha y detrás). Los reflejos, en caso de que alcancen a un enemigo con un ataque, hacen la mitad del daño de la acción como daño psíquico. Al defender, puede sacrificar uno de los reflejos para aumentar en 3 la defensa solo durante esa defensa."
+                    }
+                  ],
+                  packs: [
+                    [{ palo: "oros", numero: 2 }, { palo: "bastos", numero: 3 }],
+                    [{ palo: "espadas", numero: 2 }, { palo: "bastos", numero: 3 }]
+                  ]
+                },
+                5: {
+                  caracteristica: true,
+                  pendientes: ["Elección de habilidad"]
+                },
+                6: {
+                  manoMaxima: 1,
+                  pendientes: ["Elección de abalorio"]
+                }
+              }
             },
             {
               clave: "elementalista", nombre: "Elementalista",
@@ -977,7 +1053,11 @@ export const EFECTOS_VALOR_X = {
   // (v0.18.0) Fortis Corpore · Custodio
   muroVoluntad: "Muro de voluntad: muro con 3 × X de vida",
   corazonDragon: "Corazón del dragón: X turnos con daño máximo 1 (+1 Agotamiento al recibirlo)",
-  rencor: "Rencor: devolver el daño mitigado + X al atacante"
+  rencor: "Rencor: devolver el daño mitigado + X al atacante",
+  // (v0.19.0) Alta Scentia · Ilusionista
+  pesadillas: "Pesadillas: invocar X pesadillas (1 de daño psíquico cada una)",
+  pasoEnFalso: "Paso en falso: ilusión del terreno de X m de radio (tu nivel en turnos)",
+  caleidoscopio: "Caleidoscopio: prisma con 3 reflejos durante X turnos"
 };
 
 /**
