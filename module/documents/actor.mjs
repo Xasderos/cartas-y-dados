@@ -2976,6 +2976,119 @@ export class SistemaActor extends Actor {
   }
 
   /* ======================================================================== */
+  /*  5a. SALUD ACTUAL QUE SIGUE A LA SALUD MÁXIMA (v0.18.1)                  */
+  /* ======================================================================== */
+
+  /**
+   * Calcula la Salud actual tras un cambio de la Salud Máx. total: suma (o resta) la misma
+   * diferencia. No aplica si el Actor ya está a 0 o menos (no revive ni remata), una reducción
+   * nunca deja la Salud por debajo de 1 y el resultado nunca supera la nueva Salud Máx.
+   * @param {number} valor - Salud actual antes del cambio.
+   * @param {number} maxAnterior - Salud Máx. total antes del cambio.
+   * @param {number} maxNuevo - Salud Máx. total después del cambio.
+   * @returns {number|null} Nueva Salud actual, o null si no hay que cambiarla.
+   */
+  static saludTrasCambioMaximo(valor, maxAnterior, maxNuevo) {
+    const actual = Number(valor) || 0;
+    const delta = (Number(maxNuevo) || 0) - (Number(maxAnterior) || 0);
+    if (!delta || actual <= 0) return null;
+    const nueva = Math.min(maxNuevo, Math.max(1, actual + delta));
+    return nueva === actual ? null : nueva;
+  }
+
+  /**
+   * Cambios del propio Actor (Salud base, características, Agotamiento...): calcula la Salud Máx.
+   * resultante con un clon temporal y ajusta `system.salud.value` en la misma actualización
+   * (atómico: sin carreras con otras automatizaciones). Se omite si la actualización ya fija la
+   * Salud actual de forma explícita o con `options.cydSinAjusteSalud`.
+   * @override
+   */
+  async _preUpdate(changes, options, user) {
+    const permitido = await super._preUpdate(changes, options, user);
+    if (permitido === false) return false;
+    if (options.cydSinAjusteSalud || !["personaje", "pnj"].includes(this.type)) return;
+    const rutas = Object.keys(foundry.utils.flattenObject(changes));
+    if (!rutas.some(r => r.startsWith("system."))) return;
+    if (rutas.includes("system.salud.value")) return;
+
+    try {
+      const maxAnterior = Number(this.system.salud?.maxTotal) || 0;
+      const maxNuevo = Number(this.clone(foundry.utils.deepClone(changes)).system.salud?.maxTotal) || 0;
+      const nueva = SistemaActor.saludTrasCambioMaximo(this.system.salud?.value, maxAnterior, maxNuevo);
+      if (nueva !== null) foundry.utils.setProperty(changes, "system.salud.value", nueva);
+    } catch (error) {
+      console.warn("[Cartas y Dados] No se pudo ajustar la Salud a la nueva Salud Máxima", error);
+    }
+  }
+
+  /**
+   * Guarda la Salud Máx. total antes de crear/editar/borrar Items embebidos (sus bonificadores
+   * y el estado `equipado` cambian la Salud Máx.).
+   * @param {string} collection
+   * @private
+   */
+  _guardarSaludMaxAntesDeItems(collection) {
+    if (collection !== "items") return;
+    this._cydSaludMaxAntesItems = Number(this.system.salud?.maxTotal) || 0;
+  }
+
+  /**
+   * Tras crear/editar/borrar Items embebidos: si cambió la Salud Máx. total, suma (o resta) la
+   * misma diferencia a la Salud actual. Solo en el cliente que hizo el cambio.
+   * @param {string} collection
+   * @param {string} userId
+   * @private
+   */
+  _ajustarSaludTrasItems(collection, userId) {
+    if (collection !== "items") return;
+    const maxAnterior = this._cydSaludMaxAntesItems;
+    this._cydSaludMaxAntesItems = undefined;
+    if (userId !== game.user.id || maxAnterior === undefined) return;
+    if (!["personaje", "pnj"].includes(this.type)) return;
+    this.prepareData();
+    const nueva = SistemaActor.saludTrasCambioMaximo(this.system.salud?.value, maxAnterior, this.system.salud?.maxTotal);
+    if (nueva === null) return;
+    this.update({ "system.salud.value": nueva }, { cydSinAjusteSalud: true })
+      .catch(error => console.warn("[Cartas y Dados] No se pudo ajustar la Salud a la nueva Salud Máxima", error));
+  }
+
+  /** @override */
+  _preCreateDescendantDocuments(parent, collection, data, options, userId) {
+    super._preCreateDescendantDocuments(parent, collection, data, options, userId);
+    this._guardarSaludMaxAntesDeItems(collection);
+  }
+
+  /** @override */
+  _onCreateDescendantDocuments(parent, collection, documents, data, options, userId) {
+    super._onCreateDescendantDocuments(parent, collection, documents, data, options, userId);
+    this._ajustarSaludTrasItems(collection, userId);
+  }
+
+  /** @override */
+  _preUpdateDescendantDocuments(parent, collection, changes, options, userId) {
+    super._preUpdateDescendantDocuments(parent, collection, changes, options, userId);
+    this._guardarSaludMaxAntesDeItems(collection);
+  }
+
+  /** @override */
+  _onUpdateDescendantDocuments(parent, collection, documents, changes, options, userId) {
+    super._onUpdateDescendantDocuments(parent, collection, documents, changes, options, userId);
+    this._ajustarSaludTrasItems(collection, userId);
+  }
+
+  /** @override */
+  _preDeleteDescendantDocuments(parent, collection, ids, options, userId) {
+    super._preDeleteDescendantDocuments(parent, collection, ids, options, userId);
+    this._guardarSaludMaxAntesDeItems(collection);
+  }
+
+  /** @override */
+  _onDeleteDescendantDocuments(parent, collection, documents, ids, options, userId) {
+    super._onDeleteDescendantDocuments(parent, collection, documents, ids, options, userId);
+    this._ajustarSaludTrasItems(collection, userId);
+  }
+
+  /* ======================================================================== */
   /*  5b. AGOTAMIENTO (v0.12.0)                                                */
   /* ======================================================================== */
 

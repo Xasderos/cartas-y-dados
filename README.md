@@ -4,7 +4,7 @@
 
 A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal card decks with dice rolls. No external modules required.
 
-**Current version:** 0.18.0 (beta)
+**Current version:** 0.18.1 (beta)
 
 ## How it plays
 - **Card + Dice (`XdY`):** a card's **suit** picks the Characteristic that sets how many dice you roll: Espadas → Physical (FISC), Bastos → Awareness (CONS), Oros → Social (SOC), Copas → Mysticism (MIST). Its **number (1–5)** sets the die: d4, d6, d8, d10, d12.
@@ -25,6 +25,7 @@ A custom RPG system for **Foundry VTT v14** (`14.369+`) that combines personal c
 - **GM Panel** (crown button in Token controls): Difficulty, group actions and a party overview.
 - **Portraits:** click any sheet image to view it full size; small Edit and Token buttons sit right below it.
 - **Responsive windows:** every sheet, panel and dialog fits the screen, reflows when resized and scrolls wherever content can grow; the window menu (⋮) can stretch a sheet to the full screen height. Character sheets have Main, Equipment and Race tabs.
+- **Max Health changes:** when a character's max Health goes up or down (base value, Physical, item bonuses, equipping, Exhaustion 3), current Health moves by the same amount (never below 1 or above the maximum).
 - **Death at 0 Health:** a token whose Health drops to 0 or below gets the Dead status (and is marked defeated in combat); healing above 0 removes it, unless the death came from Exhaustion 8.
 
 ## Installation
