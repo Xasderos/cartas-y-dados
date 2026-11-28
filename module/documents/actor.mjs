@@ -17,6 +17,7 @@ import { abrirDialogoAccion } from "../applications/dialogo-accion.mjs";
 import { combinarTiradas, enviarMensajeSoloMaster, htmlResolucionDificultad, publicarTirada, tirarDadosSistema } from "../dados.mjs";
 import { obtenerOCrearCarpeta } from "../carpetas.mjs";
 import { leerAjuste } from "../settings.mjs";
+import { registrarAbalorioJugado, subirNivelPeligro } from "../peligro.mjs";
 
 export class SistemaActor extends Actor {
 
@@ -794,6 +795,8 @@ export class SistemaActor extends Actor {
 
     // Las consecuencias del nuevo nivel las anuncia/aplica `_alCambiarAgotamiento` (hook updateActor).
     await this.cambiarAgotamiento(1);
+    // (v0.21.0) Nivel de peligro: cada vez que el Master (un PNJ con Mazo de Jefe) baraja su mazo, +1.
+    if (this.type === "pnj") await subirNivelPeligro(1, `${this.name} (Master) baraja su mazo.`);
     // (v0.20.0) Brujo · Ritual de sangre: el abalorio vuelve al Mazo de Trinkets y se paga el precio.
     await this._ritualSangreAlBarajar();
   }
@@ -1133,7 +1136,8 @@ export class SistemaActor extends Actor {
       const dadosDe = caract => configAccion?.mitadAtributos
         ? Math.max(1, Math.ceil(this._dadosDeCaracteristica(caract) / 2))
         : this._dadosDeCaracteristica(caract);
-      const tirarCarta = (c, caract, extra = 0) => {
+      // (v0.21.0) `principal`: solo la carta principal recibe los dados extra del Nivel de peligro.
+      const tirarCarta = (c, caract, extra = 0, principal = false) => {
         // (v0.17.0) Mal de ojo: las cartas MIST del Actor maldito bajan una categoría de dado.
         const malDeOjo = c.system.palo === "copas" ? this._ajusteMalDeOjo(c.system.tipoDado ?? "d6") : null;
         if (malDeOjo) usaMalDeOjo = true;
@@ -1143,13 +1147,13 @@ export class SistemaActor extends Actor {
           bono: Number(c.system.automatizacion?.bonoTirada) || 0,
           rollData: this.getRollData(),
           mitadPorAgotamiento, multiplicador: this._multiplicadorTiradas(),
-          parcial: hayPartes,
+          parcial: hayPartes, dadosPeligro: principal,
           speaker: ChatMessage.getSpeaker({ actor: this }),
           titulo: `${configAccion ? `${configAccion.nombre} · ` : ""}${nombreVisibleCarta(c)}`,
           resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
         });
       };
-      const partes = [{ tirada: await tirarCarta(carta, claveCaract, amistad ? 1 : 0), etiqueta: nombreVisibleCarta(carta) }];
+      const partes = [{ tirada: await tirarCarta(carta, claveCaract, amistad ? 1 : 0, true), etiqueta: nombreVisibleCarta(carta) }];
       if (cartaApuntado) {
         partes.push({ tirada: await tirarCarta(cartaApuntado, caractApuntado), etiqueta: `${nombreVisibleCarta(cartaApuntado)} (apuntado)` });
       }
@@ -1280,6 +1284,8 @@ export class SistemaActor extends Actor {
     }
 
     await this._moverCartaEntrePilas(mano, seQuema ? quemadas : enJuego, carta.id);
+    // (v0.21.0) Nivel de peligro: cada 3 abalorios jugados En Juego en la mesa sube 1 punto.
+    if (!seQuema) await registrarAbalorioJugado(this.name);
     const resumenEfectosAuto = await this._aplicarAutomatizacionCarta(carta);
 
     // (v0.15.0) Abalorio Amistad: al jugarlo se enlaza el destino con un aliado.
@@ -3295,7 +3301,7 @@ export class SistemaActor extends Actor {
     }
     const speaker = ChatMessage.getSpeaker({ actor: this });
     const partes = [];
-    for (const c of quemadas) {
+    for (const [indice, c] of quemadas.entries()) {
       const caract = SISTEMA_CONFIG.palosCartas[c.palo]?.caracteristicaAsociada ?? "fisico";
       const malDeOjo = c.palo === "copas" ? this._ajusteMalDeOjo(c.tipoDado) : null;
       partes.push({
@@ -3303,6 +3309,7 @@ export class SistemaActor extends Actor {
           cantidadDados: this._dadosDeCaracteristica(caract), tipoDado: malDeOjo?.tipoDado ?? c.tipoDado,
           rollData: this.getRollData(), mitadPorAgotamiento: this._tiradasAMitadPorAgotamiento(),
           multiplicador: this._multiplicadorTiradas(), parcial: quemadas.length > 1, speaker,
+          dadosPeligro: indice === 0, // (v0.21.0) los dados del Nivel de peligro, una sola vez
           titulo: `Cerrar destino · ${c.nombre}`,
           resultadoFijo: malDeOjo?.resultadoFijo ?? null, motivoFijo: malDeOjo?.motivoFijo ?? ""
         }),
@@ -4525,7 +4532,7 @@ export class SistemaActor extends Actor {
         tirada: await tirarDadosSistema({
           cantidadDados: this._dadosDeCaracteristica("consciencia"), tipoDado: c.system.tipoDado ?? "d6",
           bono: Number(c.system.automatizacion?.bonoTirada) || 0, rollData: this.getRollData(),
-          mitadPorAgotamiento, multiplicador: this._multiplicadorTiradas(), parcial: true,
+          mitadPorAgotamiento, multiplicador: this._multiplicadorTiradas(), parcial: true, dadosPeligro: false,
           speaker: ChatMessage.getSpeaker({ actor: this }), titulo: `${item.name} · ${nombreVisibleCarta(c)}`
         }),
         etiqueta: `${nombreVisibleCarta(c)} (Consciencia)`

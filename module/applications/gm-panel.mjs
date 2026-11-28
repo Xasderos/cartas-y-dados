@@ -9,6 +9,9 @@ import { VentanaDinamicaMixin, opcionesDialogoSistema } from "./ventana-dinamica
 
 import { PRESETS_DIFICULTAD_POR_DEFECTO } from "../settings.mjs";
 import { preguntarTipoDescanso } from "../documents/actor.mjs";
+import {
+  ABALORIOS_POR_NIVEL_PELIGRO, NIVEL_PELIGRO_MAXIMO, fijarNivelPeligro, leerNivelPeligro, listaEfectosPeligro, reiniciarPeligro
+} from "../peligro.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -65,8 +68,11 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const dificultadActual = game.settings.get("cartas-y-dados", "dificultadMaster") || 0;
-    // (v0.20.0) Nivel de peligro del encuentro (Brujo · Ritual de espíritu).
-    const nivelPeligro = game.settings.get("cartas-y-dados", "nivelPeligro") || 0;
+    // (v0.20.0) Nivel de peligro de la escena. (v0.21.0) Mecánica global 0–15 (`module/peligro.mjs`):
+    // efectos activos y contador de abalorios jugados hacia la siguiente subida.
+    const nivelPeligro = leerNivelPeligro();
+    const efectosPeligroActivos = listaEfectosPeligro(nivelPeligro);
+    const abaloriosPeligro = Math.floor(Number(game.settings.get("cartas-y-dados", "abaloriosPeligro")) || 0);
     const presetsDificultad = PanelMasterApp.#leerPresetsDificultad().map((valor, indice) => ({
       valor,
       indice,
@@ -117,6 +123,10 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
       dificultadActual,
       presetsDificultad,
       nivelPeligro,
+      nivelPeligroMaximo: NIVEL_PELIGRO_MAXIMO,
+      efectosPeligroActivos,
+      abaloriosPeligro,
+      abaloriosPorNivel: ABALORIOS_POR_NIVEL_PELIGRO,
       personajes,
       pnjs
     };
@@ -223,7 +233,7 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
     const inputPeligro = this.element.querySelector(".cyd-gm-input-peligro");
     if (inputPeligro) {
       inputPeligro.addEventListener("change", async ev => {
-        await game.settings.set("cartas-y-dados", "nivelPeligro", Math.max(0, Math.floor(Number(ev.target.value) || 0)));
+        await fijarNivelPeligro(Number(ev.target.value) || 0, { motivo: "Decisión del Master." });
         this.render();
       });
     }
@@ -241,15 +251,14 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
   }
 
   /**
-   * (v0.20.0) Sube o baja el Nivel de peligro del encuentro (`data-delta`), mínimo 0. Lo usa el
-   * abalorio «Ritual de espíritu» (Brujo) para multiplicar las tiradas de su portador.
+   * (v0.20.0) Sube o baja el Nivel de peligro de la escena (`data-delta`). (v0.21.0) Entre 0 y 15,
+   * con aviso en el chat de los efectos de cada nivel alcanzado (`fijarNivelPeligro`).
    * @param {PointerEvent} event
    * @param {HTMLElement} target
    */
   static async #onAjustarPeligro(event, target) {
     const delta = Number(target.dataset.delta) || 0;
-    const actual = game.settings.get("cartas-y-dados", "nivelPeligro") || 0;
-    await game.settings.set("cartas-y-dados", "nivelPeligro", Math.max(0, actual + delta));
+    await fijarNivelPeligro(leerNivelPeligro() + delta, { motivo: delta > 0 ? "Decisión del Master." : "" });
     this.render();
   }
 
@@ -300,10 +309,31 @@ export class PanelMasterApp extends VentanaDinamicaMixin(HandlebarsApplicationMi
     this.render();
   }
 
+  /**
+   * Fin de Escena/Combate del grupo. (v0.21.0) Si hay Nivel de peligro o abalorios contados, pregunta
+   * si se reinicia (el peligro dura una escena; un fin de combate a mitad de escena puede conservarlo).
+   */
   static async #onFinCombateGrupo() {
+    const abalorios = Math.floor(Number(game.settings.get("cartas-y-dados", "abaloriosPeligro")) || 0);
+    let reiniciar = false;
+    if (leerNivelPeligro() > 0 || abalorios > 0) {
+      const respuesta = await DialogV2.wait({
+        ...opcionesDialogoSistema({ width: 400 }),
+        window: { title: "Fin de Escena · Nivel de peligro", icon: "fa-solid fa-skull" },
+        content: `<p>El Nivel de peligro es <strong>${leerNivelPeligro()}</strong> (${abalorios}/${ABALORIOS_POR_NIVEL_PELIGRO} abalorios jugados). ¿Termina la escena y se reinicia a 0?</p>`,
+        buttons: [
+          { action: "reiniciar", label: "Fin de escena: reiniciar a 0", icon: "fa-solid fa-rotate-left", default: true },
+          { action: "conservar", label: "Solo fin de combate: conservar", icon: "fa-solid fa-skull" }
+        ],
+        rejectClose: false
+      });
+      if (!respuesta) return;
+      reiniciar = respuesta === "reiniciar";
+    }
     for (const actor of game.actors.filter(a => a.type === "personaje")) {
       if (actor.system.pilasDocumentos?.mazo) await actor.finalizarAccionOCombate();
     }
+    if (reiniciar) await reiniciarPeligro();
     this.render();
   }
 

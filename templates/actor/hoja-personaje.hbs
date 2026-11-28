@@ -92,7 +92,7 @@
           <meter class="cyd-barra-salud {{barraSalud.estado}}" min="0" max="{{barraSalud.maximo}}" value="{{barraSalud.valor}}" aria-label="Salud" data-tooltip="Salud: {{barraSalud.valor}} / {{barraSalud.maximo}} ({{barraSalud.porcentaje}} %)"></meter>
         </div>
 
-        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo/Raza: +{{system.bonificadorDefensa}}{{#if system.bonoDefensaRaza}} (Rasgo racial: +{{system.bonoDefensaRaza}}){{/if}} | Total: {{system.defensaTotal}}">
+        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo/Raza: +{{system.bonificadorDefensa}}{{#if system.bonoDefensaRaza}} (Rasgo racial: +{{system.bonoDefensaRaza}}){{/if}}{{#if system.reduccionDefensaPeligro}} | Nivel de peligro: −{{system.reduccionDefensaPeligro}}{{/if}} | Total: {{system.defensaTotal}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Defensa</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" aria-label="Defensa base" />
@@ -163,7 +163,7 @@
 
       {{!-- ================= MOVIMIENTO Y TAMAÑO (v0.13.1: fila compacta bajo las Características) ================= --}}
       <div class="cyd-rejilla-sidebar cyd-rejilla-movimiento">
-        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.velocidadMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Movimiento · Base editable / Total. Total = Base + (Físico Total × 5) metros{{#if system.agotamiento.efectos.velocidadMitad}} | Agotamiento: {{system.movimiento.maxSinAgotamiento}} ÷ 2{{/if}}">
+        <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.velocidadMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Movimiento · Base editable / Total. Total = Base + (Físico Total × 5) metros{{#if system.movimiento.bonoPeligro}} | Nivel de peligro: +{{system.movimiento.bonoPeligro}} m{{/if}}{{#if system.agotamiento.efectos.velocidadMitad}} | Agotamiento: {{system.movimiento.maxSinAgotamiento}} ÷ 2{{/if}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-person-running"></i> Mov. (m)</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" aria-label="Movimiento base" />

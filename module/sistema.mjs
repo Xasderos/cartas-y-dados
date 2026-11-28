@@ -24,6 +24,7 @@ import { HojaPnjActor } from "./applications/npc-sheet.mjs";
 import { personalizarBannerPausa } from "./applications/game-pause.mjs";
 import { opcionesDialogoSistema, registrarReajusteEnResize } from "./applications/ventana-dinamica.mjs";
 import { activarBotonesTiradaPendiente, registrarSocketDados } from "./dados.mjs";
+import { efectosPeligro, registrarSocketPeligro } from "./peligro.mjs";
 import { leerTamanoBase, registrarAjustesDelSistema } from "./settings.mjs";
 import { limpiarNombreCarta, nombreVisibleCarta, tieneRasgoRacial } from "./config.mjs";
 
@@ -42,6 +43,13 @@ Hooks.once("init", () => {
     for (const actor of game.actors ?? []) {
       actor.prepareData();
       if (actor.sheet?.rendered) actor.sheet.render();
+    }
+    // (v0.21.0) Los Actores sintéticos de Tokens no vinculados también dependen de ajustes
+    // globales como el Nivel de peligro (Defensa y Movimiento).
+    for (const token of canvas?.tokens?.placeables ?? []) {
+      if (token.document?.actorLink || !token.actor) continue;
+      token.actor.prepareData();
+      if (token.actor.sheet?.rendered) token.actor.sheet.render();
     }
     if (PanelMasterApp.instancia?.rendered) PanelMasterApp.instancia.render();
   });
@@ -165,6 +173,7 @@ Hooks.once("ready", async () => {
   registrarReajusteEnResize();
   // Crítico/Pifia y privacidad de ataques (v0.11.0): mensajes solo Master pedidos por jugadores.
   registrarSocketDados();
+  registrarSocketPeligro(); // (v0.21.0) Nivel de peligro: peticiones de los jugadores al Master
   registrarSocketAltaScentia(); // (v0.16.0) Monóculo indiscreto
 
   // (v0.14.1) El ajuste "tamanoBase" guardaba índices ("0".."4"): se convierte al nombre del tamaño.
@@ -843,7 +852,8 @@ Hooks.on("updateActor", (actor, changes, options, userId) => {
  * (`CONFIG.specialStatusEffects.DEFEATED`, "dead" por defecto) con la Salud:
  * - Salud ≤ 0 → aplica el estado (superpuesto al Token). El Combatiente queda derrotado
  *   (`Combatant#isDefeated` lo lee de los estados del Actor).
- * - Salud > 0 → lo retira, salvo que el Actor esté muerto por Agotamiento 8.
+ * - Salud > 0 → lo retira, salvo que el Actor esté muerto por Agotamiento 8 o (v0.21.0) haya
+ *   caído con Nivel de peligro 10+ (`flags.cartas-y-dados.muertePermanente`: no vuelve a la vida).
  * Solo en el cliente que hizo el cambio, para no duplicar la operación.
  */
 Hooks.on("updateActor", (actor, changes, options, userId) => {
@@ -854,9 +864,20 @@ Hooks.on("updateActor", (actor, changes, options, userId) => {
   const estadoMuerte = CONFIG.specialStatusEffects?.DEFEATED ?? "dead";
   const salud = Number(actor.system.salud?.value) || 0;
   const muerto = actor.statuses?.has(estadoMuerte) ?? false;
+  const muertePermanente = Boolean(actor.getFlag("cartas-y-dados", "muertePermanente"));
   let activar = null;
   if (salud <= 0 && !muerto) activar = true;
-  else if (salud > 0 && muerto && !actor.system.agotamiento?.muerto) activar = false;
+  else if (salud > 0 && muerto && !actor.system.agotamiento?.muerto && !muertePermanente) activar = false;
+
+  // (v0.21.0) Nivel de peligro 10: caer a 0 de Salud es muerte permanente.
+  if (salud <= 0 && !muertePermanente && efectosPeligro().muertePermanente) {
+    actor.setFlag("cartas-y-dados", "muertePermanente", true)
+      .then(() => ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<div class="cyd-alerta-cansancio cyd-alerta-peligro"><h4><i class="fa-solid fa-skull"></i> Muerte permanente</h4><p><strong>${foundry.utils.escapeHTML(actor.name)}</strong> cae a 0 de Salud con Nivel de peligro 10 o más: su esencia se pierde en un torbellino de magia caótica y no puede volver a la vida por ningún medio.</p></div>`
+      }))
+      .catch(error => console.warn("[Cartas y Dados] No se pudo marcar la muerte permanente", error));
+  }
   if (activar === null) return;
 
   actor.toggleStatusEffect(estadoMuerte, { active: activar, overlay: true })

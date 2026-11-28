@@ -64,7 +64,7 @@
           </div>
         </div>
 
-        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo: +{{system.bonificadorDefensa}} | Total: {{system.defensaTotal}}">
+        <div class="cyd-recurso-caja" data-tooltip="Defensa Base: {{system.defensa}} | Bono Equipo: +{{system.bonificadorDefensa}}{{#if system.reduccionDefensaPeligro}} | Nivel de peligro: −{{system.reduccionDefensaPeligro}}{{/if}} | Total: {{system.defensaTotal}}">
           <span class="cyd-recurso-titulo"><i class="fa-solid fa-shield-halved"></i> Defensa</span>
           <div class="cyd-recurso-inputs">
             <input type="number" name="system.defensa" value="{{system.defensa}}" min="0" />
@@ -179,7 +179,7 @@
           <h3><i class="fa-solid fa-shoe-prints"></i> Movimiento y Tamaño</h3>
         </div>
         <div class="cyd-recursos-barra cyd-cols-2">
-          <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.velocidadMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base de Movimiento editable en esta ficha. El Total se calcula automáticamente: Base + (Físico Total × 5) metros{{#if system.agotamiento.efectos.velocidadMitad}} | Agotamiento: {{system.movimiento.maxSinAgotamiento}} ÷ 2{{/if}}">
+          <div class="cyd-recurso-caja{{#if system.agotamiento.efectos.velocidadMitad}} cyd-afectado-agotamiento{{/if}}" data-tooltip="Base de Movimiento editable en esta ficha. El Total se calcula automáticamente: Base + (Físico Total × 5) metros{{#if system.movimiento.bonoPeligro}} | Nivel de peligro: +{{system.movimiento.bonoPeligro}} m{{/if}}{{#if system.agotamiento.efectos.velocidadMitad}} | Agotamiento: {{system.movimiento.maxSinAgotamiento}} ÷ 2{{/if}}">
             <span class="cyd-recurso-titulo"><i class="fa-solid fa-person-running"></i> Movimiento · Base / Total</span>
             <div class="cyd-recurso-inputs">
               <input type="number" name="system.movimiento.base" value="{{system.movimiento.base}}" min="0" />

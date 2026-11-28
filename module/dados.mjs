@@ -21,6 +21,7 @@
  */
 
 import { leerAjuste } from "./settings.mjs";
+import { efectosPeligro } from "./peligro.mjs";
 
 /**
  * @typedef {Object} ResultadoTiradaSistema
@@ -36,7 +37,13 @@ import { leerAjuste } from "./settings.mjs";
  * @property {number} totalSinAgotamiento - Total antes de la reducción por Agotamiento.
  * @property {number} multiplicador - (v0.20.0, Ritual de espíritu) Factor aplicado al resultado (1 = ninguno).
  * @property {string} formula - Fórmula base legible ("3d6 + 2").
- * @property {number} cantidadDados - Nº de dados lanzados (para repetir la tirada, v0.13.0).
+ * @property {number} cantidadDados - Nº de dados pedidos, SIN los del Nivel de peligro (para repetir
+ *   la tirada, v0.13.0: la repetición vuelve a sumar los dados del peligro vigente).
+ * @property {number} dadosPeligro - (v0.21.0) Dados añadidos por el Nivel de peligro (Nv. 1 y 4).
+ * @property {number} nivelPeligro - (v0.21.0) Nivel de peligro con el que se lanzó la tirada.
+ * @property {number} umbralCritico - (v0.21.0) Valor mínimo de un dado para ser Crítico.
+ * @property {number[]} resultadosCritico2 - (v0.21.0, peligro 8) Segunda repetición de los dados de
+ *   Crítico que volvieron a ser críticos (ya incluidos en `resultadosCritico`).
  * @property {string} tipoDado - Dado lanzado ("d6").
  * @property {number} bono - Bonificador plano aplicado.
  * @property {string[]} mensajesPendientes - (v0.14.1) Ids de las tarjetas de tirada pendiente
@@ -75,19 +82,29 @@ function valoresDados(roll) {
  * @param {string} [opciones.motivoFijo=""] - (v0.17.0) Texto del desglose para el resultado fijo.
  * @param {number} [opciones.multiplicador=1] - (v0.20.0, Brujo · Ritual de espíritu) El resultado final
  *   (tras la mitad por Agotamiento) se multiplica por este valor, también si es negativo. 0 o 1 = sin efecto.
+ * @param {boolean} [opciones.dadosPeligro=true] - (v0.21.0) Sumar los dados extra del Nivel de peligro
+ *   (Nv. 1 y 4). En una tirada combinada solo los recibe la parte principal: pasar `false` en las
+ *   demás (Ataque apuntado, Potenciar, cartas de Descarga elemental...). El resto de efectos del
+ *   peligro (umbral de Crítico, Pifia de un dado, doble Crítico) se aplican siempre.
  * @returns {Promise<ResultadoTiradaSistema>} En modo manual, no se resuelve hasta que se pulsan
  *   los botones de Crítico/Pifia de la tarjeta.
  */
 export async function tirarDadosSistema({
   cantidadDados, tipoDado, bono = 0, rollData = {}, mitadPorAgotamiento = false, parcial = false,
-  speaker = null, titulo = "", resultadoFijo = null, motivoFijo = "", multiplicador = 1
+  speaker = null, titulo = "", resultadoFijo = null, motivoFijo = "", multiplicador = 1, dadosPeligro = true
 }) {
-  const n = Math.max(1, Math.floor(Number(cantidadDados) || 1));
+  const nPedidos = Math.max(1, Math.floor(Number(cantidadDados) || 1));
   const caras = Math.max(2, Number(String(tipoDado ?? "d6").replace(/^d/i, "")) || 6);
   const bonoNum = Number(bono) || 0;
   if (resultadoFijo !== null && resultadoFijo !== undefined) {
-    return tiradaResultadoFijo(Number(resultadoFijo) || 0, { n, caras, motivo: motivoFijo });
+    return tiradaResultadoFijo(Number(resultadoFijo) || 0, { n: nPedidos, caras, motivo: motivoFijo });
   }
+  // (v0.21.0) Nivel de peligro: dados extra, umbral de Crítico, Pifia de un dado y doble Crítico.
+  const peligro = efectosPeligro();
+  const extraPeligro = dadosPeligro ? peligro.dadosExtra : 0;
+  const n = nPedidos + extraPeligro;
+  const umbralCritico = Math.max(2, caras - peligro.margenCritico);
+  const esCriticoValor = v => v >= umbralCritico;
 
   const tiradaBase = await new Roll(`${n}d${caras}`, rollData).evaluate();
   const rolls = [tiradaBase];
@@ -99,11 +116,13 @@ export async function tirarDadosSistema({
   for (const s of sustituciones) resultadosBase[s.indice] = s.despues;
   const sumaBase = resultadosBase.reduce((a, b) => a + b, 0);
 
-  // Crítico: una única repetición por cada dado máximo (sin encadenar).
-  const maximos = resultadosBase.filter(v => v === caras).length;
+  // Crítico: una única repetición por cada dado máximo (sin encadenar). (v0.21.0) Con peligro 5,
+  // también desde uno menos del máximo; con peligro 8, la repetición crítica se repite una vez más.
+  const maximos = resultadosBase.filter(esCriticoValor).length;
   // Pifia: al menos la mitad de los dados base en 1 → se repiten esos dados y se restan.
+  // (v0.21.0) Con peligro 6 basta un solo dado en 1.
   const minimos = resultadosBase.filter(v => v === 1).length;
-  const esPifia = minimos > 0 && minimos * 2 >= n;
+  const esPifia = minimos > 0 && (peligro.pifiaUnDado || minimos * 2 >= n);
 
   // Modo manual (ajuste `modoCriticosPifias`): la tarjeta se publica con los dados base y
   // botones para lanzar el Crítico y/o la Pifia; la tirada continúa al pulsarlos.
@@ -111,31 +130,43 @@ export async function tirarDadosSistema({
   const pendiente = (maximos > 0 || esPifia) && leerAjuste("modoCriticosPifias", "automatico") === "manual"
     ? await crearTarjetaPendiente({
       speaker: speaker ?? ChatMessage.getSpeaker(), titulo, tiradaBase, resultadosBase,
-      formula: `${n}d${caras}`, caras, maximos, minimos, n
+      formula: `${n}d${caras}`, caras, maximos, minimos, n, esPifia, umbralCritico
     })
     : null;
 
   /**
    * Lanza las repeticiones de Crítico o Pifia (esperando antes al clic en modo manual).
-   * @param {"critico"|"pifia"} tipo
+   * @param {"critico"|"critico2"|"pifia"} tipo
    * @param {number} cantidad
+   * @param {Function|null} [siguiente=null] - (v0.21.0) Recibe la `Roll` y devuelve cuántos dados
+   *   necesitan otra ronda (`critico2`); en modo manual la tarjeta muestra su botón.
    * @returns {Promise<Roll|null>}
    */
-  const repetir = async (tipo, cantidad) => {
+  const repetir = async (tipo, cantidad, siguiente = null) => {
     if (cantidad <= 0) return null;
     if (pendiente) await pendiente.esperar(tipo);
     const roll = await new Roll(`${cantidad}d${caras}`).evaluate();
-    if (pendiente) await pendiente.mostrar(tipo, roll);
+    if (pendiente) await pendiente.mostrar(tipo, roll, siguiente ? siguiente(roll) : 0);
     return roll;
   };
+  /** (v0.21.0, peligro 8) Dados de la primera repetición de Crítico que vuelven a ser críticos. */
+  const criticosEncadenados = roll => peligro.rondasCritico > 1 ? valoresDados(roll).filter(esCriticoValor).length : 0;
+  /** Crítico completo: primera repetición y, con peligro 8, la segunda. */
+  const repetirCriticos = async () => {
+    const primera = await repetir("critico", maximos, criticosEncadenados);
+    const segunda = primera ? await repetir("critico2", criticosEncadenados(primera)) : null;
+    return [primera, segunda];
+  };
   // En modo manual ambos botones pueden pulsarse en cualquier orden.
-  const [tiradaCritico, tiradaPifia] = await Promise.all([
-    repetir("critico", maximos),
+  const [[tiradaCritico, tiradaCritico2], tiradaPifia] = await Promise.all([
+    repetirCriticos(),
     repetir("pifia", esPifia ? minimos : 0)
   ]);
   if (tiradaCritico) rolls.push(tiradaCritico);
+  if (tiradaCritico2) rolls.push(tiradaCritico2);
   if (tiradaPifia) rolls.push(tiradaPifia);
-  const resultadosCritico = valoresDados(tiradaCritico);
+  const resultadosCritico2 = valoresDados(tiradaCritico2);
+  const resultadosCritico = [...valoresDados(tiradaCritico), ...resultadosCritico2];
   const resultadosPifia = valoresDados(tiradaPifia);
   const sumaCritico = resultadosCritico.reduce((a, b) => a + b, 0);
   const sumaPifia = resultadosPifia.reduce((a, b) => a + b, 0);
@@ -164,14 +195,20 @@ export async function tirarDadosSistema({
     multiplicador: factor,
     totalTrasMitad,
     formula,
-    cantidadDados: n,
+    cantidadDados: nPedidos,
+    dadosPeligro: extraPeligro,
+    nivelPeligro: peligro.nivel,
+    umbralCritico,
+    resultadosCritico2,
     tipoDado: `d${caras}`,
     bono: bonoNum,
     mensajesPendientes: pendiente ? [pendiente.mensajeId] : [],
     sustituciones,
     html: ""
   };
-  resultado.html = htmlDetalleTirada(resultado, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial });
+  resultado.html = htmlDetalleTirada(resultado, {
+    n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial, pifiaUnDado: peligro.pifiaUnDado
+  });
   return resultado;
 }
 
@@ -199,6 +236,10 @@ async function tiradaResultadoFijo(valor, { n, caras, motivo }) {
     totalTrasMitad: valor,
     formula: String(valor),
     cantidadDados: n,
+    dadosPeligro: 0,
+    nivelPeligro: 0,
+    umbralCritico: caras,
+    resultadosCritico2: [],
     tipoDado: `d${caras}`,
     bono: 0,
     mensajesPendientes: [],
@@ -245,19 +286,28 @@ async function pedirSustitucionesDados({ speaker, resultadosBase, caras, titulo 
  * @param {Object} d - Datos intermedios del cálculo.
  * @returns {string}
  */
-function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial = false }) {
+function htmlDetalleTirada(t, { n, caras, maximos, minimos, bonoNum, apuntado, sumaCritico, sumaPifia, parcial = false, pifiaUnDado = false }) {
   const lista = valores => `[${valores.join(", ")}]`;
   const lineas = [];
+
+  if (t.dadosPeligro > 0) {
+    // (v0.21.0) Nivel de peligro 1 y 4.
+    lineas.push(`<p class="cyd-tirada-peligro"><i class="fa-solid fa-skull"></i> <strong>PELIGRO ${t.nivelPeligro}</strong> · +${t.dadosPeligro} dado(s) por el Nivel de peligro</p>`);
+  }
 
   if (t.sustituciones?.length) {
     const cambios = t.sustituciones.map(s => `dado ${s.indice + 1}: ${s.antes} → ${s.despues}`).join(" · ");
     lineas.push(`<p class="cyd-tirada-embotellado"><i class="fa-solid fa-hourglass-start"></i> <strong>TIEMPO EMBOTELLADO</strong> · ${cambios}</p>`);
   }
   if (t.esCritico) {
-    lineas.push(`<p class="cyd-tirada-critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO</strong> · ${maximos} dado(s) al máximo (${caras}) se repiten: ${lista(t.resultadosCritico)} <strong>+${sumaCritico}</strong></p>`);
+    // (v0.21.0) Peligro 5: umbral de Crítico uno menos; peligro 8: segunda repetición.
+    const textoUmbral = t.umbralCritico < caras ? `${t.umbralCritico} o más, Nivel de peligro` : caras;
+    const primera = t.resultadosCritico.slice(0, t.resultadosCritico.length - (t.resultadosCritico2?.length ?? 0));
+    const segunda = t.resultadosCritico2?.length ? ` · vuelven a ser críticos y se repiten otra vez: ${lista(t.resultadosCritico2)}` : "";
+    lineas.push(`<p class="cyd-tirada-critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO</strong> · ${maximos} dado(s) al máximo (${textoUmbral}) se repiten: ${lista(primera)}${segunda} <strong>+${sumaCritico}</strong></p>`);
   }
   if (t.esPifia) {
-    lineas.push(`<p class="cyd-tirada-pifia"><i class="fa-solid fa-skull-crossbones"></i> <strong>PIFIA</strong> · ${minimos} de ${n} dado(s) en 1; resultado apuntado ${apuntado}, se repiten: ${lista(t.resultadosPifia)} <strong>−${sumaPifia}</strong></p>`);
+    lineas.push(`<p class="cyd-tirada-pifia"><i class="fa-solid fa-skull-crossbones"></i> <strong>PIFIA</strong> · ${minimos} de ${n} dado(s) en 1${pifiaUnDado && minimos * 2 < n ? " (basta uno por el Nivel de peligro)" : ""}; resultado apuntado ${apuntado}, se repiten: ${lista(t.resultadosPifia)} <strong>−${sumaPifia}</strong></p>`);
   }
   if (t.mitadPorAgotamiento) {
     lineas.push(`<p class="cyd-tirada-agotamiento"><i class="fa-solid fa-hourglass-half"></i> <strong>AGOTAMIENTO</strong> · resultado a la mitad: ${t.totalSinAgotamiento} → <strong>${t.totalTrasMitad}</strong></p>`);
@@ -351,8 +401,9 @@ export function combinarTiradas(partes, { mitad = false, motivoMitad = "" } = {}
  * @typedef {Object} TarjetaPendiente
  * @property {string} mensajeId - Id del `ChatMessage` de la tirada pendiente.
  * @property {(tipo: "critico"|"pifia") => Promise<void>} esperar - Se resuelve al pulsar el botón.
- * @property {(tipo: "critico"|"pifia", roll: Roll) => Promise<void>} mostrar - Muestra los dados
- *   lanzados (Dice So Nice o sonido) y actualiza la tarjeta.
+ * @property {(tipo: "critico"|"critico2"|"pifia", roll: Roll, siguientes?: number) => Promise<void>} mostrar -
+ *   Muestra los dados lanzados (Dice So Nice o sonido) y actualiza la tarjeta. `siguientes` (v0.21.0):
+ *   dados que necesitan la segunda repetición de Crítico (activa su botón).
  */
 
 /**
@@ -370,9 +421,10 @@ const TIRADAS_PENDIENTES = new Map();
  * @param {Object} datos
  * @returns {Promise<TarjetaPendiente>}
  */
-async function crearTarjetaPendiente({ speaker, titulo, tiradaBase, resultadosBase, formula, caras, maximos, minimos, n }) {
-  const info = { titulo, formula, resultadosBase, caras, maximos, minimos, n };
-  const estado = { critico: maximos > 0 ? true : null, pifia: minimos > 0 && minimos * 2 >= n ? true : null };
+async function crearTarjetaPendiente({ speaker, titulo, tiradaBase, resultadosBase, formula, caras, maximos, minimos, n, esPifia, umbralCritico }) {
+  const info = { titulo, formula, resultadosBase, caras, maximos, minimos, n, umbralCritico, maximos2: 0 };
+  // (v0.21.0) `critico2`: segunda repetición de Crítico (Nivel de peligro 8), se activa tras la primera.
+  const estado = { critico: maximos > 0 ? true : null, critico2: null, pifia: esPifia ? true : null };
   const mensaje = await ChatMessage.create({
     speaker,
     content: htmlTarjetaPendiente(info, estado),
@@ -386,11 +438,15 @@ async function crearTarjetaPendiente({ speaker, titulo, tiradaBase, resultadosBa
   return {
     mensajeId: mensaje.id,
     esperar: tipo => new Promise(resolve => { registro.resolutores[tipo] = resolve; }),
-    mostrar: async (tipo, roll) => {
+    mostrar: async (tipo, roll, siguientes = 0) => {
       if (game.dice3d) await game.dice3d.showForRoll(roll, game.user, true);
       else foundry.audio.AudioHelper.play({ src: CONFIG.sounds.dice }, false);
       estado[tipo] = valoresDados(roll);
-      if (estado.critico !== true && estado.pifia !== true) TIRADAS_PENDIENTES.delete(mensaje.id);
+      if (tipo === "critico" && siguientes > 0) {
+        estado.critico2 = true;
+        info.maximos2 = siguientes;
+      }
+      if (![estado.critico, estado.critico2, estado.pifia].includes(true)) TIRADAS_PENDIENTES.delete(mensaje.id);
       const actual = game.messages.get(mensaje.id);
       if (!actual?.getFlag("cartas-y-dados", "pendiente")) return;
       await actual.update({
@@ -408,14 +464,21 @@ async function crearTarjetaPendiente({ speaker, titulo, tiradaBase, resultadosBa
  * @param {{critico: (true|number[]|null), pifia: (true|number[]|null)}} estado
  * @returns {string}
  */
-function htmlTarjetaPendiente({ titulo, formula, resultadosBase, caras, maximos, minimos, n }, estado) {
+function htmlTarjetaPendiente({ titulo, formula, resultadosBase, caras, maximos, minimos, n, umbralCritico = caras, maximos2 = 0 }, estado) {
   const lista = valores => `[${valores.join(", ")}]`;
   const suma = valores => valores.reduce((a, b) => a + b, 0);
   const lineas = [];
+  const textoUmbral = umbralCritico < caras ? `${umbralCritico} o más` : caras;
   if (estado.critico === true) {
-    lineas.push(`<p class="cyd-tirada-critico" data-cyd-pendiente="critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO</strong> · ${maximos} dado(s) al máximo (${caras}): falta lanzar ${maximos}d${caras}.</p>`);
+    lineas.push(`<p class="cyd-tirada-critico" data-cyd-pendiente="critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO</strong> · ${maximos} dado(s) al máximo (${textoUmbral}): falta lanzar ${maximos}d${caras}.</p>`);
   } else if (Array.isArray(estado.critico)) {
     lineas.push(`<p class="cyd-tirada-critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO</strong> · se repiten: ${lista(estado.critico)} <strong>+${suma(estado.critico)}</strong></p>`);
+  }
+  // (v0.21.0) Nivel de peligro 8: segunda repetición de los dados de Crítico que vuelven a ser críticos.
+  if (estado.critico2 === true) {
+    lineas.push(`<p class="cyd-tirada-critico" data-cyd-pendiente="critico2"><i class="fa-solid fa-star"></i> <strong>CRÍTICO (2.ª repetición, Nivel de peligro)</strong> · ${maximos2} dado(s) vuelven a ser críticos: falta lanzar ${maximos2}d${caras}.</p>`);
+  } else if (Array.isArray(estado.critico2)) {
+    lineas.push(`<p class="cyd-tirada-critico"><i class="fa-solid fa-star"></i> <strong>CRÍTICO (2.ª repetición)</strong> · se repiten: ${lista(estado.critico2)} <strong>+${suma(estado.critico2)}</strong></p>`);
   }
   if (estado.pifia === true) {
     lineas.push(`<p class="cyd-tirada-pifia" data-cyd-pendiente="pifia"><i class="fa-solid fa-skull-crossbones"></i> <strong>PIFIA</strong> · ${minimos} de ${n} dado(s) en 1: falta lanzar ${minimos}d${caras}.</p>`);
@@ -456,7 +519,9 @@ export function activarBotonesTiradaPendiente(message, html) {
     boton.className = "cyd-btn-tirada-pendiente";
     boton.innerHTML = tipo === "critico"
       ? '<i class="fa-solid fa-star"></i> Tirar Crítico'
-      : '<i class="fa-solid fa-skull-crossbones"></i> Tirar Pifia';
+      : tipo === "critico2"
+        ? '<i class="fa-solid fa-star"></i> Tirar Crítico (2.ª)'
+        : '<i class="fa-solid fa-skull-crossbones"></i> Tirar Pifia';
     boton.addEventListener("click", ev => {
       ev.preventDefault();
       const resolver = TIRADAS_PENDIENTES.get(message.id)?.resolutores?.[tipo];

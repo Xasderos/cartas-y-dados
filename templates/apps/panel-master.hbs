@@ -29,14 +29,15 @@
 
       <span class="cyd-gm-separador-vertical"></span>
 
-      {{!-- (v0.20.0) Nivel de peligro del encuentro: multiplica las tiradas con «Ritual de espíritu» (Brujo) --}}
-      <div class="cyd-gm-bloque" data-tooltip="Nivel de peligro del encuentro (0 = sin peligro). Multiplica las tiradas de quien tenga En Juego el abalorio «Ritual de espíritu»">
+      {{!-- (v0.20.0) Nivel de peligro de la escena. (v0.21.0) Mecánica global 0–15 con efectos acumulativos --}}
+      <div class="cyd-gm-bloque" data-tooltip="Nivel de peligro de la escena (0–{{nivelPeligroMaximo}}). Sus efectos se acumulan y afectan a todas las criaturas. Sube cada {{abaloriosPorNivel}} abalorios jugados y cada vez que un PNJ baraja su Mazo de Jefe; se reinicia con Fin Escena">
         <span class="cyd-gm-etiqueta"><i class="fa-solid fa-skull"></i> Peligro</span>
         <div class="cyd-gm-control-numero">
           <button type="button" class="cyd-gm-btn-icono" data-action="ajustarPeligro" data-delta="-1" data-tooltip="Reducir"><i class="fa-solid fa-minus"></i></button>
-          <input type="number" class="cyd-gm-input-dificultad cyd-gm-input-peligro" value="{{nivelPeligro}}" min="0" />
+          <input type="number" class="cyd-gm-input-dificultad cyd-gm-input-peligro" value="{{nivelPeligro}}" min="0" max="{{nivelPeligroMaximo}}" />
           <button type="button" class="cyd-gm-btn-icono" data-action="ajustarPeligro" data-delta="1" data-tooltip="Aumentar"><i class="fa-solid fa-plus"></i></button>
         </div>
+        <span class="cyd-gm-peligro-contador" data-tooltip="Abalorios jugados En Juego hacia la siguiente subida del Nivel de peligro"><i class="fa-solid fa-gem"></i> {{abaloriosPeligro}}/{{abaloriosPorNivel}}</span>
       </div>
 
       <span class="cyd-gm-separador-vertical"></span>
@@ -50,6 +51,15 @@
         </div>
       </div>
     </div>
+
+    {{!-- (v0.21.0) Efectos activos del Nivel de peligro (texto completo en el tooltip) --}}
+    {{#if efectosPeligroActivos.length}}
+      <div class="cyd-gm-peligro-efectos">
+        {{#each efectosPeligroActivos as |efecto|}}
+          <span class="cyd-gm-peligro-efecto" data-tooltip="Nv. {{efecto.nivel}}: {{efecto.texto}}"><i class="fa-solid {{efecto.icono}}"></i> {{efecto.nivel}}</span>
+        {{/each}}
+      </div>
+    {{/if}}
   </section>
 
   {{!-- Contenedor desplazable común a las dos cuadrículas (PJ y PNJ) --}}

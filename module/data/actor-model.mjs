@@ -7,6 +7,7 @@
 
 import { SISTEMA_CONFIG, abalorioDeTrinket, claveClaseDeItem, estadoAgotamiento, razaBaseDeActor } from "../config.mjs";
 import { CATEGORIAS_TAMANO, leerAjuste, leerTamanoBase } from "../settings.mjs";
+import { efectosPeligro } from "../peligro.mjs";
 
 const { TypeDataModel } = foundry.abstract;
 const { BooleanField, NumberField, SchemaField, StringField, HTMLField, ForeignDocumentField } = foundry.data.fields;
@@ -234,8 +235,14 @@ export class BaseActorDataModel extends TypeDataModel {
       misticismo: Math.max(1, this.caracteristicas.misticismo + bonosCaract.misticismo)
     };
 
+    // (v0.21.0) Nivel de peligro (global): −1 Defensa Total en los niveles 2 y 7 y +5 m de
+    // Movimiento en el nivel 3. Se recalcula al cambiar el ajuste `nivelPeligro` (sistema.mjs).
+    const peligro = efectosPeligro();
+    this.peligro = peligro;
+
     this.bonificadorDefensa = bonoDefensa;
-    this.defensaTotal = Math.max(0, this.defensa + bonoDefensa);
+    this.reduccionDefensaPeligro = peligro.reduccionDefensa;
+    this.defensaTotal = Math.max(0, this.defensa + bonoDefensa - peligro.reduccionDefensa);
 
     const nivelEfectivo = this.itemClase?.system.nivel ?? this.nivelClase ?? 1;
     this.nivelEfectivo = nivelEfectivo;
@@ -275,7 +282,8 @@ export class BaseActorDataModel extends TypeDataModel {
     const baseMov = Number.isFinite(Number(this.movimiento.base))
       ? Number(this.movimiento.base)
       : SISTEMA_CONFIG.movimientoBase;
-    this.movimiento.maxSinAgotamiento = baseMov + this.caracteristicasTotales.fisico * 5;
+    this.movimiento.bonoPeligro = peligro.movimientoExtra;
+    this.movimiento.maxSinAgotamiento = baseMov + this.caracteristicasTotales.fisico * 5 + peligro.movimientoExtra;
     // Agotamiento 2: velocidad a la mitad (hacia arriba, como el resto de reducciones).
     this.movimiento.max = agotamiento.efectos.velocidadMitad
       ? Math.ceil(this.movimiento.maxSinAgotamiento / 2)

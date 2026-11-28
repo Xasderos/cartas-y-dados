@@ -292,3 +292,40 @@
 .cyd-gm-sin-mazo i {
   color: var(--cyd-azul);
 }
+
+/* ======================================================================== */
+/*  NIVEL DE PELIGRO (v0.21.0)                                              */
+/* ======================================================================== */
+
+/* Contador de abalorios jugados hacia la siguiente subida */
+.cyd-gm-peligro-contador {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--cyd-texto-tenue);
+  white-space: nowrap;
+}
+
+/* Efectos activos: una etiqueta por nivel (texto completo en data-tooltip) */
+.cyd-gm-peligro-efectos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.cyd-gm-peligro-efecto {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--cyd-peligro) 55%, transparent);
+  border-radius: 3px;
+  cursor: help;
+}
+
+.cyd-gm-peligro-efecto i {
+  color: var(--cyd-peligro);
+}

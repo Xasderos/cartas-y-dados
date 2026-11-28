@@ -441,6 +441,18 @@ button.cyd-btn-tirada-pendiente .fa-skull-crossbones {
   color: var(--color-level-warning, #ee9b3a);
 }
 
+/* Nivel de peligro (v0.21.0): dados extra en el desglose de la tirada */
+.cyd-tirada-peligro i {
+  color: var(--cyd-peligro);
+}
+
+/* Nivel de peligro (v0.21.0): lista de efectos del aviso en el chat */
+.cyd-alerta-peligro ul i {
+  width: 1.1em;
+  text-align: center;
+  color: var(--cyd-peligro);
+}
+
 /* Lista de consecuencias de Agotamiento en el chat (v0.12.0) */
 .cyd-alerta-cansancio ul {
   margin: 4px 0 0;

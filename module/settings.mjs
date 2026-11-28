@@ -67,13 +67,26 @@ export function registrarAjustesDelSistema(onUpdateCallback = () => {}) {
     onChange: onUpdateCallback
   });
 
-  // 1b. (v0.20.0) Nivel de peligro del encuentro (Panel del Master). Lo usa el abalorio «Ritual de
-  // espíritu» (Brujo): multiplica todas las tiradas de su portador; 0 = sin efecto.
+  // 1b. (v0.20.0) Nivel de peligro de la escena (Panel del Master). (v0.21.0) Mecánica global
+  // 0–15 con efectos acumulativos (`module/peligro.mjs`); también lo usan «Ritual de espíritu» y
+  // «Flagelar esencia» (Brujo / Potens Mystica).
   game.settings.register(SYSTEM_ID, "nivelPeligro", {
     name: "Nivel de Peligro",
-    hint: "Peligro del encuentro actual (0 = sin peligro). El abalorio «Ritual de espíritu» multiplica por este valor las tiradas de su portador.",
+    hint: "Peligro de la escena actual (0–15). Sus efectos se acumulan y afectan a todas las criaturas; sube cada 3 abalorios jugados y cada vez que el Master baraja su mazo. Se reinicia con «Fin Escena» en el Panel del Master.",
     scope: "world",
     config: true,
+    type: Number,
+    range: { min: 0, max: 15, step: 1 },
+    default: 0,
+    onChange: onUpdateCallback
+  });
+
+  // 1c. (v0.21.0) Abalorios jugados En Juego desde la última subida del Nivel de peligro (0–2).
+  //     Oculto: se muestra en el Panel del Master.
+  game.settings.register(SYSTEM_ID, "abaloriosPeligro", {
+    name: "Abalorios jugados (Nivel de peligro)",
+    scope: "world",
+    config: false,
     type: Number,
     default: 0,
     onChange: onUpdateCallback
